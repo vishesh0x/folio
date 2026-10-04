@@ -1,0 +1,9 @@
+# Copy to `.dev.vars` for local development. NEVER commit `.dev.vars`.
+# For production run:  npx wrangler secret put ADMIN_SETUP_TOKEN
+
+# One-time token required to create the first (and only) admin account at /auth.
+# Generate one with:  openssl rand -base64 32
+ADMIN_SETUP_TOKEN="change-me-to-a-long-random-string"
+
+# Optional: Turnstile *secret* key (pair with TURNSTILE_SITE_KEY in wrangler.jsonc).
+# TURNSTILE_SECRET_KEY=""

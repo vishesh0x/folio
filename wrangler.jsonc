@@ -1,0 +1,34 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "folio",
+  "main": "src/server.ts",
+  "compatibility_date": "2026-09-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": { "enabled": true },
+
+  // Public, non-secret configuration. Secrets go in `.dev.vars` (local) or
+  // `wrangler secret put` (production) — see README.
+  "vars": {
+    // Canonical origin used for sitemap, canonical URLs and Open Graph tags.
+    // Leave empty to fall back to the request origin.
+    "SITE_URL": "https://visheshraghuvanshi.in",
+    // Optional: Cloudflare Turnstile *site* key to protect the contact form.
+    "TURNSTILE_SITE_KEY": "0x4AAAAAAFNLlH_NrctHUs4o"
+  },
+
+  // D1: content, sessions, inbox, asset metadata.
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "folio-db",
+      "database_id": "d7c1c6a2-28c2-40f8-87a6-0e240b0750c2",
+      "migrations_dir": "drizzle/migrations"
+    }
+  ],
+
+  // R2: original, un-transformed uploads (private bucket, served via /media).
+  "r2_buckets": [{ "binding": "MEDIA", "bucket_name": "folio-media" }],
+
+  // Cloudflare Images binding: resize / convert (AVIF, WebP) on the fly.
+  "images": { "binding": "IMAGES" }
+}
