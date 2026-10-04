@@ -3,6 +3,7 @@ import { useSuspenseQuery } from "@tanstack/react-query";
 import { ArrowRight, MapPin } from "lucide-react";
 import { Img } from "@/components/Img";
 import { Markdown } from "@/components/Markdown";
+import { RevealContact } from "@/components/RevealContact";
 import { SafeLink } from "@/components/SafeLink";
 import { ProjectCard } from "@/components/site/ProjectCard";
 import { jsonLd, nowQuery, pageSeo, projectsQuery, seoMeta, siteQuery } from "@/lib/queries";
@@ -184,10 +185,14 @@ function Home() {
             Let's make something <em className="text-primary">good</em>.
           </h2>
           <div className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-3 text-sm">
-            {cfg?.email && (
+            {cfg?.email ? (
               <a href={`mailto:${cfg.email}`} className="link-underline py-1 font-medium">
                 {cfg.email}
               </a>
+            ) : (
+              site.emailReveal && (
+                <RevealContact field="siteEmail" kind="email" siteKey={site.turnstileSiteKey} />
+              )
             )}
             {socials.map((s) => (
               <SafeLink

@@ -9,6 +9,51 @@ import {
 } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { isPrivacyMode, type PrivacyMode } from "@/lib/constants";
+
+const PRIVACY_HELP: Record<PrivacyMode, string> = {
+  reveal:
+    "Not in the page source. Visitors click “Show” to see it; bots that only read HTML never get it. Rate-limited, and checked with Turnstile when configured.",
+  public: "Shown as plain text. Easiest to read, but scrapers can harvest it.",
+  hidden: "Not shown anywhere on the site. People can still use the contact form.",
+};
+
+/** Who can see an email / phone number on the public site. */
+export function PrivacySelect({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: PrivacyMode) => void;
+}) {
+  const id = useId();
+  const mode: PrivacyMode = isPrivacyMode(value) ? value : "reveal";
+  return (
+    <div className="space-y-1.5">
+      <Label htmlFor={id}>{label}</Label>
+      <Select value={mode} onValueChange={(v) => isPrivacyMode(v) && onChange(v)}>
+        <SelectTrigger id={id}>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="reveal">Click to reveal (recommended)</SelectItem>
+          <SelectItem value="public">Visible to everyone</SelectItem>
+          <SelectItem value="hidden">Hidden</SelectItem>
+        </SelectContent>
+      </Select>
+      <p className="text-xs text-muted-foreground">{PRIVACY_HELP[mode]}</p>
+    </div>
+  );
+}
 
 export function PageHeader({
   title,

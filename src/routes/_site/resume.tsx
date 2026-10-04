@@ -48,7 +48,13 @@ function ResumePage() {
           )}
         </div>
       </div>
-      <ResumeView profile={data.profile} sections={data.sections} entries={data.entries} />
+      <ResumeView
+        profile={data.profile}
+        sections={data.sections}
+        entries={data.entries}
+        reveal={data.reveal}
+        siteKey={data.turnstileSiteKey}
+      />
     </div>
   );
 }

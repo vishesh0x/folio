@@ -58,6 +58,8 @@ export const siteConfig = sqliteTable(
     tagline: text("tagline").notNull().default(""),
     bio: text("bio").notNull().default(""),
     email: text("email").notNull().default(""),
+    /** `public` | `reveal` (click-to-reveal, not in page source) | `hidden`. */
+    emailPrivacy: text("email_privacy").notNull().default("reveal"),
     location: text("location").notNull().default(""),
     avatarUrl: text("avatar_url"),
     avatarAlt: text("avatar_alt").notNull().default(""),
@@ -158,6 +160,9 @@ export const resumeProfile = sqliteTable(
     headline: text("headline").notNull().default(""),
     email: text("email").notNull().default(""),
     phone: text("phone").notNull().default(""),
+    /** `public` | `reveal` | `hidden` — see site_config.email_privacy. */
+    emailPrivacy: text("email_privacy").notNull().default("reveal"),
+    phonePrivacy: text("phone_privacy").notNull().default("reveal"),
     location: text("location").notNull().default(""),
     website: text("website").notNull().default(""),
     summary: text("summary").notNull().default(""),
@@ -198,6 +203,8 @@ export const resumeEntries = sqliteTable(
       .$type<string[]>()
       .notNull()
       .default(sql`'[]'`),
+    /** Set when the entry was added from the Projects section (deleting the project keeps the entry). */
+    projectId: text("project_id").references(() => projects.id, { onDelete: "set null" }),
     sortOrder: integer("sort_order").notNull().default(0),
     createdAt: createdAt(),
   },

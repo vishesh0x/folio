@@ -2,11 +2,12 @@ import { Link, createFileRoute, redirect, useNavigate } from "@tanstack/react-ro
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { ThemedToaster } from "@/components/ThemedToaster";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { getAuthState, login, setupAdmin } from "@/lib/auth.functions";
 import { ThemeToggle } from "@/lib/theme";
-import { MIN_PASSWORD } from "@/lib/validators";
+import { MIN_PASSWORD } from "@/lib/constants";
 import { errMsg } from "@/components/dash/api";
 
 export const Route = createFileRoute("/auth")({
@@ -53,6 +54,7 @@ function AuthPage() {
       tabIndex={-1}
       className="flex min-h-screen items-center justify-center bg-background px-5"
     >
+      <ThemedToaster />
       <div className="absolute right-5 top-5">
         <ThemeToggle />
       </div>

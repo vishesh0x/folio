@@ -1,8 +1,7 @@
 import { queryOptions } from "@tanstack/react-query";
-import { mediaUrl } from "./images";
 import { getNow, getProject, getProjects, getResume, getSiteData } from "./public.functions";
 import type { PageSeo } from "./public.functions";
-import { absoluteUrl, mediaKeyFromUrl } from "./url";
+import { shareImage } from "./share-image";
 
 export const siteQuery = queryOptions({ queryKey: ["site"], queryFn: () => getSiteData() });
 export const projectsQuery = queryOptions({ queryKey: ["projects"], queryFn: () => getProjects() });
@@ -13,11 +12,7 @@ export const resumeQuery = queryOptions({ queryKey: ["resume"], queryFn: () => g
 
 type SeoInput = { title?: string | null; description?: string | null; image?: string | null };
 
-/** Social crawlers need an absolute URL, and prefer JPEG/PNG (our /media negotiates by Accept). */
-export function shareImage(url: string | null | undefined, origin: string): string | undefined {
-  const key = mediaKeyFromUrl(url);
-  return absoluteUrl(key ? mediaUrl(key, { w: 1280 }) : url, origin);
-}
+export { shareImage };
 
 /** JSON-LD must not be able to close its own <script> tag. */
 export const jsonLd = (data: unknown) => JSON.stringify(data).replace(/</g, "\\u003c");

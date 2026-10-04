@@ -1,4 +1,4 @@
-import { DEFAULT_QUALITY, IMAGE_WIDTHS, snapWidth } from "@/lib/images";
+import { DEFAULT_QUALITY, IMAGE_WIDTHS, snapIconSize, snapWidth } from "@/lib/images";
 import { isValidKey, pickOutputFormat, type OutputFormat } from "@/lib/media-core";
 import type { AppEnv } from "./env.server";
 
@@ -10,6 +10,8 @@ const IMMUTABLE = "public, max-age=31536000, immutable";
  *  - no `w`            → the original object from R2 (supports Range + ETag)
  *  - `w` on a raster   → resized + converted (AVIF/WebP/JPEG/PNG by Accept) by
  *                        the Cloudflare Images binding, cached at the edge.
+ *  - `w` + `f=png`     → an icon-sized PNG (favicons / app icons): fixed sizes, and always
+ *                        PNG so the `<link rel="icon" type="image/png">` we emit is truthful.
  *
  * Keys are unique per upload and never overwritten, so everything is served
  * `immutable`. Deleting an asset removes the R2 object; stale edge copies
@@ -34,9 +36,10 @@ export async function handleMedia(
 
   const wParam = url.searchParams.get("w");
   const requestedWidth = wParam ? Number.parseInt(wParam, 10) : 0;
+  const asIcon = url.searchParams.get("f") === "png";
 
   if (requestedWidth > 0) {
-    const transformed = await serveVariant(request, env, ctx, key, requestedWidth);
+    const transformed = await serveVariant(request, env, ctx, key, requestedWidth, asIcon);
     if (transformed) return transformed;
     // Not transformable (pdf/gif/ico) or Images unavailable → fall through to original.
   }
@@ -83,8 +86,11 @@ async function serveVariant(
   ctx: { waitUntil(p: Promise<unknown>): void },
   key: string,
   requestedWidth: number,
+  asIcon = false,
 ): Promise<Response | null> {
-  const width = snapWidth(Math.min(requestedWidth, IMAGE_WIDTHS[IMAGE_WIDTHS.length - 1]!));
+  const width = asIcon
+    ? snapIconSize(requestedWidth)
+    : snapWidth(Math.min(requestedWidth, IMAGE_WIDTHS[IMAGE_WIDTHS.length - 1]!));
 
   // Cheap metadata check first so PDFs/GIFs skip the transform path entirely.
   const head = await env.MEDIA.head(key);
@@ -92,17 +98,20 @@ async function serveVariant(
   const sourceMime = head.httpMetadata?.contentType ?? "";
   if (!/^image\/(png|jpeg|webp|avif)$/.test(sourceMime)) return null;
 
-  const format: OutputFormat = pickOutputFormat(request.headers.get("accept"), sourceMime);
+  const format: OutputFormat = asIcon
+    ? "image/png"
+    : pickOutputFormat(request.headers.get("accept"), sourceMime);
 
   // Cache key is independent of the Accept header string; it varies on the
   // *chosen* format, so one entry per (key, width, format).
   const cacheUrl = new URL(request.url);
-  cacheUrl.search = `?w=${width}&f=${format.split("/")[1]}`;
+  // Quality is part of the key so changing DEFAULT_QUALITY doesn't serve stale variants.
+  cacheUrl.search = `?w=${width}&f=${format.split("/")[1]}&q=${DEFAULT_QUALITY}`;
   const cacheKey = new Request(cacheUrl.toString(), { method: "GET" });
   const cache = (caches as unknown as { default: Cache }).default;
 
   const hit = await cache.match(cacheKey);
-  if (hit) return withVariantHeaders(hit, format, request.method === "HEAD");
+  if (hit) return withVariantHeaders(hit, asIcon, request.method === "HEAD");
 
   const obj = await env.MEDIA.get(key);
   if (!obj) return notFound();
@@ -118,7 +127,7 @@ async function serveVariant(
     headers.set("Content-Type", out.contentType());
     const cacheable = new Response(response.body, { status: 200, headers });
     ctx.waitUntil(cache.put(cacheKey, cacheable.clone()));
-    return withVariantHeaders(cacheable, format, request.method === "HEAD");
+    return withVariantHeaders(cacheable, asIcon, request.method === "HEAD");
   } catch (err) {
     // Images binding unavailable / failed → serve the original instead of a broken image.
     console.error("image transform failed", key, err);
@@ -126,9 +135,11 @@ async function serveVariant(
   }
 }
 
-function withVariantHeaders(res: Response, _format: OutputFormat, head: boolean): Response {
+function withVariantHeaders(res: Response, fixedFormat: boolean, head: boolean): Response {
   const headers = new Headers(res.headers);
-  headers.set("Vary", "Accept");
+  // Icon variants are always PNG, so they must not fragment caches by Accept.
+  if (fixedFormat) headers.delete("Vary");
+  else headers.set("Vary", "Accept");
   headers.set("X-Content-Type-Options", "nosniff");
   headers.set("Cross-Origin-Resource-Policy", "cross-origin");
   return new Response(head ? null : res.body, { status: res.status, headers });

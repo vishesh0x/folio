@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { and, asc, count, desc, eq, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 import {
   assetDeleteSchema,
@@ -7,6 +7,7 @@ import {
   categorySchema,
   entrySchema,
   idSchema,
+  importProjectsSchema,
   messagePatchSchema,
   nowItemSchema,
   pageSeoSchema,
@@ -17,6 +18,7 @@ import {
   siteConfigSchema,
 } from "./validators";
 import { requireAdmin } from "./admin-middleware";
+import { projectToEntry } from "./resume-projects";
 import { getDb, schema } from "@/server/db.server";
 import { applyOrder, findUsages } from "@/server/admin-helpers.server";
 import { getEnv } from "@/server/env.server";
@@ -79,7 +81,14 @@ export const adminOverview = createServerFn({ method: "GET" })
           .where(eq(schema.contactMessages.archived, false))
           .orderBy(desc(schema.contactMessages.createdAt))
           .limit(5),
-        db.select({ name: schema.siteConfig.name }).from(schema.siteConfig).get(),
+        db
+          .select({
+            name: schema.siteConfig.name,
+            email: schema.siteConfig.email,
+            emailPrivacy: schema.siteConfig.emailPrivacy,
+          })
+          .from(schema.siteConfig)
+          .get(),
         // Missing-alt audit for the dashboard.
       ],
     );
@@ -102,6 +111,7 @@ export const adminOverview = createServerFn({ method: "GET" })
       setupWarnings: {
         noSiteUrl: !getEnv().SITE_URL,
         noTurnstile: !getEnv().TURNSTILE_SECRET_KEY,
+        emailPublic: !!cfg?.email && cfg.emailPrivacy === "public",
       },
     };
   });
@@ -396,6 +406,51 @@ export const adminSaveEntry = createServerFn({ method: "POST" })
     const newId = crypto.randomUUID();
     await db.insert(schema.resumeEntries).values({ id: newId, ...data, sortOrder: n });
     return { id: newId };
+  });
+
+/**
+ * "Choose from my projects": copy the selected projects into a resume section as normal,
+ * editable entries (each remembers its `projectId`, so it can't be added twice).
+ */
+export const adminImportProjects = createServerFn({ method: "POST" })
+  .middleware([requireAdmin])
+  .inputValidator((d: unknown) => importProjectsSchema.parse(d))
+  .handler(async ({ data }) => {
+    const db = getDb();
+    const section = await db
+      .select({ id: schema.resumeSections.id })
+      .from(schema.resumeSections)
+      .where(eq(schema.resumeSections.id, data.sectionId))
+      .get();
+    if (!section) throw new Error("That section no longer exists.");
+
+    const [chosen, existing] = await Promise.all([
+      db.select().from(schema.projects).where(inArray(schema.projects.id, data.projectIds)),
+      db
+        .select({ projectId: schema.resumeEntries.projectId })
+        .from(schema.resumeEntries)
+        .where(eq(schema.resumeEntries.sectionId, data.sectionId)),
+    ]);
+    const have = new Set(existing.map((e) => e.projectId).filter(Boolean));
+    // Keep the order the admin picked them in.
+    const byId = new Map(chosen.map((p) => [p.id, p]));
+    const fresh = data.projectIds.map((id) => byId.get(id)).filter((p) => p && !have.has(p.id));
+
+    if (fresh.length) {
+      const [{ n }] = await db
+        .select({ n: count() })
+        .from(schema.resumeEntries)
+        .where(eq(schema.resumeEntries.sectionId, data.sectionId));
+      const stmts = fresh.map((p, i) =>
+        db.insert(schema.resumeEntries).values({
+          id: crypto.randomUUID(),
+          ...projectToEntry(p!, data.sectionId),
+          sortOrder: n + i,
+        }),
+      );
+      await db.batch(stmts as unknown as [(typeof stmts)[0], ...(typeof stmts)[0][]]);
+    }
+    return { added: fresh.length, skipped: data.projectIds.length - fresh.length };
   });
 
 export const adminDeleteEntry = createServerFn({ method: "POST" })

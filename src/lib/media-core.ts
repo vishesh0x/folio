@@ -17,17 +17,21 @@ const T = {
   gif: { mime: "image/gif", ext: "gif", transformable: false },
   ico: { mime: "image/x-icon", ext: "ico", transformable: false },
   pdf: { mime: "application/pdf", ext: "pdf", transformable: false },
+  /** Text format: detected + validated by `lib/svg-safety.ts`, never by magic bytes. */
+  svg: { mime: "image/svg+xml", ext: "svg", transformable: false },
 } satisfies Record<string, AllowedType>;
 
 export const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
+export const SVG_TYPE: AllowedType = T.svg;
 
 const ascii = (b: Uint8Array, start: number, len: number) =>
   String.fromCharCode(...b.slice(start, start + len));
 
 /**
  * Identify a file from its magic bytes. The client-supplied Content-Type and
- * file extension are never trusted. SVG is deliberately NOT allowed: it can
- * carry script and would be same-origin.
+ * file extension are never trusted. SVG is text, so it is NOT detected here:
+ * the upload handler runs `looksLikeSvg` + the strict allowlist in `svg-safety.ts`
+ * and then uses `SVG_TYPE`.
  */
 export function sniffFileType(b: Uint8Array): AllowedType | null {
   if (b.length < 12) return null;

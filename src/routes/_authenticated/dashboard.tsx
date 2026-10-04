@@ -12,6 +12,7 @@ import {
   Settings,
   Sparkles,
 } from "lucide-react";
+import { ThemedToaster } from "@/components/ThemedToaster";
 import { logout } from "@/lib/auth.functions";
 import { overviewQuery } from "@/components/dash/queries";
 import { ThemeToggle } from "@/lib/theme";
@@ -49,6 +50,7 @@ function DashLayout() {
 
   return (
     <div className="flex min-h-screen bg-background">
+      <ThemedToaster />
       <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col border-r border-sidebar-border bg-sidebar p-4 md:flex">
         <Link to="/" className="mb-6 px-2 font-display text-xl">
           Folio

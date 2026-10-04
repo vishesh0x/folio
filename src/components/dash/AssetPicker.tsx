@@ -22,6 +22,8 @@ type PickerProps = {
   onChange: (url: string | null, asset?: Asset) => void;
   accept?: string;
   placeholder?: string;
+  /** Social-share image: SVG is hidden/refused (platforms can't render it). */
+  noSvg?: boolean;
 };
 
 /** URL box + "Choose" dialog backed by the R2 asset library. */
@@ -31,6 +33,7 @@ export function AssetPicker({
   onChange,
   accept = "image/*",
   placeholder = "Paste an https URL or choose a file",
+  noSvg = false,
 }: PickerProps) {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -39,9 +42,12 @@ export function AssetPicker({
   const qc = useQueryClient();
   const { data: assets = [] } = useQuery({ ...assetsQuery, enabled: open });
   const isImage = accept.startsWith("image");
-  const list = assets.filter((a) =>
-    isImage ? a.mime.startsWith("image") : a.mime === accept || accept === "*",
+  const list = assets.filter(
+    (a) =>
+      (isImage ? a.mime.startsWith("image") : a.mime === accept || accept === "*") &&
+      !(noSvg && a.mime === "image/svg+xml"),
   );
+  const imageTypes = `image/png,image/jpeg,image/webp,image/avif,image/gif,image/x-icon${noSvg ? "" : ",image/svg+xml"}`;
 
   const onUpload = async (f: File | undefined) => {
     if (!f) return;
@@ -123,11 +129,7 @@ export function AssetPicker({
             {busy ? "Uploading…" : "Upload new file"}
             <input
               type="file"
-              accept={
-                accept === "image/*"
-                  ? "image/png,image/jpeg,image/webp,image/avif,image/gif,image/x-icon"
-                  : accept
-              }
+              accept={accept === "image/*" ? imageTypes : accept}
               className="sr-only"
               disabled={busy}
               onChange={(e) => onUpload(e.target.files?.[0])}

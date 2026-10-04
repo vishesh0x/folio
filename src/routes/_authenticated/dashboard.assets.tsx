@@ -126,12 +126,13 @@ function AssetsPage() {
           {busy ? `Uploading ${busy} file(s)…` : "Drop files here or click to upload"}
         </span>
         <span className="text-xs text-muted-foreground">
-          PNG, JPEG, WebP, AVIF, GIF, ICO or PDF · up to 10 MB each
+          PNG, JPEG, WebP, AVIF, GIF, ICO, SVG or PDF · up to 10 MB each (SVG up to 1 MB, checked
+          for safety)
         </span>
         <input
           type="file"
           multiple
-          accept="image/png,image/jpeg,image/webp,image/avif,image/gif,image/x-icon,application/pdf"
+          accept="image/png,image/jpeg,image/webp,image/avif,image/gif,image/x-icon,image/svg+xml,application/pdf"
           className="sr-only"
           onChange={(e) => {
             upload(e.target.files);

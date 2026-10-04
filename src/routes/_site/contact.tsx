@@ -1,11 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { ArrowUpRight, Loader2, Mail, MapPin, Send } from "lucide-react";
 import { toast } from "sonner";
+import { RevealContact } from "@/components/RevealContact";
 import { SafeLink } from "@/components/SafeLink";
+import { ThemedToaster } from "@/components/ThemedToaster";
 import { sendMessage } from "@/lib/contact.functions";
 import { pageSeo, seoMeta, siteQuery } from "@/lib/queries";
+import { useTurnstile } from "@/lib/turnstile";
 import { contactSchema } from "@/lib/validators";
 
 export const Route = createFileRoute("/_site/contact")({
@@ -23,47 +26,6 @@ export const Route = createFileRoute("/_site/contact")({
     }),
   component: ContactPage,
 });
-
-type TurnstileApi = {
-  render: (el: HTMLElement, opts: Record<string, unknown>) => string;
-  reset: (id?: string) => void;
-};
-declare global {
-  interface Window {
-    turnstile?: TurnstileApi;
-  }
-}
-
-/** Loads Cloudflare Turnstile only once the visitor starts the form. */
-function useTurnstile(siteKey: string | null, active: boolean, onToken: (t: string) => void) {
-  const host = useRef<HTMLDivElement>(null);
-  const widget = useRef<string | undefined>(undefined);
-  useEffect(() => {
-    if (!siteKey || !active || widget.current) return;
-    const mount = () => {
-      if (host.current && window.turnstile && !widget.current) {
-        widget.current = window.turnstile.render(host.current, {
-          sitekey: siteKey,
-          callback: onToken,
-          "expired-callback": () => onToken(""),
-        });
-      }
-    };
-    if (window.turnstile) return mount();
-    const s = document.createElement("script");
-    s.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
-    s.async = true;
-    s.onload = mount;
-    document.head.appendChild(s);
-  }, [siteKey, active, onToken]);
-  return {
-    host,
-    reset: () => {
-      if (widget.current) window.turnstile?.reset(widget.current);
-      onToken("");
-    },
-  };
-}
 
 const field =
   "w-full border-0 border-b border-input bg-transparent px-0 py-3 text-lg transition-colors placeholder:text-muted-foreground/70 focus:border-primary focus-visible:outline-none focus-visible:ring-0";
@@ -113,6 +75,8 @@ function ContactPage() {
       turnstile.reset();
       setTimeout(() => heading.current?.focus(), 50);
     } catch (err) {
+      // A Turnstile token is single-use: get a fresh one so the visitor can simply retry.
+      turnstile.reset();
       toast.error(
         err instanceof Error && err.message.length < 200
           ? err.message
@@ -134,6 +98,7 @@ function ContactPage() {
 
   return (
     <div className="mx-auto grid max-w-5xl gap-16 px-5 py-16 md:grid-cols-[1fr_1.3fr]">
+      <ThemedToaster />
       <div>
         <p className="font-mono text-xs uppercase tracking-[0.3em] text-primary">Contact</p>
         <h1 className="mt-3 font-display text-5xl font-light leading-tight md:text-6xl">
@@ -143,13 +108,20 @@ function ContactPage() {
           Have a project in mind, a question, or just want to share a good book? My inbox is open.
         </p>
         <div className="mt-10 space-y-4 text-sm">
-          {cfg?.email && (
+          {cfg?.email ? (
             <a
               href={`mailto:${cfg.email}`}
               className="flex items-center gap-3 py-1 hover:text-primary"
             >
               <Mail aria-hidden className="h-4 w-4 text-muted-foreground" /> {cfg.email}
             </a>
+          ) : (
+            site.emailReveal && (
+              <p className="flex items-center gap-3">
+                <Mail aria-hidden className="h-4 w-4 text-muted-foreground" />
+                <RevealContact field="siteEmail" kind="email" siteKey={site.turnstileSiteKey} />
+              </p>
+            )
           )}
           {cfg?.location && (
             <p className="flex items-center gap-3">
@@ -202,7 +174,12 @@ function ContactPage() {
             </p>
             <button
               type="button"
-              onClick={() => setSent(false)}
+              onClick={() => {
+                // The old widget lived inside the form that just unmounted; start clean.
+                turnstile.dispose();
+                setStarted(false);
+                setSent(false);
+              }}
               className="mt-6 py-2 text-sm text-primary underline"
             >
               Send another

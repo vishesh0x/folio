@@ -364,7 +364,7 @@ function ProjectEditor() {
               />
             </Field>
             <Field label="Share image">
-              <AssetPicker value={d.seoImage} onChange={(v) => set("seoImage", v)} />
+              <AssetPicker noSvg value={d.seoImage} onChange={(v) => set("seoImage", v)} />
             </Field>
           </Panel>
         </div>

@@ -9,16 +9,21 @@ import {
 } from "@tanstack/react-router";
 import { useEffect, useRef, type ReactNode } from "react";
 import appCss from "../styles.css?url";
-import { Toaster } from "@/components/ui/sonner";
+// Preload the two faces every page needs so the browser doesn't wait for the stylesheet to
+// discover them (saves a round trip on slow connections). Both are `latin` subsets only.
+import frauncesLatin from "@fontsource-variable/fraunces/files/fraunces-latin-opsz-normal.woff2?url";
+import instrumentLatin from "@fontsource-variable/instrument-sans/files/instrument-sans-latin-wght-normal.woff2?url";
+import { iconLinks } from "@/lib/favicon";
 import { siteQuery } from "@/lib/queries";
-import { ThemeProvider, themeScript, useTheme } from "@/lib/theme";
+import { safeImageSrc } from "@/lib/url";
+import { ThemeProvider, themeScript } from "@/lib/theme";
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   loader: async ({ context }) => {
     try {
       const d = await context.queryClient.ensureQueryData(siteQuery);
       return {
-        favicon: d.config?.faviconUrl ?? null,
+        favicon: safeImageSrc(d.config?.faviconUrl) ?? null,
         name: d.config?.name ?? "",
         origin: d.origin,
       };
@@ -37,12 +42,15 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       ...(loaderData?.name ? [{ property: "og:site_name", content: loaderData.name }] : []),
     ],
     links: [
+      ...[frauncesLatin, instrumentLatin].map((href) => ({
+        rel: "preload",
+        as: "font",
+        type: "font/woff2",
+        href,
+        crossOrigin: "anonymous" as const,
+      })),
       { rel: "stylesheet", href: appCss },
-      loaderData?.favicon
-        ? { rel: "icon", href: loaderData.favicon }
-        : { rel: "icon", href: "/favicon.svg", type: "image/svg+xml" },
-      { rel: "icon", href: "/favicon.ico", sizes: "48x48" },
-      { rel: "apple-touch-icon", href: "/apple-touch-icon.png" },
+      ...iconLinks(loaderData?.favicon),
       { rel: "manifest", href: "/manifest.webmanifest" },
     ],
   }),
@@ -91,11 +99,6 @@ function RouteFocus() {
   return null;
 }
 
-function ThemedToaster() {
-  const { theme } = useTheme();
-  return <Toaster theme={theme} />;
-}
-
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   return (
@@ -103,7 +106,6 @@ function RootComponent() {
       <ThemeProvider>
         <Outlet />
         <RouteFocus />
-        <ThemedToaster />
       </ThemeProvider>
     </QueryClientProvider>
   );

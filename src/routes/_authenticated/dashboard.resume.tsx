@@ -7,6 +7,7 @@ import {
   Eye,
   EyeOff,
   ExternalLink,
+  FolderKanban,
   Loader2,
   Pencil,
   Plus,
@@ -23,6 +24,7 @@ import {
   PageHeader,
   Panel,
   PrimaryButton,
+  PrivacySelect,
   TagInput,
 } from "@/components/dash/ui";
 import { ResumeView } from "@/components/site/ResumeView";
@@ -46,6 +48,8 @@ import {
   adminDeleteEntry,
   adminDeleteSection,
   adminGetResume,
+  adminImportProjects,
+  adminListProjects,
   adminReorderEntries,
   adminReorderSections,
   adminSaveEntry,
@@ -85,6 +89,33 @@ function ResumeBuilder() {
   const [entry, setEntry] = useState<EntryDraft | null>(null);
   const [sectionDraft, setSectionDraft] = useState<SectionDraft | null>(null);
   const [preview, setPreview] = useState(false);
+  // "Choose from my projects" dialog
+  const [pickFor, setPickFor] = useState<{ sectionId: string; title: string } | null>(null);
+  const [picked, setPicked] = useState<string[]>([]);
+  const { data: projects } = useQuery({
+    queryKey: ["dash", "projects"],
+    queryFn: () => adminListProjects(),
+    enabled: !!pickFor,
+  });
+  const alreadyAdded = new Set(
+    (data?.entries ?? [])
+      .filter((e) => e.sectionId === pickFor?.sectionId && e.projectId)
+      .map((e) => e.projectId as string),
+  );
+  const togglePicked = (id: string) =>
+    setPicked((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]));
+  const importPicked = async () => {
+    if (!pickFor || picked.length === 0) return;
+    const res = await run(() =>
+      adminImportProjects({ data: { sectionId: pickFor.sectionId, projectIds: picked } }),
+    );
+    if (res) {
+      toast.success(`${res.added} project${res.added === 1 ? "" : "s"} added`);
+      setPickFor(null);
+      setPicked([]);
+      refresh();
+    }
+  };
 
   const saveSection = async () => {
     if (!sectionDraft?.title.trim()) return toast.error("Section title is required");
@@ -268,6 +299,11 @@ function ResumeBuilder() {
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-medium">
                           {e.title || "Untitled"}
+                          {e.projectId && (
+                            <span className="ml-2 rounded-full bg-muted px-2 py-0.5 text-[10px] font-normal text-muted-foreground">
+                              from project
+                            </span>
+                          )}
                           {e.organization && (
                             <span className="font-normal text-muted-foreground">
                               {" "}
@@ -300,15 +336,28 @@ function ResumeBuilder() {
                       </ConfirmButton>
                     </li>
                   ))}
-                  <li>
+                  <li className="flex">
                     <button
                       type="button"
                       onClick={() => setEntry({ sectionId: s.id, tags: [] })}
-                      className="flex w-full items-center justify-center gap-1.5 p-3 text-sm text-muted-foreground hover:text-foreground"
+                      className="flex flex-1 items-center justify-center gap-1.5 p-3 text-sm text-muted-foreground hover:text-foreground"
                     >
                       <Plus aria-hidden className="h-4 w-4" /> Add entry
                       <span className="sr-only"> to {s.title}</span>
                     </button>
+                    {(s.kind === "projects" || s.kind === "custom") && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPicked([]);
+                          setPickFor({ sectionId: s.id, title: s.title });
+                        }}
+                        className="flex flex-1 items-center justify-center gap-1.5 border-l border-border p-3 text-sm text-primary hover:text-foreground"
+                      >
+                        <FolderKanban aria-hidden className="h-4 w-4" /> Choose from my projects
+                        <span className="sr-only"> for {s.title}</span>
+                      </button>
+                    )}
                   </li>
                 </ul>
               </Panel>
@@ -480,6 +529,78 @@ function ResumeBuilder() {
           )}
         </DialogContent>
       </Dialog>
+      <Dialog
+        open={!!pickFor}
+        onOpenChange={(o) => {
+          if (!o) {
+            setPickFor(null);
+            setPicked([]);
+          }
+        }}
+      >
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Choose projects for “{pickFor?.title}”</DialogTitle>
+            <DialogDescription>
+              Tick the projects to include. They&apos;re copied in as normal entries you can edit
+              afterwards, and each project can be added to a section once.
+            </DialogDescription>
+          </DialogHeader>
+          {!projects ? (
+            <p className="py-6 text-center text-sm text-muted-foreground">Loading projects…</p>
+          ) : projects.length === 0 ? (
+            <p className="py-6 text-center text-sm text-muted-foreground">
+              You haven&apos;t added any projects yet.
+            </p>
+          ) : (
+            <ul className="divide-y divide-border rounded-xl border border-border">
+              {projects.map((p) => {
+                const added = alreadyAdded.has(p.id);
+                return (
+                  <li key={p.id}>
+                    <label
+                      className={`flex items-start gap-3 p-3 ${added ? "opacity-60" : "cursor-pointer hover:bg-muted/50"}`}
+                    >
+                      <input
+                        type="checkbox"
+                        className="mt-1 h-4 w-4 accent-[var(--primary)]"
+                        disabled={added}
+                        checked={added || picked.includes(p.id)}
+                        onChange={() => togglePicked(p.id)}
+                      />
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-sm font-medium">
+                          {p.title}
+                          {!p.published && (
+                            <span className="ml-2 rounded-full bg-muted px-2 py-0.5 text-[10px] font-normal">
+                              Draft
+                            </span>
+                          )}
+                          {added && (
+                            <span className="ml-2 text-xs font-normal text-muted-foreground">
+                              Already added
+                            </span>
+                          )}
+                        </span>
+                        {p.tags.length > 0 && (
+                          <span className="block truncate text-xs text-muted-foreground">
+                            {p.tags.join(", ")}
+                          </span>
+                        )}
+                      </span>
+                    </label>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          <div className="flex justify-end">
+            <PrimaryButton onClick={importPicked} disabled={picked.length === 0}>
+              Add {picked.length || ""} project{picked.length === 1 ? "" : "s"}
+            </PrimaryButton>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -490,7 +611,9 @@ function ProfileEditor({ profile }: { profile: ResumeProfile | null }) {
     fullName: "",
     headline: "",
     email: "",
+    emailPrivacy: "reveal" as string,
     phone: "",
+    phonePrivacy: "reveal" as string,
     location: "",
     website: "",
     summary: "",
@@ -558,6 +681,21 @@ function ProfileEditor({ profile }: { profile: ResumeProfile | null }) {
           />
         </Field>
       </div>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <PrivacySelect
+          label="Email on the public resume"
+          value={p.emailPrivacy}
+          onChange={(v) => setP({ ...p, emailPrivacy: v })}
+        />
+        <PrivacySelect
+          label="Phone on the public resume"
+          value={p.phonePrivacy}
+          onChange={(v) => setP({ ...p, phonePrivacy: v })}
+        />
+      </div>
+      <p className="text-xs text-muted-foreground">
+        The preview below always shows everything; visitors only see what you allow here.
+      </p>
       <Field label="Professional summary" hint="Markdown">
         <Textarea
           rows={4}

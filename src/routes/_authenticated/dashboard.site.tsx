@@ -1,7 +1,8 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { Loader2, Plus, Save, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 import { ImageField, AssetPicker } from "@/components/dash/AssetPicker";
 import { run } from "@/components/dash/api";
 import {
@@ -11,6 +12,7 @@ import {
   PageHeader,
   Panel,
   PrimaryButton,
+  PrivacySelect,
   useUnsavedWarning,
 } from "@/components/dash/ui";
 import { Input } from "@/components/ui/input";
@@ -18,13 +20,14 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { adminGetSite, adminSaveSite } from "@/lib/admin.functions";
 import { changePassword } from "@/lib/auth.functions";
-import { MIN_PASSWORD } from "@/lib/validators";
+import { MIN_PASSWORD } from "@/lib/constants";
 import type { SiteConfig, Social } from "@/lib/public.functions";
 
 export const Route = createFileRoute("/_authenticated/dashboard/site")({ component: SitePage });
 
 function SitePage() {
   const qc = useQueryClient();
+  const router = useRouter();
   const { data } = useQuery({ queryKey: ["dash", "site_config"], queryFn: () => adminGetSite() });
   const [c, setC] = useState<SiteConfig | null>(null);
   const [saving, setSaving] = useState(false);
@@ -50,6 +53,8 @@ function SitePage() {
     if (ok) {
       setDirty(false);
       qc.invalidateQueries();
+      // The favicon lives in the root route's <head>; re-run loaders so it updates right away.
+      router.invalidate();
     }
   };
 
@@ -112,6 +117,11 @@ function SitePage() {
             <Field label="Email">
               <Input type="email" value={c.email} onChange={(e) => set("email", e.target.value)} />
             </Field>
+            <PrivacySelect
+              label="Email on the public site"
+              value={c.emailPrivacy}
+              onChange={(v) => set("emailPrivacy", v)}
+            />
             <Field label="Location">
               <Input value={c.location} onChange={(e) => set("location", e.target.value)} />
             </Field>
@@ -123,9 +133,33 @@ function SitePage() {
                 value={c.resumeUrl}
                 onChange={(v) => set("resumeUrl", v)}
               />
+              <p className="mt-1.5 text-xs text-muted-foreground">
+                Anything inside this PDF is public and can be scraped. If your email or phone is set
+                to “click to reveal”, upload a version of the PDF without them.
+              </p>
             </Field>
             <Field label="Favicon" hint="Optional — Folio's icon is the default">
-              <AssetPicker value={c.faviconUrl} onChange={(v) => set("faviconUrl", v)} />
+              <AssetPicker
+                value={c.faviconUrl}
+                onChange={(v, a) => {
+                  set("faviconUrl", v);
+                  if (
+                    a?.width &&
+                    a.height &&
+                    Math.abs(a.width - a.height) / Math.max(a.width, a.height) > 0.05
+                  ) {
+                    toast.warning(
+                      `That image is ${a.width}×${a.height}. Favicons look best when square — otherwise browsers will squash it.`,
+                    );
+                  }
+                }}
+              />
+              <p className="mt-1.5 text-xs text-muted-foreground">
+                Use a simple, square PNG (512×512 or larger) or an SVG. PNGs are resized
+                automatically for the browser tab, home-screen and app icons; an SVG is used as-is
+                for the tab (no iOS home-screen icon). The default Folio icon is no longer sent once
+                you upload one.
+              </p>
             </Field>
           </Panel>
           <Panel title="Default meta">
@@ -140,7 +174,7 @@ function SitePage() {
               />
             </Field>
             <Field label="Default share image">
-              <AssetPicker value={c.ogImage} onChange={(v) => set("ogImage", v)} />
+              <AssetPicker noSvg value={c.ogImage} onChange={(v) => set("ogImage", v)} />
             </Field>
           </Panel>
         </div>

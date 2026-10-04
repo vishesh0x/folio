@@ -97,7 +97,7 @@ function SeoCard({ meta, row }: { meta: (typeof PAGES)[number]; row?: PageSeo })
             />
           </Field>
           <Field label="Share image" hint="1200×630 works best">
-            <AssetPicker value={s.ogImage} onChange={(v) => setS({ ...s, ogImage: v })} />
+            <AssetPicker noSvg value={s.ogImage} onChange={(v) => setS({ ...s, ogImage: v })} />
           </Field>
         </div>
         <div className="rounded-xl bg-muted p-4" aria-label="Search preview">

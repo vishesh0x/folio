@@ -1,14 +1,17 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { eq, sql } from "drizzle-orm";
-import { z } from "zod";
-import { loginSchema, MIN_PASSWORD, setupSchema } from "./validators";
 import { requireAdmin } from "./admin-middleware";
 import { createSession, destroySession, getAdmin } from "@/server/auth.server";
 import { hashPassword, safeEqualStrings, verifyPassword } from "@/server/crypto.server";
 import { getDb, schema } from "@/server/db.server";
 import { getEnv } from "@/server/env.server";
 import { clientKey, rateLimit, resetRateLimit } from "@/server/ratelimit.server";
+
+// The validators run on the server only, but TanStack keeps `.inputValidator()` callbacks in
+// the client stubs. Importing zod lazily keeps ~55 kB (minified) out of the main bundle:
+// the dynamic import is never executed in the browser.
+const validators = () => import("./validators");
 
 // A precomputed hash lets us spend the same time on unknown emails as on real
 // ones, so response timing doesn't reveal which emails exist.
@@ -40,7 +43,7 @@ export const getAuthState = createServerFn({ method: "GET" }).handler(async () =
  * only succeeds while no admin exists.
  */
 export const setupAdmin = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) => setupSchema.parse(d))
+  .inputValidator(async (d: unknown) => (await validators()).setupSchema.parse(d))
   .handler(async ({ data }) => {
     const db = getDb();
     const request = getRequest();
@@ -64,7 +67,7 @@ export const setupAdmin = createServerFn({ method: "POST" })
   });
 
 export const login = createServerFn({ method: "POST" })
-  .inputValidator((d: unknown) => loginSchema.parse(d))
+  .inputValidator(async (d: unknown) => (await validators()).loginSchema.parse(d))
   .handler(async ({ data }) => {
     const db = getDb();
     const request = getRequest();
@@ -96,14 +99,7 @@ export const logout = createServerFn({ method: "POST" }).handler(async () => {
 
 export const changePassword = createServerFn({ method: "POST" })
   .middleware([requireAdmin])
-  .inputValidator((d: unknown) =>
-    z
-      .object({
-        current: z.string().min(1).max(256),
-        next: z.string().min(MIN_PASSWORD, `Use at least ${MIN_PASSWORD} characters`).max(256),
-      })
-      .parse(d),
-  )
+  .inputValidator(async (d: unknown) => (await validators()).changePasswordSchema.parse(d))
   .handler(async ({ data, context }) => {
     const db = getDb();
     const rl = await rateLimit(db, `pw:${context.admin.id}`, 5, 900);

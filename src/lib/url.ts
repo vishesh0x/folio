@@ -38,6 +38,10 @@ export function safeImageSrc(input: string | null | undefined): string | undefin
   return undefined;
 }
 
+/** True for URLs whose path ends in `.svg` (uploads always get a real extension). */
+export const isSvgUrl = (url: string | null | undefined) =>
+  /\.svg$/i.test((url ?? "").split(/[?#]/)[0] ?? "");
+
 export const isExternal = (href: string) => /^https?:\/\//i.test(href);
 
 /** Resolve a (possibly relative) URL against the site origin. */

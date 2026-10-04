@@ -9,6 +9,12 @@ import { defineConfig } from "vite";
 // behave the same locally as in production.
 export default defineConfig({
   resolve: { tsconfigPaths: true },
+  build: {
+    // Vite inlines assets under 4 kB as base64 `data:` URIs. A tiny font subset got
+    // inlined that way and was blocked by the CSP (`font-src 'self'`), which logged a
+    // console error and lowered the Lighthouse Best Practices score. Never inline fonts.
+    assetsInlineLimit: (file) => (/\.(woff2?|ttf|otf)$/i.test(file) ? false : undefined),
+  },
   plugins: [
     cloudflare({ viteEnvironment: { name: "ssr" } }),
     // The Worker entry (security headers, /media pipeline) is src/server.ts,

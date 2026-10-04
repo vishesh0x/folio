@@ -1,19 +1,20 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { Search } from "lucide-react";
-import { useMemo } from "react";
-import { z } from "zod";
+import { useEffect, useMemo, useState } from "react";
 import { ProjectCard } from "@/components/site/ProjectCard";
 import { pageSeo, projectsQuery, seoMeta, siteQuery } from "@/lib/queries";
 
 // Filters live in the URL so a filtered view can be shared / bookmarked.
-const searchSchema = z.object({
-  q: z.string().max(100).optional().catch(undefined),
-  tag: z.string().max(60).optional().catch(undefined),
+const str = (v: unknown, max: number) =>
+  typeof v === "string" && v.length > 0 && v.length <= max ? v : undefined;
+const validateSearch = (s: Record<string, unknown>): { q?: string; tag?: string } => ({
+  q: str(s.q, 100),
+  tag: str(s.tag, 60),
 });
 
 export const Route = createFileRoute("/_site/projects/")({
-  validateSearch: searchSchema,
+  validateSearch,
   loader: async ({ context }) => {
     const [site] = await Promise.all([
       context.queryClient.ensureQueryData(siteQuery),
@@ -37,7 +38,11 @@ const chip = (on: boolean) =>
 
 function ProjectsPage() {
   const { data: projects } = useSuspenseQuery(projectsQuery);
-  const { q = "", tag } = Route.useSearch();
+  const { q: urlQ = "", tag } = Route.useSearch();
+  // Keep the text box in local state and sync it to the URL after a short pause. Binding a
+  // controlled input straight to router search params can drop characters while typing fast.
+  const [q, setQ] = useState(urlQ);
+  useEffect(() => setQ(urlQ), [urlQ]);
   const navigate = useNavigate({ from: Route.fullPath });
   const tags = useMemo(() => [...new Set(projects.flatMap((p) => p.tags))].sort(), [projects]);
   const needle = q.trim().toLowerCase();
@@ -48,6 +53,12 @@ function ProjectsPage() {
   );
   const setSearch = (next: { q?: string; tag?: string }) =>
     navigate({ search: (prev) => ({ ...prev, ...next }), replace: true });
+  useEffect(() => {
+    if (q === urlQ) return;
+    const t = setTimeout(() => setSearch({ q: q || undefined }), 250);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [q]);
 
   return (
     <div className="mx-auto max-w-5xl px-5 py-16">
@@ -71,7 +82,7 @@ function ProjectsPage() {
             id="project-search"
             type="search"
             value={q}
-            onChange={(e) => setSearch({ q: e.target.value || undefined })}
+            onChange={(e) => setQ(e.target.value)}
             placeholder="Search projects…"
             className="w-full rounded-full border border-input bg-card py-2.5 pl-9 pr-4 text-sm"
           />

@@ -1,5 +1,6 @@
 import { eq } from "drizzle-orm";
-import { MAX_UPLOAD_BYTES, buildKey, sniffFileType } from "@/lib/media-core";
+import { MAX_UPLOAD_BYTES, SVG_TYPE, buildKey, sniffFileType } from "@/lib/media-core";
+import { MAX_SVG_BYTES, decodeSvgBytes, looksLikeSvg, validateSvg } from "@/lib/svg-safety";
 import { altText } from "@/lib/validators";
 import { getAdmin } from "./auth.server";
 import { randomToken } from "./crypto.server";
@@ -39,17 +40,41 @@ export async function handleUpload(request: Request, env: AppEnv): Promise<Respo
 
   // Identify by content, not by the browser-supplied type or extension.
   const head = new Uint8Array(await file.slice(0, 32).arrayBuffer());
-  const type = sniffFileType(head);
+  let type = sniffFileType(head);
+
+  // SVG is text: validate it with the strict allowlist, and store exactly the bytes we validated.
+  let svgBytes: Uint8Array | undefined;
+  let width: number | null = null;
+  let height: number | null = null;
+  if (!type) {
+    const probe = new Uint8Array(await file.slice(0, 1024).arrayBuffer());
+    if (looksLikeSvg(probe)) {
+      if (file.size > MAX_SVG_BYTES) return json({ error: "SVG too large (max 1 MB)" }, 413);
+      svgBytes = new Uint8Array(await file.arrayBuffer());
+      const text = decodeSvgBytes(svgBytes);
+      const result = text === null ? null : validateSvg(text);
+      if (!result || !result.ok) {
+        const why = result && !result.ok ? result.reason : "it isn't valid UTF-8 text";
+        return json(
+          {
+            error: `This SVG can't be uploaded: ${why}. Export it as a plain SVG (no scripts, links or embedded fonts) and try again.`,
+          },
+          415,
+        );
+      }
+      type = SVG_TYPE;
+      width = result.width;
+      height = result.height;
+    }
+  }
   if (!type) {
     return json(
-      { error: "Unsupported file type. Use PNG, JPEG, WebP, AVIF, GIF, ICO or PDF." },
+      { error: "Unsupported file type. Use PNG, JPEG, WebP, AVIF, GIF, ICO, SVG or PDF." },
       415,
     );
   }
 
-  let width: number | null = null;
-  let height: number | null = null;
-  if (type.mime.startsWith("image/") && type.mime !== "image/x-icon") {
+  if (!svgBytes && type.mime.startsWith("image/") && type.mime !== "image/x-icon") {
     try {
       const info = await env.IMAGES.info(file.stream());
       if ("width" in info) {
@@ -63,7 +88,7 @@ export async function handleUpload(request: Request, env: AppEnv): Promise<Respo
 
   const alt = altText.safeParse(form.get("alt") ?? "");
   const key = buildKey(file.name, type.ext, randomToken(6));
-  await env.MEDIA.put(key, file.stream(), {
+  await env.MEDIA.put(key, svgBytes ?? file.stream(), {
     httpMetadata: { contentType: type.mime, cacheControl: "public, max-age=31536000, immutable" },
     customMetadata: { originalName: file.name.slice(0, 200) },
   });

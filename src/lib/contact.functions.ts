@@ -4,27 +4,9 @@ import { contactSchema } from "./validators";
 import { getDb, schema } from "@/server/db.server";
 import { getEnv } from "@/server/env.server";
 import { clientKey, rateLimit } from "@/server/ratelimit.server";
+import { verifyTurnstile } from "@/server/turnstile.server";
 
 const MAX_PER_HOUR = 5;
-
-async function verifyTurnstile(secret: string, token: string, request: Request): Promise<boolean> {
-  if (!token) return false;
-  const body = new FormData();
-  body.set("secret", secret);
-  body.set("response", token);
-  const ip = request.headers.get("cf-connecting-ip");
-  if (ip) body.set("remoteip", ip);
-  try {
-    const res = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
-      method: "POST",
-      body,
-    });
-    const out = (await res.json()) as { success?: boolean };
-    return out.success === true;
-  } catch {
-    return false;
-  }
-}
 
 /**
  * Contact form endpoint.

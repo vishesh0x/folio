@@ -31,6 +31,8 @@ export async function rateLimit(
       count = CASE WHEN window_start <= ${cutoff} THEN 1 ELSE count + 1 END,
       window_start = CASE WHEN window_start <= ${cutoff} THEN ${nowS} ELSE window_start END
     RETURNING count, window_start`);
+  // The table keys on a hashed IP, so it would otherwise grow forever. Prune ~2% of calls.
+  if (Math.random() < 0.02) await pruneRateLimits(db).catch(() => {});
   const row = rows[0]!;
   const retryAfter = Math.max(1, row.window_start + windowSeconds - nowS);
   return { allowed: row.count <= limit, remaining: Math.max(0, limit - row.count), retryAfter };

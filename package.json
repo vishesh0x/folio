@@ -2,7 +2,7 @@
   "name": "folio",
   "version": "1.0.0",
   "private": true,
-  "description": "Folio — a personal portfolio and content dashboard on Cloudflare Workers, D1, R2 and Cloudflare Images.",
+  "description": "Folio \u2014 a personal portfolio and content dashboard on Cloudflare Workers, D1, R2 and Cloudflare Images.",
   "sideEffects": false,
   "type": "module",
   "engines": {
@@ -73,6 +73,7 @@
     "eslint-plugin-react-refresh": "^0.4.20",
     "globals": "^15.15.0",
     "prettier": "^3.7.3",
+    "seroval": "^1.6.8",
     "tailwindcss": "^4.2.1",
     "tw-animate-css": "^1.3.4",
     "typescript": "^5.8.3",

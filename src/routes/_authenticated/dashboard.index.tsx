@@ -59,6 +59,11 @@ function Overview() {
     warnings.push({
       text: "SITE_URL isn't set in wrangler.jsonc, so canonical/OG URLs use the request origin.",
     });
+  if (data?.setupWarnings.emailPublic)
+    warnings.push({
+      text: "Your email is shown as plain text on the site, so scrapers can harvest it. Switch it to “click to reveal” in Site config.",
+      to: "/dashboard/site",
+    });
   if (data?.setupWarnings.noTurnstile)
     warnings.push({
       text: "Turnstile isn't configured; the contact form relies on the honeypot + rate limit only.",

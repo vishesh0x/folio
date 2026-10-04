@@ -1,5 +1,8 @@
 import { z } from "zod";
-import { safeHref, safeImageSrc } from "./url";
+import { MIN_PASSWORD, PRIVACY_MODES } from "./constants";
+import { isSvgUrl, safeHref, safeImageSrc } from "./url";
+
+export { MIN_PASSWORD };
 
 /** Empty string → null, otherwise trimmed. */
 const emptyToNull = (v: unknown) => (typeof v === "string" && v.trim() === "" ? null : v);
@@ -12,6 +15,20 @@ export const urlField = z
   .refine((v) => safeHref(v) !== undefined, "Enter a valid http(s) URL");
 
 export const optionalUrl = z.preprocess(emptyToNull, urlField.nullable()).default(null);
+
+/** Social-share image: same as `optionalImage`, but SVG is refused (platforms can't render it). */
+export const optionalShareImage = z
+  .preprocess(
+    emptyToNull,
+    z
+      .string()
+      .trim()
+      .max(2048)
+      .refine((v) => safeImageSrc(v) !== undefined, "Images must be uploaded or use https")
+      .refine((v) => !isSvgUrl(v), "Share images must be PNG, JPEG, WebP or AVIF (not SVG)")
+      .nullable(),
+  )
+  .default(null);
 
 /** Image reference: uploaded asset (`/media/...`) or an https URL. */
 export const optionalImage = z
@@ -65,10 +82,13 @@ export const contactSchema = z.object({
 export type ContactInput = z.infer<typeof contactSchema>;
 
 // ── auth ─────────────────────────────────────────────────────────────────────
-export const MIN_PASSWORD = 12;
 export const loginSchema = z.object({
   email: text(255).email(),
   password: z.string().min(1).max(256),
+});
+export const changePasswordSchema = z.object({
+  current: z.string().min(1).max(256),
+  next: z.string().min(MIN_PASSWORD, `Use at least ${MIN_PASSWORD} characters`).max(256),
 });
 export const setupSchema = z.object({
   email: text(255).email("Enter a valid email"),
@@ -83,12 +103,13 @@ export const siteConfigSchema = z.object({
   tagline: text(300),
   bio: text(4000),
   email: z.union([z.literal(""), text(255).email()]),
+  emailPrivacy: z.enum(PRIVACY_MODES).default("reveal"),
   location: text(120),
   avatarUrl: optionalImage,
   avatarAlt: altText,
   faviconUrl: optionalImage,
   resumeUrl: optionalUrl,
-  ogImage: optionalImage,
+  ogImage: optionalShareImage,
   metaTitle: text(120),
   metaDescription: text(320),
   socials: z.array(socialSchema).max(20),
@@ -99,7 +120,7 @@ export const pageSeoSchema = z.object({
   page: z.enum(["home", "projects", "now", "resume", "contact"]),
   title: text(120),
   description: text(320),
-  ogImage: optionalImage,
+  ogImage: optionalShareImage,
 });
 
 // ── admin: projects ──────────────────────────────────────────────────────────
@@ -121,7 +142,7 @@ export const projectSchema = z.object({
   endDate: isoDate.default(null),
   seoTitle: z.preprocess(emptyToNull, text(120).nullable()).default(null),
   seoDescription: z.preprocess(emptyToNull, text(320).nullable()).default(null),
-  seoImage: optionalImage,
+  seoImage: optionalShareImage,
 });
 export type ProjectInput = z.infer<typeof projectSchema>;
 
@@ -145,7 +166,9 @@ export const resumeProfileSchema = z.object({
   fullName: text(120),
   headline: text(160),
   email: z.union([z.literal(""), text(255).email()]),
+  emailPrivacy: z.enum(PRIVACY_MODES).default("reveal"),
   phone: text(60),
+  phonePrivacy: z.enum(PRIVACY_MODES).default("reveal"),
   location: text(120),
   website: z.union([z.literal(""), urlField]),
   summary: text(4000),
@@ -181,6 +204,10 @@ export const entrySchema = z.object({
 });
 
 // ── admin: misc ──────────────────────────────────────────────────────────────
+export const importProjectsSchema = z.object({
+  sectionId: z.string().uuid(),
+  projectIds: z.array(z.string().uuid()).min(1).max(50),
+});
 export const idSchema = z.object({ id: z.string().uuid() });
 export const reorderSchema = z.object({ ids: z.array(z.string().uuid()).min(1).max(500) });
 export const messagePatchSchema = z.object({

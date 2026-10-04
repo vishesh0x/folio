@@ -1,4 +1,5 @@
 import { Markdown } from "@/components/Markdown";
+import { RevealContact } from "@/components/RevealContact";
 import { SafeLink } from "@/components/SafeLink";
 import type { ResumeEntry, ResumeProfile, ResumeSection } from "@/lib/public.functions";
 
@@ -6,10 +7,15 @@ export function ResumeView({
   profile,
   sections,
   entries,
+  reveal,
+  siteKey = null,
 }: {
   profile: ResumeProfile | null;
   sections: ResumeSection[];
   entries: ResumeEntry[];
+  /** Details that are fetched on click instead of being in the page (public resume only). */
+  reveal?: { email: boolean; phone: boolean };
+  siteKey?: string | null;
 }) {
   const links = profile?.links ?? [];
   const contact = [profile?.email, profile?.phone, profile?.location].filter(Boolean) as string[];
@@ -23,6 +29,21 @@ export function ResumeView({
           {contact.map((c) => (
             <li key={c}>{c}</li>
           ))}
+          {reveal?.email && (
+            <li>
+              <RevealContact field="resumeEmail" kind="email" siteKey={siteKey} />
+            </li>
+          )}
+          {reveal?.phone && (
+            <li>
+              <RevealContact
+                field="resumePhone"
+                kind="phone"
+                siteKey={siteKey}
+                buttonClassName="py-1 hover:text-foreground hover:underline"
+              />
+            </li>
+          )}
           {profile?.website && (
             <li>
               <SafeLink href={profile.website} className="hover:text-foreground hover:underline">
