@@ -1,17 +1,18 @@
 import { Link, createFileRoute, notFound } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { ArrowLeft, ExternalLink, Github } from "lucide-react";
+import { ArrowLeft, ArrowRight, ExternalLink, Github } from "lucide-react";
 import { Img } from "@/components/Img";
 import { Markdown } from "@/components/Markdown";
 import { SafeLink } from "@/components/SafeLink";
 import { formatDate } from "@/lib/dates";
-import { jsonLd, projectQuery, seoMeta, siteQuery } from "@/lib/queries";
+import { jsonLd, projectQuery, projectsQuery, seoMeta, siteQuery } from "@/lib/queries";
 
 export const Route = createFileRoute("/_site/projects/$slug")({
   loader: async ({ context, params }) => {
     const [p, site] = await Promise.all([
       context.queryClient.ensureQueryData(projectQuery(params.slug)),
       context.queryClient.ensureQueryData(siteQuery),
+      context.queryClient.ensureQueryData(projectsQuery),
     ]);
     if (!p) throw notFound();
     return { p, origin: site.origin, name: site.config?.name, author: site.config?.name };
@@ -60,7 +61,11 @@ export const Route = createFileRoute("/_site/projects/$slug")({
 function ProjectPage() {
   const { slug } = Route.useParams();
   const { data: p } = useSuspenseQuery(projectQuery(slug));
+  const { data: all } = useSuspenseQuery(projectsQuery);
   if (!p) return null;
+  const at = all.findIndex((x) => x.slug === slug);
+  const prev = at > 0 ? all[at - 1] : undefined;
+  const next = at >= 0 ? all[at + 1] : undefined;
   const start = formatDate(p.startDate);
   const end = formatDate(p.endDate) ?? (p.status === "in-progress" ? "Present" : null);
   const dates = [start, end].filter(Boolean).join(" — ");
@@ -102,7 +107,18 @@ function ProjectPage() {
               <dt className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
                 Built with
               </dt>
-              <dd className="mt-1.5">{p.tech.join(" · ")}</dd>
+              <dd className="mt-1.5">
+                <ul className="flex flex-wrap gap-x-3 gap-y-1">
+                  {p.tech.map((t) => (
+                    <li
+                      key={t}
+                      className="after:ml-3 after:text-muted-foreground/50 after:content-['·'] last:after:content-none"
+                    >
+                      {t}
+                    </li>
+                  ))}
+                </ul>
+              </dd>
             </div>
           )}
           {p.tags.length > 0 && (
@@ -134,6 +150,43 @@ function ProjectPage() {
       <Markdown className="mt-10" fallbackAlt={`Illustration from ${p.title}`}>
         {p.content}
       </Markdown>
+      {(prev || next) && (
+        <nav
+          aria-label="More projects"
+          className="mt-16 grid gap-4 border-t border-border pt-8 sm:grid-cols-2"
+        >
+          {prev ? (
+            <Link
+              to="/projects/$slug"
+              params={{ slug: prev.slug }}
+              className="group rounded-2xl border border-border p-5 transition-colors hover:border-foreground/30 hover:bg-muted/50"
+            >
+              <span className="flex items-center gap-1.5 font-mono text-xs uppercase tracking-wider text-muted-foreground">
+                <ArrowLeft aria-hidden className="h-3.5 w-3.5" /> Previous
+              </span>
+              <span className="mt-2 block font-display text-xl group-hover:text-primary">
+                {prev.title}
+              </span>
+            </Link>
+          ) : (
+            <span className="hidden sm:block" />
+          )}
+          {next && (
+            <Link
+              to="/projects/$slug"
+              params={{ slug: next.slug }}
+              className="group rounded-2xl border border-border p-5 text-right transition-colors hover:border-foreground/30 hover:bg-muted/50"
+            >
+              <span className="flex items-center justify-end gap-1.5 font-mono text-xs uppercase tracking-wider text-muted-foreground">
+                Next <ArrowRight aria-hidden className="h-3.5 w-3.5" />
+              </span>
+              <span className="mt-2 block font-display text-xl group-hover:text-primary">
+                {next.title}
+              </span>
+            </Link>
+          )}
+        </nav>
+      )}
     </article>
   );
 }

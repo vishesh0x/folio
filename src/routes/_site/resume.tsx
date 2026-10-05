@@ -29,13 +29,14 @@ function ResumePage() {
   const { data: site } = useSuspenseQuery(siteQuery);
   const file = site.config?.resumeUrl;
   return (
-    <div className="mx-auto max-w-4xl px-5 py-16">
-      <div className="no-print mb-8 flex flex-wrap items-end justify-between gap-4">
+    <div className="mx-auto max-w-4xl px-5 py-12 md:py-16">
+      <div className="no-print mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
           <p className="font-mono text-xs uppercase tracking-[0.3em] text-primary">
             Curriculum vitae
           </p>
-          <h1 className="mt-3 font-display text-5xl font-light md:text-6xl">Resume</h1>
+          {/* The resume card below carries the visible name; keep one page-level heading for structure. */}
+          <h1 className="sr-only">Resume</h1>
         </div>
         <div className="flex gap-2">
           <button type="button" onClick={() => window.print()} className="btn-ghost">

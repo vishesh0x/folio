@@ -48,6 +48,15 @@ export const Route = createFileRoute("/_site/")({
   component: Home,
 });
 
+const initials = (name: string) =>
+  name
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((w) => w[0]!)
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+
 function Home() {
   const { data: site } = useSuspenseQuery(siteQuery);
   const { data: projects } = useSuspenseQuery(projectsQuery);
@@ -120,6 +129,14 @@ function Home() {
             priority
             className="h-40 w-40 rotate-3 rounded-2xl border border-border object-cover shadow-lg md:h-56 md:w-56"
           />
+        )}
+        {!cfg?.avatarUrl && cfg?.name && (
+          <div
+            aria-hidden
+            className="hidden h-56 w-56 rotate-3 items-center justify-center rounded-2xl border border-border bg-muted font-display text-8xl font-light italic text-primary/70 shadow-lg md:flex"
+          >
+            {initials(cfg.name)}
+          </div>
         )}
       </section>
 

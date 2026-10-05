@@ -25,7 +25,9 @@ import {
   Panel,
   PrimaryButton,
   PrivacySelect,
+  SaveBar,
   TagInput,
+  useUnsavedWarning,
 } from "@/components/dash/ui";
 import { ResumeView } from "@/components/site/ResumeView";
 import {
@@ -184,7 +186,7 @@ function ResumeBuilder() {
         }
       />
       <div className={`grid gap-6 ${preview ? "2xl:grid-cols-2" : ""}`}>
-        <div className="space-y-6">
+        <div className="min-w-0 space-y-6">
           {data && <ProfileEditor profile={data.profile} />}
 
           {sections.map((s, si) => {
@@ -278,9 +280,10 @@ function ResumeBuilder() {
                               refresh();
                             }
                           }}
+                          className="!h-7 !w-7"
                           aria-label={`Move ${e.title || "entry"} up`}
                         >
-                          <ArrowUp aria-hidden className="h-3 w-3" />
+                          <ArrowUp aria-hidden className="h-3.5 w-3.5" />
                         </IconButton>
                         <IconButton
                           disabled={ei === list.length - 1}
@@ -291,9 +294,10 @@ function ResumeBuilder() {
                               refresh();
                             }
                           }}
+                          className="!h-7 !w-7"
                           aria-label={`Move ${e.title || "entry"} down`}
                         >
-                          <ArrowDown aria-hidden className="h-3 w-3" />
+                          <ArrowDown aria-hidden className="h-3.5 w-3.5" />
                         </IconButton>
                       </div>
                       <div className="min-w-0 flex-1">
@@ -621,19 +625,27 @@ function ProfileEditor({ profile }: { profile: ResumeProfile | null }) {
   };
   const [p, setP] = useState(blank);
   const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState("");
   useEffect(() => {
     if (profile) {
       const { id: _i, updatedAt: _u, ...rest } = profile;
       setP(rest);
+      setSaved(JSON.stringify(rest));
     }
   }, [profile]);
+  const dirty = saved !== "" && JSON.stringify(p) !== saved;
+  const { markSaved } = useUnsavedWarning(dirty);
   const links = p.links ?? [];
   const setLinks = (l: Social[]) => setP({ ...p, links: l });
   const save = async () => {
     setSaving(true);
     const ok = await run(() => adminSaveResumeProfile({ data: p }), "Personal details saved");
     setSaving(false);
-    if (ok) qc.invalidateQueries();
+    if (ok) {
+      markSaved();
+      setSaved(JSON.stringify(p));
+      qc.invalidateQueries();
+    }
   };
   return (
     <Panel
@@ -736,6 +748,13 @@ function ProfileEditor({ profile }: { profile: ResumeProfile | null }) {
           <Plus aria-hidden className="h-4 w-4" /> Add link
         </GhostButton>
       </fieldset>
+      <SaveBar
+        dirty={dirty}
+        saving={saving}
+        onSave={save}
+        label="Save details"
+        className="-mx-5 -mb-5 rounded-b-2xl md:-mx-6 md:-mb-6 md:px-6!"
+      />
     </Panel>
   );
 }

@@ -13,6 +13,7 @@ import {
   Panel,
   PrimaryButton,
   PrivacySelect,
+  SaveBar,
   useUnsavedWarning,
 } from "@/components/dash/ui";
 import { Input } from "@/components/ui/input";
@@ -112,7 +113,7 @@ function SitePage() {
             />
           </div>
         </Panel>
-        <div className="space-y-6">
+        <div className="min-w-0 space-y-6">
           <Panel title="Contact">
             <Field label="Email">
               <Input type="email" value={c.email} onChange={(e) => set("email", e.target.value)} />
@@ -189,9 +190,9 @@ function SitePage() {
           >
             {socials.length === 0 && <p className="text-sm text-muted-foreground">No links yet.</p>}
             {socials.map((s, i) => (
-              <div key={i} className="flex gap-2">
+              <div key={i} className="grid grid-cols-[1fr_auto] gap-2 sm:flex">
                 <Input
-                  className="w-40"
+                  className="col-start-1 sm:w-40"
                   aria-label={`Link ${i + 1} label`}
                   placeholder="Label"
                   value={s.label}
@@ -202,6 +203,7 @@ function SitePage() {
                   }
                 />
                 <Input
+                  className="col-start-1"
                   aria-label={`Link ${i + 1} URL`}
                   placeholder="https://"
                   value={s.url}
@@ -210,6 +212,7 @@ function SitePage() {
                   }
                 />
                 <IconButton
+                  className="col-start-2 row-span-2 row-start-1 self-center sm:self-auto"
                   onClick={() => setSocials(socials.filter((_, j) => j !== i))}
                   aria-label={`Remove link ${i + 1}`}
                 >
@@ -223,6 +226,7 @@ function SitePage() {
           <PasswordPanel />
         </div>
       </div>
+      <SaveBar dirty={dirty} saving={saving} onSave={save} />
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 type TurnstileApi = {
   render: (el: HTMLElement, opts: Record<string, unknown>) => string;
@@ -50,6 +50,8 @@ export function useTurnstile(
   onTokenRef.current = onToken;
   const optsRef = useRef(opts);
   optsRef.current = opts;
+  // True when the script is blocked/unreachable or the widget errored (so the UI can say so).
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     if (!siteKey || !active || widget.current) return;
@@ -59,13 +61,22 @@ export function useTurnstile(
         if (!live || widget.current || !host.current || !window.turnstile) return;
         widget.current = window.turnstile.render(host.current, {
           sitekey: siteKey,
-          callback: (t: string) => onTokenRef.current(t),
+          callback: (t: string) => {
+            setFailed(false);
+            onTokenRef.current(t);
+          },
           "expired-callback": () => onTokenRef.current(""),
-          "error-callback": () => onTokenRef.current(""),
+          "error-callback": () => {
+            setFailed(true);
+            onTokenRef.current("");
+          },
           ...optsRef.current,
         });
       })
-      .catch(() => onTokenRef.current(""));
+      .catch(() => {
+        setFailed(true);
+        onTokenRef.current("");
+      });
     return () => {
       live = false;
     };
@@ -74,6 +85,7 @@ export function useTurnstile(
   const dispose = useCallback(() => {
     if (widget.current) window.turnstile?.remove(widget.current);
     widget.current = undefined;
+    setFailed(false);
     onTokenRef.current("");
   }, []);
   const reset = useCallback(() => {
@@ -84,5 +96,5 @@ export function useTurnstile(
   // Remove the widget if the component itself unmounts.
   useEffect(() => dispose, [dispose]);
 
-  return { host, reset, dispose };
+  return { host, reset, dispose, failed };
 }

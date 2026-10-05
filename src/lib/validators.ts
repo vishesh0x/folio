@@ -72,7 +72,7 @@ const isoDate = z.preprocess(
 // ── public ───────────────────────────────────────────────────────────────────
 export const contactSchema = z.object({
   name: text(120).min(1, "Please tell me your name"),
-  email: text(255).email("That email doesn't look right"),
+  email: text(255).min(1, "Please enter your email").email("That email doesn't look right"),
   subject: text(200).default(""),
   message: text(5000).min(5, "A little more detail please"),
   /** Honeypot — real users never see or fill this. */

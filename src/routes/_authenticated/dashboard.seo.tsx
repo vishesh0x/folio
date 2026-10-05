@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Loader2, Save } from "lucide-react";
 import { AssetPicker } from "@/components/dash/AssetPicker";
 import { run } from "@/components/dash/api";
-import { Field, PageHeader, Panel, PrimaryButton } from "@/components/dash/ui";
+import { Field, PageHeader, Panel, PrimaryButton, useUnsavedWarning } from "@/components/dash/ui";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { adminGetSeo, adminSaveSeo } from "@/lib/admin.functions";
@@ -41,9 +41,17 @@ function SeoCard({ meta, row }: { meta: (typeof PAGES)[number]; row?: PageSeo })
   const qc = useQueryClient();
   const [s, setS] = useState({ title: "", description: "", ogImage: null as string | null });
   const [saving, setSaving] = useState(false);
+  // Snapshot of the last loaded/saved values, to know when there are unsaved edits.
+  const [saved, setSaved] = useState("");
   useEffect(() => {
-    if (row) setS({ title: row.title, description: row.description, ogImage: row.ogImage });
+    if (row) {
+      const next = { title: row.title, description: row.description, ogImage: row.ogImage };
+      setS(next);
+      setSaved(JSON.stringify(next));
+    }
   }, [row]);
+  const dirty = saved !== "" && JSON.stringify(s) !== saved;
+  const { markSaved } = useUnsavedWarning(dirty);
 
   const save = async () => {
     setSaving(true);
@@ -52,7 +60,11 @@ function SeoCard({ meta, row }: { meta: (typeof PAGES)[number]; row?: PageSeo })
       `${meta.label} SEO saved`,
     );
     setSaving(false);
-    if (ok) qc.invalidateQueries();
+    if (ok) {
+      markSaved();
+      setSaved(JSON.stringify(s));
+      qc.invalidateQueries();
+    }
   };
   const host = typeof window !== "undefined" ? window.location.host : "yoursite.com";
 

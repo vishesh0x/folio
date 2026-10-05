@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { revealContact, type RevealField } from "@/lib/reveal.functions";
 import { useTurnstile } from "@/lib/turnstile";
 
@@ -12,6 +12,7 @@ export function RevealContact({
   siteKey,
   className = "",
   buttonClassName = "link-underline py-1 font-medium",
+  icon,
 }: {
   field: RevealField;
   kind: "email" | "phone";
@@ -19,6 +20,8 @@ export function RevealContact({
   siteKey: string | null;
   className?: string;
   buttonClassName?: string;
+  /** Rendered before the value; hidden together with the button when printing. */
+  icon?: ReactNode;
 }) {
   const [value, setValue] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -51,6 +54,24 @@ export function RevealContact({
     { appearance: "interaction-only" },
   );
 
+  // Don't hang on "Checking…" if the spam-check script is blocked or never answers.
+  useEffect(() => {
+    if (!busy || !active) return;
+    const stop = (msg: string) => {
+      setBusy(false);
+      setActive(false);
+      setError(msg);
+    };
+    if (ts.failed) {
+      stop(
+        "The spam check couldn't load. Check your connection or content blockers and try again.",
+      );
+      return;
+    }
+    const t = setTimeout(() => stop("That took too long. Please try again."), 20_000);
+    return () => clearTimeout(t);
+  }, [busy, active, ts.failed]);
+
   const onClick = () => {
     setError("");
     setBusy(true);
@@ -62,14 +83,18 @@ export function RevealContact({
 
   const label = kind === "email" ? "Show email address" : "Show phone number";
   return (
-    <span className={className} aria-live="polite">
+    <span
+      className={`inline-flex max-w-full flex-wrap items-center gap-x-1.5 ${value ? "" : "print:hidden"} ${className}`}
+      aria-live="polite"
+    >
+      {icon}
       {value ? (
         kind === "email" ? (
-          <a href={`mailto:${value}`} className="link-underline py-1 font-medium">
+          <a href={`mailto:${value}`} className="link-underline py-0.5 font-medium">
             {value}
           </a>
         ) : (
-          <a href={`tel:${value.replace(/[^\d+]/g, "")}`} className="py-1 hover:underline">
+          <a href={`tel:${value.replace(/[^\d+]/g, "")}`} className="py-0.5 hover:underline">
             {value}
           </a>
         )
@@ -79,13 +104,13 @@ export function RevealContact({
             type="button"
             onClick={onClick}
             disabled={busy}
-            className={`${buttonClassName} print:hidden disabled:opacity-60`}
+            className={`${buttonClassName} whitespace-nowrap print:hidden disabled:opacity-60`}
           >
             {busy ? "Checking…" : label}
           </button>
-          {siteKey && <span ref={ts.host} className="ml-2 inline-block align-middle" />}
+          {siteKey && <span ref={ts.host} className="inline-block align-middle" />}
           {error && (
-            <span role="alert" className="ml-2 text-sm text-destructive">
+            <span role="alert" className="w-full text-sm text-destructive">
               {error}
             </span>
           )}

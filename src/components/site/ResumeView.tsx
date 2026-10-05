@@ -1,7 +1,15 @@
+import { Globe, Mail, MapPin, Phone } from "lucide-react";
 import { Markdown } from "@/components/Markdown";
 import { RevealContact } from "@/components/RevealContact";
 import { SafeLink } from "@/components/SafeLink";
 import type { ResumeEntry, ResumeProfile, ResumeSection } from "@/lib/public.functions";
+
+const item = "inline-flex items-center gap-1.5";
+const icon = "h-3.5 w-3.5 shrink-0";
+const linkCls = "py-0.5 hover:text-foreground hover:underline";
+// Same look as the other items, but clearly clickable (dotted underline).
+const revealCls =
+  "py-0.5 text-foreground/80 underline decoration-dotted underline-offset-4 hover:text-foreground hover:decoration-solid";
 
 export function ResumeView({
   profile,
@@ -18,36 +26,65 @@ export function ResumeView({
   siteKey?: string | null;
 }) {
   const links = profile?.links ?? [];
-  const contact = [profile?.email, profile?.phone, profile?.location].filter(Boolean) as string[];
   return (
     <div className="rounded-2xl border border-border bg-card p-6 shadow-sm md:p-12 print:border-0 print:p-0 print:shadow-none">
       <header className="border-b border-border pb-6">
         {/* The page supplies the <h1>; the resume name is a level-2 heading. */}
         <h2 className="font-display text-4xl font-normal md:text-5xl">{profile?.fullName}</h2>
         {profile?.headline && <p className="mt-1 text-lg text-primary">{profile.headline}</p>}
-        <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
-          {contact.map((c) => (
-            <li key={c}>{c}</li>
-          ))}
-          {reveal?.email && (
-            <li>
-              <RevealContact field="resumeEmail" kind="email" siteKey={siteKey} />
+        {/* One consistent row: icon + value, in a fixed order (email, phone, location, website, links). */}
+        <ul className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-muted-foreground">
+          {profile?.email ? (
+            <li className={item}>
+              <Mail aria-hidden className={icon} />
+              <a href={`mailto:${profile.email}`} className={linkCls}>
+                {profile.email}
+              </a>
             </li>
+          ) : (
+            reveal?.email && (
+              <li>
+                <RevealContact
+                  field="resumeEmail"
+                  kind="email"
+                  siteKey={siteKey}
+                  icon={<Mail aria-hidden className={icon} />}
+                  buttonClassName={revealCls}
+                />
+              </li>
+            )
           )}
-          {reveal?.phone && (
-            <li>
-              <RevealContact
-                field="resumePhone"
-                kind="phone"
-                siteKey={siteKey}
-                buttonClassName="py-1 hover:text-foreground hover:underline"
-              />
+          {profile?.phone ? (
+            <li className={item}>
+              <Phone aria-hidden className={icon} />
+              <a href={`tel:${profile.phone.replace(/[^\d+]/g, "")}`} className={linkCls}>
+                {profile.phone}
+              </a>
+            </li>
+          ) : (
+            reveal?.phone && (
+              <li>
+                <RevealContact
+                  field="resumePhone"
+                  kind="phone"
+                  siteKey={siteKey}
+                  icon={<Phone aria-hidden className={icon} />}
+                  buttonClassName={revealCls}
+                />
+              </li>
+            )
+          )}
+          {profile?.location && (
+            <li className={item}>
+              <MapPin aria-hidden className={icon} />
+              {profile.location}
             </li>
           )}
           {profile?.website && (
-            <li>
-              <SafeLink href={profile.website} className="hover:text-foreground hover:underline">
-                {profile.website.replace(/^https?:\/\//, "")}
+            <li className={item}>
+              <Globe aria-hidden className={icon} />
+              <SafeLink href={profile.website} className={linkCls}>
+                {profile.website.replace(/^https?:\/\//, "").replace(/\/$/, "")}
               </SafeLink>
             </li>
           )}

@@ -103,7 +103,7 @@ function DashLayout() {
       <div className="min-w-0 flex-1">
         <nav
           aria-label="Dashboard"
-          className="sticky top-0 z-30 flex items-center gap-1 overflow-x-auto border-b border-border bg-background/95 p-2 backdrop-blur md:hidden"
+          className="sticky top-0 z-30 flex items-center gap-1 overflow-x-auto border-b border-border bg-background/95 p-2 pr-10 backdrop-blur [mask-image:linear-gradient(to_right,#000_calc(100%-2.5rem),transparent)] md:hidden"
         >
           {nav.map((n) => (
             <Link

@@ -8,6 +8,7 @@ import {
   Field,
   Panel,
   PrimaryButton,
+  SaveBar,
   TagInput,
   slugify,
   useUnsavedWarning,
@@ -91,7 +92,7 @@ function ProjectEditor() {
   const [view, setView] = useState<"split" | "write" | "preview">("split");
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
-  useUnsavedWarning(dirty);
+  const { markSaved } = useUnsavedWarning(dirty);
 
   useEffect(() => {
     if (data) {
@@ -118,6 +119,7 @@ function ProjectEditor() {
     );
     setSaving(false);
     if (!res) return;
+    markSaved();
     setDirty(false);
     qc.invalidateQueries();
     if (isNew) navigate({ to: "/dashboard/projects/$id", params: { id: res.id }, replace: true });
@@ -251,7 +253,7 @@ function ProjectEditor() {
           </pre>
         </div>
 
-        <div className="space-y-6">
+        <div className="min-w-0 space-y-6">
           <Panel title="Details">
             <Field label="Slug" hint={`/projects/${d.slug || "…"}`}>
               <Input
@@ -369,6 +371,7 @@ function ProjectEditor() {
           </Panel>
         </div>
       </div>
+      <SaveBar dirty={dirty} saving={saving} onSave={save} label="Save project" />
     </div>
   );
 }

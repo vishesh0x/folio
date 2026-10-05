@@ -81,12 +81,12 @@ function InboxPage() {
                     {m.name}
                     {!m.read && <span className="sr-only"> (unread)</span>}
                   </span>
-                  <span className="shrink-0 text-xs text-muted-foreground">
+                  <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
                     {formatDistanceToNow(parseISO(m.createdAt), { addSuffix: true })}
                   </span>
                 </div>
                 <p className="mt-0.5 truncate text-sm">{m.subject || "(no subject)"}</p>
-                <p className="truncate text-xs text-muted-foreground">{m.message}</p>
+                <p className="truncate text-sm text-muted-foreground">{m.message}</p>
               </button>
             </li>
           ))}

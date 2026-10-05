@@ -4,9 +4,12 @@ import {
   isValidElement,
   useEffect,
   useId,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
+import { useBlocker } from "@tanstack/react-router";
+import { Loader2, Save } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -19,10 +22,9 @@ import {
 import { isPrivacyMode, type PrivacyMode } from "@/lib/constants";
 
 const PRIVACY_HELP: Record<PrivacyMode, string> = {
-  reveal:
-    "Not in the page source. Visitors click “Show” to see it; bots that only read HTML never get it. Rate-limited, and checked with Turnstile when configured.",
-  public: "Shown as plain text. Easiest to read, but scrapers can harvest it.",
-  hidden: "Not shown anywhere on the site. People can still use the contact form.",
+  reveal: "Kept out of the page source; shown when a visitor clicks.",
+  public: "Plain text — scrapers can read it.",
+  hidden: "Not shown on the site (the contact form still works).",
 };
 
 /** Who can see an email / phone number on the public site. */
@@ -208,8 +210,14 @@ export function slugify(s: string) {
     .replace(/^-|-$/g, "");
 }
 
-/** Warn before leaving a form with unsaved edits. */
+/**
+ * Warn before losing unsaved edits: on closing/reloading the tab AND on in-app navigation
+ * (sidebar links, back button). Call `markSaved()` right before navigating away after a
+ * successful save — React state hasn't updated yet at that point, so the ref is cleared directly.
+ */
 export function useUnsavedWarning(dirty: boolean) {
+  const ref = useRef(dirty);
+  ref.current = dirty;
   useEffect(() => {
     if (!dirty) return;
     const h = (e: BeforeUnloadEvent) => {
@@ -218,6 +226,53 @@ export function useUnsavedWarning(dirty: boolean) {
     window.addEventListener("beforeunload", h);
     return () => window.removeEventListener("beforeunload", h);
   }, [dirty]);
+  useBlocker({
+    shouldBlockFn: () =>
+      ref.current && !window.confirm("You have unsaved changes. Leave without saving?"),
+    enableBeforeUnload: false,
+    disabled: !dirty,
+  });
+  return {
+    markSaved: () => {
+      ref.current = false;
+    },
+  };
+}
+
+/**
+ * Sticky save bar at the bottom of long forms, so Save is always reachable (on a phone the
+ * header button is a long scroll away). Place it last inside the page content.
+ */
+export function SaveBar({
+  dirty,
+  saving,
+  onSave,
+  label = "Save changes",
+  className = "-mx-5 md:-mx-10",
+}: {
+  dirty: boolean;
+  saving: boolean;
+  onSave: () => void;
+  label?: string;
+  className?: string;
+}) {
+  return (
+    <div
+      className={`sticky bottom-0 z-20 mt-8 flex items-center justify-between gap-3 border-t border-border bg-background/90 px-5 py-3 backdrop-blur md:px-10 ${className}`}
+    >
+      <p role="status" className="text-sm text-muted-foreground">
+        {dirty ? "You have unsaved changes" : "All changes saved"}
+      </p>
+      <PrimaryButton onClick={onSave} disabled={saving}>
+        {saving ? (
+          <Loader2 aria-hidden className="h-4 w-4 animate-spin" />
+        ) : (
+          <Save aria-hidden className="h-4 w-4" />
+        )}{" "}
+        {label}
+      </PrimaryButton>
+    </div>
+  );
 }
 
 /** Native-feeling confirm dialog replacement (accessible, styled). */
