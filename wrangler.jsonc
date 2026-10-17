@@ -6,24 +6,19 @@
 	"compatibility_flags": [
 		"nodejs_compat"
 	],
-	"images": {
-		"binding": "IMAGES"
-	},
-	"observability": {
-		"enabled": true
-	}, // keeps logs, so errors behind the "Something broke" page can be found
 	"d1_databases": [
-				{
-			"binding": "folio_db",
-			"database_name": "folio-db",
-			"database_id": "d261f15a-72ba-41fd-9bad-bc8fd2ba0e05"
-		}
-	],
-	"r2_buckets": [
-				{
-			"bucket_name": "folio-assets",
-			"binding": "folio_assets"
-		}
-	]
-	// Secret (never commit):  npx wrangler secret put ADMIN_SETUP_TOKEN
+      {
+        "binding": "folio_db",
+        "database_id": "d261f15a-72ba-41fd-9bad-bc8fd2ba0e05"
+      }
+    ],
+    "r2_buckets": [
+      {
+        "binding": "folio-assets",
+        "bucket_name": "folio-assets"
+      }
+    ],
+    "images": {
+      "binding": "IMAGES"
+    }
 }
