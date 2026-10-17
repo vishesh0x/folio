@@ -36,7 +36,7 @@ const total = board.reduce((n, c) => n + c.items.length, 0);
       <input type="hidden" name="action" value="cat-add" />
       <h2 class="card-h">Add a category</h2>
       <div class="cat-add-row">
-        <div class="field"><label for="c-name">Name</label><input id="c-name" name="name" maxlength="40" placeholder="Reading, Drawing, Building…" required /></div>
+        <div class="field"><label for="c-name">Name</label><input id="c-name" name="name" maxlength="40" placeholder="Reading, Drawing…" required /></div>
         <div class="field"><label for="c-icon">Icon <span class="opt">(optional)</span></label><input id="c-icon" name="icon" maxlength="12" placeholder="📚" /></div>
       </div>
       <div class="row-gap"><button class="btn sm" type="submit" disabled={board.length >= MAX_CATEGORIES}>Add category</button><span class="hint">{board.length} of {MAX_CATEGORIES} used</span></div>

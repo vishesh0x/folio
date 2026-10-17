@@ -117,6 +117,7 @@
 .dash-shell .field[data-invalid='true'] input, .dash-shell .field[data-invalid='true'] textarea { border-color: var(--danger); }
 .dash-shell .field .error, .error { font-size: .82rem; color: var(--danger); font-weight: 600; }
 .opt { font-weight: 400; color: var(--muted); }
+.stack > .check { display: flex; } .stack > .hint { display: block; }   /* a hint sits UNDER its checkbox, never beside it */
 .check { display: inline-flex; align-items: flex-start; gap: 9px; font-weight: 500; cursor: pointer; }
 .check input { flex: none; width: 17px; height: 17px; margin: 2px 0 0; accent-color: var(--brand-d); }
 .dash-shell fieldset { border: 0; padding: 0; margin-inline: 0; margin-block: 0; min-width: 0; }
@@ -130,7 +131,10 @@
 .toggle input { position: absolute; opacity: 0; inset: 0; cursor: pointer; margin: 0; }
 .toggle::before { content: ''; width: 14px; height: 14px; border-radius: 4px; border: 1.5px solid var(--d-field); background: var(--card); flex: none; }
 .toggle:has(input:checked) { border-color: var(--ink); background: color-mix(in srgb, var(--gold) 28%, var(--card)); }
-.toggle:has(input:checked)::before { border-color: var(--ink); background: var(--ink) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3.5 8.5l3 3 6-6.5' fill='none' stroke='white' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 11px no-repeat; }
+.toggle:has(input:checked)::before { border-color: var(--ink); background: var(--ink); }
+/* The tick is drawn with borders in the page colour, so it is dark on a light box and light on a dark box, in both themes */
+.toggle::after { content: ''; position: absolute; left: 20.5px; top: 50%; width: 4px; height: 8px; border: solid var(--bg); border-width: 0 2px 2px 0; transform: translateY(-62%) rotate(45deg); opacity: 0; pointer-events: none; }
+.toggle:has(input:checked)::after { opacity: 1; }
 .toggle:has(input:focus-visible) { outline: 2px solid var(--focus); outline-offset: 2px; }
 
 /* choice cards: pick one of a few options, with a sentence of explanation */
@@ -162,7 +166,7 @@
 .pill.warn::before { background: var(--danger); }
 .pill.plain::before { display: none; }
 .dash-shell .status { all: unset; }
-.slug { display: inline-flex; flex-wrap: wrap; align-items: baseline; max-width: 100%; font-size: .8rem; line-height: 1.4; overflow-wrap: anywhere; word-break: break-all; }
+.slug { display: inline-flex; flex-wrap: wrap; align-items: baseline; max-width: 100%; font-size: .8rem; line-height: 1.4; overflow-wrap: anywhere; }
 .slug .pre { color: var(--muted); }
 .slug .val { color: var(--ink); font-weight: 600; }
 .copy { cursor: pointer; }
@@ -189,14 +193,16 @@ details.more > summary:hover, details.more[open] > summary { background: var(--d
 .row-title { margin: 0; font-weight: 700; font-size: .95rem; line-height: 1.3; overflow-wrap: anywhere; }
 .row-title a { color: var(--ink); text-decoration: none; }
 .row-title a:hover { text-decoration: underline; }
-.row-meta { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; color: var(--muted); font-size: .8rem; }
+.entry-main, .row-main { min-width: 0; }
+.row-meta { min-width: 0; overflow-wrap: anywhere; display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; color: var(--muted); font-size: .8rem; }
 .row-actions { display: flex; gap: 8px; align-items: center; }
 .thumb { width: 84px; height: 56px; border-radius: 8px; border: 1px solid var(--d-line); background: var(--d-sunk); object-fit: contain; overflow: hidden; display: grid; place-items: center; color: var(--muted); font-size: .7rem; }
 img.thumb { background-color: var(--d-sunk); }
 @media (max-width: 720px) {
   .row { grid-template-columns: auto minmax(0, 1fr); padding: 14px; }
-  .row-actions { grid-column: 1 / -1; }
+  .row-actions { grid-column: 1 / -1; justify-content: flex-end; }   /* the "…" button sits at the right edge, so its menu (anchored right) opens inside the screen */
 }
+.more-panel { max-width: calc(100vw - 24px); }
 
 /* ── Tabs / filters ── */
 .filters { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 16px; }
@@ -348,12 +354,12 @@ dialog.mpick::backdrop { background: rgb(18 16 22 / .6); backdrop-filter: blur(3
 .slugbox { gap: 10px; }
 .slug-full { margin: 0 0 10px; padding: 10px 12px; border: 1px solid var(--d-line); border-radius: var(--r-s); background: var(--d-sunk); }
 .slug-input { display: grid; gap: 6px; }
-.slug-input .pre { color: var(--muted); font-size: .78rem; overflow-wrap: anywhere; word-break: break-all; }
+.slug-input .pre { color: var(--muted); font-size: .78rem; overflow-wrap: anywhere; }
 .dash-shell .slug-input textarea { min-height: 0; font-weight: 600; line-height: 1.45; resize: none; field-sizing: content; overflow: hidden; }
 
 .serp { padding: 12px 14px; border: 1px solid var(--d-line); border-radius: var(--r-s); background: var(--d-sunk); display: grid; gap: 2px; }
 .serp p { margin: 0 !important; }
-.serp-url { font-size: .74rem; color: var(--muted); overflow-wrap: anywhere; word-break: break-all; }
+.serp-url { font-size: .74rem; color: var(--muted); overflow-wrap: anywhere; }
 .serp-title { font: 700 1.02rem/1.3 var(--font-body); color: var(--link); overflow-wrap: anywhere; }
 .serp-desc { font-size: .8rem; color: var(--muted); overflow-wrap: anywhere; }
 .over { color: var(--danger); font-weight: 700; }
@@ -454,7 +460,9 @@ dialog.mpick::backdrop { background: rgb(18 16 22 / .6); backdrop-filter: blur(3
 .file-thumb, .thumb-link { text-decoration: none; color: inherit; }
 
 /* ───────── Now board ───────── */
-.cat-add-row { display: grid; grid-template-columns: minmax(0, 1fr) 7rem; gap: 10px; }
+.cat-add-row { display: grid; grid-template-columns: minmax(0, 1fr) 10.5rem; gap: 10px; align-items: end; }
+.cat-add-row .field label { white-space: nowrap; }
+@media (max-width: 480px) { .cat-add-row { grid-template-columns: minmax(0, 1fr); } .cat-add-row .field:last-child input { max-width: 8rem; } }
 .cat-title { display: flex; align-items: center; gap: 12px; min-width: 0; }
 .cat-ico { display: inline-grid; place-items: center; flex: none; width: 40px; height: 40px; border: 1px solid var(--d-line2); border-radius: 10px; background: var(--d-sunk); font-size: 1.2rem; }
 .group-h { margin: 18px 0 8px; font: 700 .78rem/1.2 var(--font-body); color: var(--muted); letter-spacing: 0; }
@@ -489,4 +497,21 @@ dialog.mpick::backdrop { background: rgb(18 16 22 / .6); backdrop-filter: blur(3
   .md-top .tabs { order: -1; margin-left: 0; }
   .md-tools { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 2px; flex-basis: 100%; }
   .md-grp { flex: none; }
+}
+
+/* ───────── Touch screens: tappable things are at least 44 x 44 px ───────── */
+@media (pointer: coarse) {
+  .dash-shell .btn, .dash-shell .btn.sm, .dash-shell .chip, .dash-shell .tab, .dash-shell .pill-btn { min-height: 44px; }
+  .dash-mbar .dash-burger { min-height: 44px; padding-inline: 16px; }
+  .dash-mbar > summary { padding-block: 8px; }
+  details.more > summary { width: 44px; height: 44px; }
+  .dash-mbar-sheet a, .dash-mbar-sheet button { min-height: 44px; }
+  .toggle { min-height: 44px; }
+  .check { min-height: 44px; align-items: center; }
+  .choice { min-height: 44px; }
+  .entry-sum { min-height: 44px; }
+  .dash-shell .field input:not([type='checkbox'], [type='radio'], [type='file'], [type='range'], [type='hidden']), .dash-shell .field select, .dash-shell .search, .dash-shell .mpick-search { min-height: 44px; }
+  .filters a, .jump a, .md-grp button, .mpick-link, .card-head > a { display: inline-flex; align-items: center; min-height: 44px; }
+  .dash-shell details > summary { min-height: 44px; }
+  .more-panel a, .more-panel button { min-height: 44px; }
 }
