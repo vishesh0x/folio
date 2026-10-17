@@ -13,24 +13,14 @@
 		"enabled": true
 	}, // keeps logs, so errors behind the "Something broke" page can be found
 	"d1_databases": [
-		{
-			"binding": "DB",
-			"database_name": "folio-db",
-			"database_id": "REPLACE_WITH_ID_FROM_wrangler_d1_create",
-			"migrations_dir": "migrations"
-		},
-		{
+				{
 			"binding": "folio_db",
 			"database_name": "folio-db",
 			"database_id": "d261f15a-72ba-41fd-9bad-bc8fd2ba0e05"
 		}
 	],
 	"r2_buckets": [
-		{
-			"binding": "ASSETS_BUCKET",
-			"bucket_name": "folio-assets"
-		},
-		{
+				{
 			"bucket_name": "folio-assets",
 			"binding": "folio_assets"
 		}
