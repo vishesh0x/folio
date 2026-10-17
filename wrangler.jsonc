@@ -6,19 +6,26 @@
 	"compatibility_flags": [
 		"nodejs_compat"
 	],
+	"observability": {
+		"enabled": true
+	}, // keeps logs, so errors behind the "Something broke" page can be found
+	// Binding names must match what the code reads (src/env.d.ts): env.DB and env.ASSETS_BUCKET.
 	"d1_databases": [
-      {
-        "binding": "folio_db",
-        "database_id": "d261f15a-72ba-41fd-9bad-bc8fd2ba0e05"
-      }
-    ],
-    "r2_buckets": [
-      {
-        "binding": "folio-assets",
-        "bucket_name": "folio-assets"
-      }
-    ],
-    "images": {
-      "binding": "IMAGES"
-    }
+		{
+			"binding": "DB",
+			"database_name": "folio-db",
+			"database_id": "d261f15a-72ba-41fd-9bad-bc8fd2ba0e05",
+			"migrations_dir": "migrations"
+		}
+	],
+	"r2_buckets": [
+		{
+			"binding": "ASSETS_BUCKET",
+			"bucket_name": "folio-assets"
+		}
+	],
+	"images": {
+		"binding": "IMAGES"
+	}
+	// Secret (never commit):  npx wrangler secret put ADMIN_SETUP_TOKEN
 }
