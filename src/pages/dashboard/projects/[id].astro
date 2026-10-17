@@ -42,6 +42,7 @@ const saved = q.get('saved'), created = q.get('created');
 const isPub = p.status === 'published';
 const site = await getSettings();
 const origin = (site.site_url || Astro.url.origin).replace(/\/$/, '');
+const [originScheme, originHost] = origin.split('://');   // lets the address wrap after "https://" on very narrow phones instead of cutting the domain
 const hasSeo = !!(p.seo_title || p.seo_desc || p.seo_image);
 const words = p.body_md.trim() ? p.body_md.trim().split(/\s+/).length : 0;
 ---
@@ -120,7 +121,7 @@ const words = p.body_md.trim() ? p.body_md.trim().split(/\s+/).length : 0;
           <h2 class="card-h" id="s-addr">Address</h2>
           <div class="field slugbox" data-invalid={!!errors.slug} data-slug data-keep-open={errors.slug ? '1' : undefined}>
             <div class="slug-view" data-slug-view hidden>
-              <p class="slug-full"><span class="slug"><span class="pre">{origin}/projects/</span><span class="val" data-slug-text>{p.slug}</span></span></p>
+              <p class="slug-full"><span class="slug"><span class="pre">{originScheme}://<wbr />{originHost}<wbr />/projects/<wbr /></span><span class="val" data-slug-text>{p.slug}</span></span></p>
               <div class="row-gap">
                 <button type="button" class="btn ghost sm" data-slug-edit>Edit address</button>
                 {isPub && <button type="button" class="btn ghost sm" data-copy={`/projects/${project.slug}`}>Copy link</button>}
@@ -128,7 +129,7 @@ const words = p.body_md.trim() ? p.body_md.trim().split(/\s+/).length : 0;
             </div>
             <div class="slug-edit" data-slug-edit-box>
               <label for="slug">Address <span class="opt">(the end of the link)</span></label>
-              <div class="slug-input"><span class="pre" aria-hidden="true">{origin}/projects/</span><textarea id="slug" name="slug" rows="2" maxlength="80" spellcheck="false" autocapitalize="off" autocomplete="off" aria-invalid={errors.slug ? 'true' : undefined} aria-describedby={errors.slug ? 'slug-err' : 'slug-h'}>{p.slug}</textarea></div>
+              <div class="slug-input"><span class="pre" aria-hidden="true">{originScheme}://<wbr />{originHost}<wbr />/projects/</span><textarea id="slug" name="slug" rows="2" maxlength="80" spellcheck="false" autocapitalize="off" autocomplete="off" aria-invalid={errors.slug ? 'true' : undefined} aria-describedby={errors.slug ? 'slug-err' : 'slug-h'}>{p.slug}</textarea></div>
               <div class="row-gap"><button type="button" class="btn ghost sm" data-slug-make hidden>Make it from the title</button></div>
             </div>
             {errors.slug ? <span class="error" id="slug-err">{errors.slug}</span> : <span class="hint" id="slug-h">{isPub ? 'This project is live. Changing the address breaks links people already have.' : 'Made from the title until you edit it.'}</span>}

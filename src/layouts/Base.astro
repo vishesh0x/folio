@@ -82,7 +82,7 @@ const ogUrl = ogImage ? new URL(ogImage, origin).href
     {!bare && (
       <footer class="site-footer">
         <div class="wrap">
-          <span class="mono">© {new Date().getFullYear()} {s.name} · Built on the edge</span>
+          <p class="mono foot-copy"><span class="foot-line">© {new Date().getFullYear()} {s.name}</span><span class="foot-line">Built on the edge</span></p>
           {s.socials.length > 0 && (
             <ul class="footer-links">
               {s.socials.map((l) => <li><a href={l.url} rel="me noopener" target="_blank">{l.label}</a></li>)}
