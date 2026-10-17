@@ -1,0 +1,7 @@
+# copy to .dev.vars for local dev
+ADMIN_SETUP_TOKEN=change-me-to-a-long-random-string
+
+# Optional: try Turnstile locally with Cloudflare's official TEST keys (the site key is visible and always passes).
+# Needs internet access to challenges.cloudflare.com. Never use these in production. Set both or neither.
+# TURNSTILE_SITE_KEY=1x00000000000000000000AA
+# TURNSTILE_SECRET_KEY=1x0000000000000000000000000000000AA

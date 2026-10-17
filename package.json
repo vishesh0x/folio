@@ -11,7 +11,11 @@
     "db:local": "wrangler d1 migrations apply folio-db --local",
     "db:remote": "wrangler d1 migrations apply folio-db --remote",
     "check": "astro check",
-    "check:routes": "node scripts/check-routes.mjs"
+    "check:routes": "node scripts/check-routes.mjs",
+    "test:e2e": "astro build && playwright test",
+    "test:e2e:only": "playwright test",
+    "test:e2e:report": "playwright show-report",
+    "shots": "node tests/tools/shots.mjs"
   },
   "dependencies": {
     "@astrojs/cloudflare": "^14.3.4",
@@ -25,5 +29,8 @@
     "miniflare": {
       "sharp": "0.35.5"
     }
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.56.0"
   }
 }
