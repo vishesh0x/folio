@@ -1,0 +1,80 @@
+---
+import { env } from 'cloudflare:workers';
+import Base from '../layouts/Base.astro';
+import Img from '../components/Img.astro';
+import ProjectCard from '../components/ProjectCard.astro';
+import { getSettings } from '../lib/settings';
+import { listPublished } from '../lib/projects';
+import { loadAsset } from '../lib/media';
+import { pageSeo } from '../lib/seo';
+import { emphasis } from '../lib/text';
+
+const s = await getSettings();
+const seo = await pageSeo('home');
+const portrait = await loadAsset(s.portrait_asset ?? undefined);
+let work = await listPublished({ featured: true, limit: 3 });
+if (work.length === 0) work = await listPublished({ limit: 3 });
+
+let now: { title: string; category: string }[] = [];
+try {
+  now = (await env.DB.prepare(`SELECT i.title, c.name AS category FROM now_items i JOIN now_categories c ON c.id = i.category_id
+    WHERE i.status = 'current' ORDER BY i.sort_order, i.id LIMIT 4`).all<{ title: string; category: string }>()).results;
+} catch {}
+
+const headlineHtml = emphasis(s.headline || `Hi, I’m *${s.name}*.`);
+const eyebrow = [s.tagline, s.location].filter(Boolean).join(' · ');
+const sameAs = s.socials.map((l) => l.url).filter((u) => /^https?:/.test(u));
+const ld = { '@context': 'https://schema.org', '@type': 'Person', name: s.name, jobTitle: s.tagline || undefined, url: s.site_url || Astro.url.origin, sameAs: sameAs.length ? sameAs : undefined };
+---
+<Base title={seo.title} description={seo.description} noindex={seo.noindex} ogImage={seo.ogImage}>
+  <script slot="head" type="application/ld+json" set:html={JSON.stringify(ld).replace(/</g, '\\u003c')} />
+
+  <section class="hero wrap">
+    <div class="hero-text">
+      {s.availability && <p class="avail">{s.availability}</p>}
+      {eyebrow && <p class="eyebrow">{eyebrow}</p>}
+      <h1 set:html={headlineHtml} />
+      {(s.bio || s.tagline) && <p class="lead">{s.bio || s.tagline}</p>}
+      <p class="hero-cta">
+        <a class="btn" href="/projects">See projects <span aria-hidden="true">→</span></a>
+        <a class="btn ghost" href="/contact">Say hello</a>
+      </p>
+    </div>
+    {portrait && <div class="portrait"><Img asset={portrait} eager sizes="(min-width: 60rem) 26rem, 80vw" /></div>}
+  </section>
+
+  {s.highlights.length > 0 && (
+    <section class="band" aria-label="Highlights">
+      <div class="wrap section" style="padding-block:clamp(2rem,5vw,3rem)">
+        <div class="hl-grid">{s.highlights.map((h) => <div class="hl"><b>{h.value}</b><span>{h.label}</span></div>)}</div>
+      </div>
+    </section>
+  )}
+
+  {work.length > 0 && (
+    <section class="wrap section" aria-labelledby="work-h">
+      <div class="section-head">
+        <div><p class="eyebrow">Featured</p><h2 id="work-h">Recent <em>work</em></h2></div>
+        <a class="btn ghost sm" href="/projects">All projects <span aria-hidden="true">→</span></a>
+      </div>
+      <div class="pgrid">{work.map((p) => <ProjectCard project={p} />)}</div>
+    </section>
+  )}
+
+  {now.length > 0 && (
+    <section class="band" aria-labelledby="now-h">
+      <div class="wrap section">
+        <p class="eyebrow">Right now</p>
+        <h2 id="now-h">What I’m <em>into</em></h2>
+        <ul class="now-band-list">{now.map((n) => <li><span class="tag">{n.category}</span> {n.title}</li>)}</ul>
+        <a class="btn ghost" href="/now">Visit /now <span aria-hidden="true">→</span></a>
+      </div>
+    </section>
+  )}
+
+  <section class="wrap closing">
+    <h2>Let’s make <em>something</em>.</h2>
+    <p class="lead">Got a project, a question, or just want to say hi? My inbox is open.</p>
+    <p><a class="btn" href="/contact">Get in touch <span aria-hidden="true">→</span></a></p>
+  </section>
+</Base>

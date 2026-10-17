@@ -1,0 +1,327 @@
+---
+import Dash from '../../layouts/Dash.astro';
+import PageHead from '../../components/PageHead.astro';
+import MediaField from '../../components/MediaField.astro';
+import MediaData from '../../components/MediaData.astro';
+import EntryFields from '../../components/EntryFields.astro';
+import { getSettings, saveSettings } from '../../lib/settings';
+import { getResumeOpts, saveResumeOpts, KIND_LABEL, KIND_TITLE, KINDS, type ContactMode } from '../../lib/resume';
+import * as R from '../../lib/resume-admin';
+import { listAssets } from '../../lib/assets';
+
+const assets = await listAssets();
+const pdfs = assets.filter((a) => a.mime === 'application/pdf');
+const enc = encodeURIComponent;
+const GONE = 'That no longer exists. It may have been removed in another tab.';
+let error = '';
+let posted: { form: string; values: Record<string, string> } | null = null;
+let redirectTo: string | null = null;
+
+if (Astro.request.method === 'POST') {
+  const f = await Astro.request.formData();
+  const action = String(f.get('action') ?? '');
+  const id = Number(f.get('id')), sid = Number(f.get('section_id'));
+  const go = (msg: string, anchor = '') => { redirectTo = `/dashboard/resume?ok=${enc(msg)}${anchor}`; };
+  const fail = (msg: string, form: string) => {
+    Astro.response.status = 400; error = msg;
+    posted = { form, values: Object.fromEntries([...f.entries()].map(([k, v]) => [k, String(v)])) };
+  };
+  const bad = (form: string) => fail(GONE, form);
+  const sOk = Number.isInteger(sid) && sid > 0, iOk = Number.isInteger(id) && id > 0;
+
+  if (action === 'opts') {
+    const line = (k: string, n: number) => String(f.get(k) ?? '').replace(/\s+/g, ' ').trim().slice(0, n);
+    const mode = String(f.get('contact_mode') ?? '');
+    await saveResumeOpts({
+      name: line('name', 80), headline: line('headline', 120), layout: f.get('layout') === 'one' ? 'one' : 'two', print_reveal: f.get('print_reveal') === 'on', show_email: f.get('show_email') === 'on', show_phone: f.get('show_phone') === 'on',
+      show_location: f.get('show_location') === 'on', show_socials: f.get('show_socials') === 'on', show_download: f.get('show_download') === 'on',
+      contact_mode: (['reveal', 'hidden', 'plain'].includes(mode) ? mode : 'reveal') as ContactMode,
+    });
+    const pick = String(f.get('resume_asset') ?? '');
+    await saveSettings({ ...(await getSettings()), resume_asset: pdfs.some((a) => a.id === pick) ? pick : null });
+    go('Options saved.', '#opts');
+  } else if (action === 'starter') {
+    const e = await R.starterLayout(); e ? fail(e, 'starter') : go('Standard layout created. Add entries to each section.');
+  } else if (action === 'sec-add') {
+    const e = await R.addSection(String(f.get('kind') ?? ''), String(f.get('title') ?? '')); e ? fail(e, 'sec-add') : go('Section added.');
+  } else if (action === 'sec-rename' && iOk) {
+    const t = String(f.get('title') ?? '').replace(/\s+/g, ' ').trim();
+    if (!t) fail('Give the section a title.', `ren-${id}`); else (await R.renameSection(id, t)) ? go('Section renamed.', `#sec-${id}`) : bad(`ren-${id}`);
+  } else if ((action === 'sec-show' || action === 'sec-hide') && iOk) {
+    (await R.setSectionVisible(id, action === 'sec-show')) ? go(action === 'sec-show' ? 'Section is visible.' : 'Section hidden.', `#sec-${id}`) : bad('x');
+  } else if ((action === 'sec-up' || action === 'sec-down') && iOk) {
+    (await R.moveSection(id, action === 'sec-up' ? 'up' : 'down')) ? go('Moved.', `#sec-${id}`) : bad('x');
+  } else if (action === 'sec-delete' && iOk) {
+    (await R.deleteSection(id)) ? go('Section and its entries removed.') : bad('x');
+  } else if (action === 'ent-add' && sOk) {
+    const kind = await R.sectionKind(sid);
+    if (!kind) bad(`add-${sid}`);
+    else {
+      const parsed = R.entryFromForm(kind, f);
+      const pid = kind === 'projects' ? Number(f.get('project_id')) : null;
+      if (parsed.error) fail(parsed.error, `add-${sid}`);
+      else if (kind === 'projects' && !(pid && pid > 0)) fail('Choose a project.', `add-${sid}`);
+      else { const e = await R.addEntry(sid, parsed.data!, pid); e ? fail(e, `add-${sid}`) : go('Added.', `#sec-${sid}`); }
+    }
+  } else if (action === 'ent-update' && iOk) {
+    const ek = await R.entryKind(id);
+    if (!ek) bad(`edit-${id}`);
+    else {
+      const parsed = R.entryFromForm(ek.project_id ? 'projects' : ek.kind, f);
+      if (parsed.error) fail(parsed.error, `edit-${id}`);
+      else (await R.updateEntry(id, parsed.data!)) ? go('Saved.', `#sec-${ek.section_id}`) : bad(`edit-${id}`);
+    }
+  } else if ((action === 'ent-show' || action === 'ent-hide') && iOk) {
+    (await R.setEntryVisible(id, action === 'ent-show')) ? go(action === 'ent-show' ? 'Entry is visible.' : 'Entry hidden.', `#sec-${sid}`) : bad('x');
+  } else if ((action === 'ent-up' || action === 'ent-down') && iOk) {
+    (await R.moveEntry(id, action === 'ent-up' ? 'up' : 'down')) ? go('Moved.', `#sec-${sid}`) : bad('x');
+  } else if (action === 'ent-delete' && iOk) {
+    (await R.deleteEntry(id)) ? go('Removed.', `#sec-${sid}`) : bad('x');
+  } else { Astro.response.status = 400; error = 'Nothing was changed.'; }
+}
+if (redirectTo) return Astro.redirect(redirectTo, 303);
+
+const [{ sections, projects }, opts, site] = await Promise.all([R.loadBuilder(), getResumeOpts(), getSettings()]);
+const ok = Astro.url.searchParams.get('ok');
+const P = posted as { form: string; values: Record<string, string> } | null;
+const isForm = (k: string) => P?.form === k;
+const projById = new Map(projects.map((p) => [p.id, p]));
+// Which forms have an error area of their own on this page? An error for any other form (for example one
+// whose item was just deleted in another tab) is shown at the top instead, so it is never lost or doubled.
+const inlineKeys = new Set<string>(['sec-add']);
+for (const sec of sections) {
+  inlineKeys.add(`ren-${sec.id}`);
+  if (sec.kind !== 'projects' || projects.some((p) => !sec.entries.some((e) => e.project_id === p.id))) inlineKeys.add(`add-${sec.id}`);
+  for (const e of sec.entries) inlineKeys.add(`edit-${e.id}`);
+}
+const topError = error && !(P && inlineKeys.has(P.form));
+
+const baseValues = (kind: string, d: Record<string, any>): Record<string, string> => {
+  const v: Record<string, string> = {};
+  for (const [k, x] of Object.entries(d)) v[k] = Array.isArray(x) ? x.join('\n') : x === true ? 'on' : x === false ? '' : String(x ?? '');
+  return v;
+};
+const vals = (form: string, base: Record<string, string>) => (isForm(form) ? P!.values : base);
+const line = (kind: string, d: Record<string, any>): string => {
+  const j = (...p: string[]) => p.filter(Boolean).join(' · ');
+  switch (kind) {
+    case 'summary': return d.text.length > 90 ? d.text.slice(0, 90) + '…' : d.text;
+    case 'experience': return j(d.role, d.company) + (d.current ? ' (current)' : '');
+    case 'education': return j(d.degree, d.school);
+    case 'skills': return j(d.group, d.items);
+    case 'certifications': return j(d.name, d.issuer);
+    default: return j(d.heading, d.subheading) || (d.text ?? '').slice(0, 80);
+  }
+};
+const modes: [ContactMode, string, string][] = [
+  ['reveal', 'Click to show', 'A “Show email” / “Show phone” button. The value is never in the page itself, which stops scrapers that only read HTML. Recommended.'],
+  ['hidden', 'Hidden', 'Not shown at all. The resume points visitors to your contact form instead.'],
+  ['plain', 'Written on the page', 'Visible to everyone, including scrapers and spam bots. Only choose this if you do not mind.'],
+];
+---
+<Dash title="Resume">
+  <MediaData assets={assets} />
+  <PageHead title="Resume" lede="Build the online version of your resume, choose what shows and how your contact details are protected, and set the PDF people can download.">
+    <a class="btn ghost sm" href="/resume" target="_blank" rel="noopener">View resume ↗</a>
+  </PageHead>
+  {ok && <p class="flash" role="status">{ok}</p>}
+  {topError && <p class="flash error" role="alert">{error}</p>}
+
+  <form method="post" id="opts" class="stack" style="--stack:16px" data-savebar aria-label="Resume options">
+    <input type="hidden" name="action" value="opts" />
+
+    <section class="card" aria-labelledby="o-who">
+      <div class="card-head"><div><h2 class="card-h" id="o-who">Name and headline</h2><p class="card-sub">What sits at the top of your resume.</p></div></div>
+      <div class="two">
+        <div class="field"><label for="o-name">Name on the resume</label><input id="o-name" name="name" value={opts.name} maxlength="80" placeholder={site.name} aria-describedby="o-name-h" /><span class="hint" id="o-name-h">Leave empty to use “{site.name}” from Settings. Also names the PDF people download.</span></div>
+        <div class="field"><label for="o-headline">Headline</label><input id="o-headline" name="headline" value={opts.headline} maxlength="120" placeholder={site.tagline || 'Senior frontend engineer'} /><span class="hint">The line under your name. Empty uses your site tagline.</span></div>
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="o-show">
+      <div class="card-head"><div><h2 class="card-h" id="o-show">What to show</h2><p class="card-sub">Details that sit beside your experience. Set the values themselves in <a href="/dashboard/settings">Settings</a>.</p></div></div>
+      <div class="stack" style="--stack:18px">
+        <div class="toggles" role="group" aria-label="Show on the resume">
+          <label class="toggle"><input type="checkbox" name="show_email" checked={opts.show_email} /> Email</label>
+          <label class="toggle"><input type="checkbox" name="show_phone" checked={opts.show_phone} /> Phone</label>
+          <label class="toggle"><input type="checkbox" name="show_location" checked={opts.show_location} /> Location</label>
+          <label class="toggle"><input type="checkbox" name="show_socials" checked={opts.show_socials} /> Social links</label>
+        </div>
+        {opts.show_email && !site.email && <p class="hint" style="margin:-8px 0 0">No email is set yet. Add one in <a href="/dashboard/settings#about">Settings</a>.</p>}
+        {opts.show_phone && !site.phone && <p class="hint" style="margin:-8px 0 0">No phone number is set yet. Add one in <a href="/dashboard/settings#about">Settings</a>.</p>}
+        <fieldset class="field"><legend>How your email and phone are shown</legend>
+          <div class="choices">
+            {modes.map(([val, title, desc]) => (
+              <label class="choice"><input type="radio" name="contact_mode" value={val} checked={opts.contact_mode === val} /><b>{title}</b><span>{desc}</span></label>
+            ))}
+          </div>
+        </fieldset>
+        <div class="stack" style="--stack:4px">
+          <label class="check"><input type="checkbox" name="print_reveal" checked={opts.print_reveal} /> Include my email and phone when someone uses “Print this page”</label>
+          <span class="hint" style="padding-left:26px">Only applies to “Click to show”. The printed copy then contains your details, so anyone who prints it has them. Pressing Ctrl+P directly does not do this.</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="o-layout">
+      <div class="card-head"><div><h2 class="card-h" id="o-layout">Layout</h2></div></div>
+      <div class="choices">
+        <label class="choice"><input type="radio" name="layout" value="two" checked={opts.layout === 'two'} /><b>Two columns</b><span>Experience, projects and education on the left; contact, skills and certifications on the right. Best for a one-page printout.</span></label>
+        <label class="choice"><input type="radio" name="layout" value="one" checked={opts.layout === 'one'} /><b>One column</b><span>Every section in the order you set, top to bottom. Better for very long resumes.</span></label>
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="o-pdf">
+      <div class="card-head"><div><h2 class="card-h" id="o-pdf">Download</h2><p class="card-sub">The PDF behind the “Download PDF” button.</p></div></div>
+      <div class="stack" style="--stack:16px">
+        <MediaField side name="resume_asset" value={site.resume_asset} assets={assets} kind="pdf" label="Resume PDF" none="No PDF" aspect="4 / 3" empty="Upload your resume PDF" pickTitle="Choose your resume PDF" thumbWidth="150px" help="Its own text is yours to control: if the PDF contains your phone number, anyone who downloads it has it." />
+        <div class="toggles"><label class="toggle"><input type="checkbox" name="show_download" checked={opts.show_download} /> Show the Download PDF button</label></div>
+      </div>
+    </section>
+
+    <div class="savebar"><button class="btn" type="submit">Save options</button><span class="state">No changes yet</span></div>
+  </form>
+
+  <div class="sec-title">
+    <h2>Sections</h2>
+    <p class="muted">What the online resume is made of, in order. Each section holds entries.</p>
+  </div>
+
+  {sections.length === 0 && (
+    <form method="post" class="empty">
+      <input type="hidden" name="action" value="starter" />
+      <h3>Start quickly</h3>
+      <p>Create the usual sections (Summary, Experience, Education, Skills and Selected projects), then fill them in.</p>
+      <button class="btn" type="submit">Create the standard layout</button>
+    </form>
+  )}
+
+  <div class="stack" style="--stack:14px">
+  {sections.map((sec, si) => {
+    const usedIds = new Set(sec.entries.map((e) => e.project_id));
+    const shown = sec.entries.filter((e) => e.visible && (sec.kind !== 'projects' || projById.get(e.project_id!)?.status === 'published')).length;
+    const free = projects.filter((p) => !usedIds.has(p.id));
+    const dots = '<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>';
+    return (
+      <section class="card sec" id={`sec-${sec.id}`} aria-labelledby={`sec-h-${sec.id}`}>
+        <header class="sec-head">
+          <div class="sec-titles">
+            <h3 class="card-h" id={`sec-h-${sec.id}`}>{sec.title}</h3>
+            <p class="row-meta"><span class="pill plain">{KIND_LABEL[sec.kind]}</span><span>{sec.entries.length} {sec.entries.length === 1 ? 'entry' : 'entries'}</span>{!sec.visible && <span class="pill warn">Hidden</span>}</p>
+          </div>
+          <div class="row-actions">
+            <details class="more">
+              <summary aria-label={`Actions for the ${sec.title} section`}><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" set:html={dots} /></summary>
+              <div class="more-panel">
+                <form method="post"><input type="hidden" name="id" value={sec.id} /><button name="action" value={sec.visible ? 'sec-hide' : 'sec-show'}>{sec.visible ? 'Hide from resume' : 'Show on resume'}</button></form>
+                <form method="post"><input type="hidden" name="id" value={sec.id} /><button name="action" value="sec-up" disabled={si === 0}>Move up</button></form>
+                <form method="post"><input type="hidden" name="id" value={sec.id} /><button name="action" value="sec-down" disabled={si === sections.length - 1}>Move down</button></form>
+                <div class="sep" role="separator"></div>
+                <form method="post" data-confirm={`Delete the section “${sec.title}”${sec.entries.length ? ` and its ${sec.entries.length} entr${sec.entries.length === 1 ? 'y' : 'ies'}` : ''}? This cannot be undone.`}>
+                  <input type="hidden" name="id" value={sec.id} /><button class="bad" name="action" value="sec-delete">Delete section…</button></form>
+              </div>
+            </details>
+          </div>
+        </header>
+
+        <details class="rename" open={isForm(`ren-${sec.id}`)}>
+          <summary>Rename</summary>
+          <form method="post" class="rename-form">
+            <input type="hidden" name="action" value="sec-rename" /><input type="hidden" name="id" value={sec.id} />
+            <div class="field"><label for={`ren-${sec.id}`} class="visually-hidden">New title for the section {sec.title}</label><input id={`ren-${sec.id}`} name="title" value={vals(`ren-${sec.id}`, { title: sec.title }).title} maxlength="80" required /></div>
+            <button class="btn ghost sm" type="submit">Save title</button>
+          </form>
+        </details>
+        {isForm(`ren-${sec.id}`) && error && <p class="flash error" role="alert">{error}</p>}
+        {sec.visible && shown === 0 && <p class="note-line">Not shown on your resume yet: add an entry{sec.kind === 'projects' ? ' (and make sure the project is published)' : ''}.</p>}
+
+        {sec.entries.length > 0 && (
+          <ul class="entries">
+            {sec.entries.map((e, ei) => {
+              const proj = e.project_id ? projById.get(e.project_id) : null;
+              const draft = !!proj && proj.status !== 'published';
+              const title = proj ? proj.title : line(sec.kind, e.d) || '(empty entry)';
+              const ek = `edit-${e.id}`;
+              return (
+                <li class="entry-wrap" id={`ent-${e.id}`}>
+                  <details class="entry" open={isForm(ek)}>
+                    <summary class="entry-sum">
+                      <span class="entry-main">
+                        <span class="row-title">{title}</span>
+                        {(proj && e.d.blurb) && <span class="row-meta">{e.d.blurb}</span>}
+                        {(!e.visible || draft || (e.project_id && !proj)) && (
+                          <span class="row-meta">
+                            {!e.visible && <span class="pill warn">Hidden</span>}
+                            {draft && <span class="pill warn">Project is a draft: not shown</span>}
+                            {e.project_id && !proj && <span class="pill warn">Project was deleted</span>}
+                          </span>
+                        )}
+                      </span>
+                      <span class="entry-edit" aria-hidden="true">Edit</span>
+                      <span class="visually-hidden">Edit “{title}”</span>
+                    </summary>
+                    {isForm(ek) && error && <p class="flash error" role="alert">{error}</p>}
+                    <form method="post" class="edit-form">
+                      <input type="hidden" name="action" value="ent-update" /><input type="hidden" name="id" value={e.id} />
+                      {proj && <p class="hint" style="margin:0">Project: <strong>{proj.title}</strong> · <a href={`/dashboard/projects/${proj.id}`}>edit the project itself</a></p>}
+                      <EntryFields kind={e.project_id ? 'projects' : sec.kind} idp={ek} v={vals(ek, baseValues(sec.kind, e.d))} />
+                      <div><button class="btn sm" type="submit">Save changes</button></div>
+                    </form>
+                  </details>
+                  <div class="entry-menu">
+                    <details class="more">
+                      <summary aria-label={`Actions for ${title}`}><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" set:html={dots} /></summary>
+                      <div class="more-panel">
+                        <form method="post"><input type="hidden" name="id" value={e.id} /><input type="hidden" name="section_id" value={sec.id} /><button name="action" value={e.visible ? 'ent-hide' : 'ent-show'}>{e.visible ? 'Hide from resume' : 'Show on resume'}</button></form>
+                        <form method="post"><input type="hidden" name="id" value={e.id} /><input type="hidden" name="section_id" value={sec.id} /><button name="action" value="ent-up" disabled={ei === 0}>Move earlier</button></form>
+                        <form method="post"><input type="hidden" name="id" value={e.id} /><input type="hidden" name="section_id" value={sec.id} /><button name="action" value="ent-down" disabled={ei === sec.entries.length - 1}>Move later</button></form>
+                        <div class="sep" role="separator"></div>
+                        <form method="post" data-confirm={`Remove “${title}” from the resume?`}><input type="hidden" name="id" value={e.id} /><input type="hidden" name="section_id" value={sec.id} /><button class="bad" name="action" value="ent-delete">Remove…</button></form>
+                      </div>
+                    </details>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+
+        {sec.kind === 'projects' && free.length === 0 && <p class="note-line">{projects.length === 0 ? 'You have no projects yet. Create some under Projects.' : 'All your projects are already in this section.'}</p>}
+        {(sec.kind !== 'projects' || free.length > 0) && (
+          <details class="add" open={isForm(`add-${sec.id}`)}>
+            <summary><span aria-hidden="true">＋</span> {sec.kind === 'projects' ? 'Add a project' : `Add to ${sec.title}`}</summary>
+            {isForm(`add-${sec.id}`) && error && <p class="flash error" role="alert">{error}</p>}
+            <form method="post" class="edit-form">
+              <input type="hidden" name="action" value="ent-add" /><input type="hidden" name="section_id" value={sec.id} />
+              {sec.kind === 'projects' && (
+                <div class="field"><label for={`ap-${sec.id}`}>Project</label>
+                  <select id={`ap-${sec.id}`} name="project_id" required>
+                    <option value="">Choose a project…</option>
+                    {free.map((p) => <option value={p.id} selected={isForm(`add-${sec.id}`) && P!.values.project_id === String(p.id)}>{p.title}{p.status !== 'published' ? ' (draft: not shown until published)' : ''}</option>)}
+                  </select></div>
+              )}
+              <EntryFields kind={sec.kind} idp={`add-${sec.id}`} v={vals(`add-${sec.id}`, {})} />
+              <div><button class="btn sm" type="submit">Add</button></div>
+            </form>
+          </details>
+        )}
+      </section>
+    );
+  })}
+  </div>
+
+  <details class="card fold add-section" open={isForm('sec-add')} style="margin-top:14px">
+    <summary><span class="card-h">Add a section</span><span class="hint">{sections.length} of {R.MAX_SECTIONS} used</span></summary>
+    <form method="post" class="stack" style="--stack:14px;margin-top:14px">
+      <input type="hidden" name="action" value="sec-add" />
+      {isForm('sec-add') && error && <p class="flash error" role="alert">{error}</p>}
+      <div class="two">
+        <div class="field"><label for="as-kind">Kind</label>
+          <select id="as-kind" name="kind">{KINDS.map((k) => <option value={k} selected={isForm('sec-add') && P!.values.kind === k}>{KIND_LABEL[k]}</option>)}</select></div>
+        <div class="field"><label for="as-title">Title <span class="opt">(optional)</span></label><input id="as-title" name="title" maxlength="80" value={isForm('sec-add') ? P!.values.title : ''} placeholder="Uses the kind’s usual title" /></div>
+      </div>
+      <p class="hint" style="margin:0">Use “Custom section” for anything else: talks, awards, volunteering, languages. You can have several. A section’s kind cannot be changed later, only its title.</p>
+      <div><button class="btn sm" type="submit" disabled={sections.length >= R.MAX_SECTIONS}>Add section</button></div>
+    </form>
+  </details>
+</Dash>

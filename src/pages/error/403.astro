@@ -1,0 +1,11 @@
+---
+import Base from '../../layouts/Base.astro';
+import ErrorView from '../../components/ErrorView.astro';
+Astro.response.status = 403;
+---
+<Base title="Not allowed" noindex>
+  <ErrorView code="403" kicker="Door’s closed" title="You can’t do that here." art="lock">
+    <p class="lead">That request was blocked. This usually means a form was sent from a different website, or you need to sign in first.</p>
+    <p class="hero-cta"><a class="btn" href="/">Back home</a><a class="btn ghost" href="/contact">Contact me</a></p>
+  </ErrorView>
+</Base>

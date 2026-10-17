@@ -1,0 +1,119 @@
+---
+import Base from './Base.astro';
+import '../styles/dashboard.css'; // after Base, so these rules win ties with the public stylesheet
+import ThemeSwitch from '../components/ThemeSwitch.astro';
+import { unreadCount } from '../lib/inbox';
+import { getSettings } from '../lib/settings';
+interface Props { title: string; }
+const { title } = Astro.props;
+const path = Astro.url.pathname;
+const unread = await unreadCount();
+const site = await getSettings();
+const email = Astro.locals.user?.email ?? '';
+
+// 24px line icons, drawn here so the dashboard needs no icon font
+const ICONS: Record<string, string> = {
+  overview: '<rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/>',
+  inbox: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/>',
+  projects: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+  now: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  resume: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/>',
+  assets: '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="1.8"/><path d="m21 16-5-5-8 9"/>',
+  settings: '<path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/>',
+  seo: '<circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/>',
+};
+type Item = [href: string, label: string, icon: string];
+const groups: { label?: string; items: Item[] }[] = [
+  { items: [['/dashboard', 'Overview', 'overview'], ['/dashboard/inbox', 'Inbox', 'inbox']] },
+  { label: 'Content', items: [['/dashboard/projects', 'Projects', 'projects'], ['/dashboard/now', 'Now board', 'now'], ['/dashboard/resume', 'Resume', 'resume'], ['/dashboard/assets', 'Files', 'assets']] },
+  { label: 'Site', items: [['/dashboard/settings', 'Settings', 'settings'], ['/dashboard/seo', 'Search & sharing', 'seo']] },
+];
+const active = (href: string) => (href === '/dashboard' ? path === href : path === href || path.startsWith(href + '/'));
+---
+<Base title={title} noindex bare>
+  <a class="skip" href="#dash-main">Skip to content</a>
+  <div class="dash-shell">
+    <aside class="dash-side">
+      <a class="dash-brand" href="/dashboard" title={site.name}>{site.name}<b>.</b><small>Dashboard</small></a>
+      <nav class="dash-nav" aria-label="Dashboard">
+        {groups.map((g) => (
+          <>
+            {g.label && <p class="grp">{g.label}</p>}
+            {g.items.map(([href, label, icon]) => (
+              <a href={href} aria-current={active(href) ? 'page' : undefined}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" set:html={ICONS[icon]} />
+                {label}{label === 'Inbox' && unread > 0 && <span class="badge">{unread > 99 ? '99+' : unread}<span class="visually-hidden"> unread</span></span>}
+              </a>
+            ))}
+          </>
+        ))}
+      </nav>
+      <div class="dash-foot">
+        <div class="dash-foot-row"><a class="btn ghost sm" href="/" target="_blank" rel="noopener">View site <span aria-hidden="true">↗</span></a><ThemeSwitch /></div>
+        <p class="who">{email}</p>
+        <form method="post" action="/auth/logout" class="dash-foot-row"><button class="btn ghost sm" type="submit">Sign out</button></form>
+      </div>
+    </aside>
+
+    <div class="dash-col">
+      <!-- Phone and tablet: the sidebar becomes a menu. A <details> element, so it works without JavaScript. -->
+      <header class="dash-mbar-head">
+      <details class="dash-mbar">
+        <summary><span>{site.name}<b class="dot">.</b></span>{unread > 0 && <span class="badge" style="background:var(--gold);color:var(--on-gold);border-radius:999px;padding:1px 7px;font-size:.75rem">{unread}<span class="visually-hidden"> unread</span></span>}<span class="dash-burger">Menu</span></summary>
+        <div class="dash-mbar-sheet">
+          <nav class="dash-nav" aria-label="Dashboard (menu)">
+            {groups.map((g) => (
+              <>
+                {g.label && <p class="grp">{g.label}</p>}
+                {g.items.map(([href, label, icon]) => (
+                  <a href={href} aria-current={active(href) ? 'page' : undefined}>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" set:html={ICONS[icon]} />
+                    {label}{label === 'Inbox' && unread > 0 && <span class="badge">{unread}</span>}
+                  </a>
+                ))}
+              </>
+            ))}
+          </nav>
+          <div class="dash-foot">
+            <div class="dash-foot-row"><a class="btn ghost sm" href="/" target="_blank" rel="noopener">View site <span aria-hidden="true">↗</span></a><ThemeSwitch /></div>
+            <form method="post" action="/auth/logout" class="dash-foot-row"><button class="btn ghost sm" type="submit">Sign out</button><span class="who">{email}</span></form>
+          </div>
+        </div>
+      </details>
+      </header>
+      <main id="dash-main" class="dash-main"><slot /></main>
+    </div>
+  </div>
+  <script is:inline nonce={Astro.locals.nonce}>
+    document.addEventListener('click', function (e) {
+      var b = e.target.closest('[data-copy],[data-copy-text]');
+      if (b) {
+        var url = b.hasAttribute('data-copy-text') ? b.getAttribute('data-copy-text') : new URL(b.getAttribute('data-copy'), location.origin).href, old = b.textContent;
+        navigator.clipboard.writeText(url).then(function () { b.textContent = 'Copied'; setTimeout(function () { b.textContent = old; }, 1500); });
+      }
+      // a "…" menu closes when you click anywhere else
+      document.querySelectorAll('details.more[open]').forEach(function (d) { if (!d.contains(e.target)) d.removeAttribute('open'); });
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key !== 'Escape') return;
+      document.querySelectorAll('details.more[open]').forEach(function (d) { d.removeAttribute('open'); var s = d.querySelector('summary'); if (s) s.focus(); });
+    });
+    document.querySelectorAll('time[data-local]').forEach(function (t) {
+      var d = new Date(t.getAttribute('datetime'));
+      if (!isNaN(d)) t.textContent = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(d);
+    });
+    document.addEventListener('submit', function (e) {
+      var m = e.target.getAttribute && e.target.getAttribute('data-confirm');
+      if (m && !confirm(m)) e.preventDefault();
+    });
+    // Forms with a save bar: say whether there is anything to save, and warn before leaving with unsaved edits.
+    document.querySelectorAll('form[data-savebar]').forEach(function (f) {
+      var s = f.querySelector('.savebar .state'), dirty = false, sending = false;
+      if (!s) return;
+      var idle = s.textContent;
+      f.addEventListener('input', function () { if (!dirty) { dirty = true; s.textContent = 'Unsaved changes'; s.classList.add('dirty'); } });
+      f.addEventListener('submit', function () { sending = true; });
+      window.addEventListener('beforeunload', function (e) { if (dirty && !sending) { e.preventDefault(); e.returnValue = ''; } });
+    });
+  </script>
+</Base>

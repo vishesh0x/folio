@@ -1,0 +1,58 @@
+---
+import Base from '../../layouts/Base.astro';
+import Img from '../../components/Img.astro';
+import { getPublished, neighbours } from '../../lib/projects';
+import { renderMarkdown, excerpt } from '../../lib/markdown';
+import { loadAsset } from '../../lib/media';
+import { getSettings } from '../../lib/settings';
+
+const p = await getPublished(Astro.params.slug ?? '');
+if (!p) return Astro.rewrite('/404');
+
+const [{ html, toc }, { prev, next }, s] = await Promise.all([renderMarkdown(p.body_md), neighbours(p), getSettings()]);
+const seoImg = await loadAsset(p.seo_image ?? undefined);
+const ogImage = seoImg && seoImg.mime !== 'image/svg+xml' ? `/media/${seoImg.id}/${encodeURIComponent(seoImg.filename)}?w=1280&f=jpeg`
+  : p.cover && p.cover.mime !== 'image/svg+xml' ? `/media/${p.cover.id}/${encodeURIComponent(p.cover.filename)}?w=1280&f=jpeg` : undefined;
+const description = p.seo_desc || p.summary || excerpt(p.body_md);
+const year = new Date(p.created_at * 1000).getFullYear();
+const ld = { '@context': 'https://schema.org', '@type': 'CreativeWork', name: p.title, description, author: { '@type': 'Person', name: s.name },
+  dateCreated: new Date(p.created_at * 1000).toISOString(), dateModified: new Date(p.updated_at * 1000).toISOString(), keywords: p.tags.join(', ') || undefined,
+  codeRepository: p.source_url || undefined };
+---
+<Base title={p.seo_title || p.title} description={description} ogImage={ogImage} ogType="article">
+  <script slot="head" type="application/ld+json" set:html={JSON.stringify(ld).replace(/</g, '\\u003c')} />
+
+  <article class="wrap project">
+    <p class="crumb"><a href="/projects">← All projects</a></p>
+    <header class="project-head">
+      <div class="project-meta"><span class="eyebrow" style="margin:0">{year}</span>{p.tags.length > 0 && <ul class="tags">{p.tags.map((t) => <li class="tag">{t}</li>)}</ul>}</div>
+      <h1>{p.title}</h1>
+      {p.summary && <p class="lead">{p.summary}</p>}
+      {(p.live_url || p.source_url) && (
+        <p class="hero-cta">
+          {p.live_url && <a class="btn" href={p.live_url} target="_blank" rel="noopener noreferrer">Live site <span aria-hidden="true">↗</span></a>}
+          {p.source_url && <a class="btn ghost" href={p.source_url} target="_blank" rel="noopener noreferrer">Source code <span aria-hidden="true">↗</span></a>}
+        </p>
+      )}
+    </header>
+
+    {p.cover && <figure class="project-cover" style="margin-inline:0"><div class="frame"><Img asset={p.cover} eager sizes="(min-width: 72rem) 72rem, 100vw" /></div></figure>}
+
+    <div class={toc.length >= 3 ? 'project-body has-toc' : 'project-body'}>
+      <div class="md" set:html={html} />
+      {toc.length >= 3 && (
+        <nav class="toc" aria-label="On this page">
+          <p class="toc-title">On this page</p>
+          <ol>{toc.map((t) => <li class={`d${t.depth}`}><a href={`#${t.id}`}>{t.text}</a></li>)}</ol>
+        </nav>
+      )}
+    </div>
+
+    {(prev || next) && (
+      <nav class="pager" aria-label="More projects">
+        {prev ? <a href={`/projects/${prev.slug}`} data-astro-prefetch="hover"><span>Previous</span>{prev.title}</a> : <span />}
+        {next ? <a href={`/projects/${next.slug}`} style="text-align:right"><span>Next</span>{next.title}</a> : <span />}
+      </nav>
+    )}
+  </article>
+</Base>

@@ -1,0 +1,12 @@
+---
+import Base from '../layouts/Base.astro';
+import ErrorView from '../components/ErrorView.astro';
+Astro.response.status = 500;
+// Deliberately shows nothing about what went wrong. Details are in the server log only.
+---
+<Base title="Something went wrong" noindex>
+  <ErrorView code="500" kicker="Our end" title="Something broke." art="bolt">
+    <p class="lead">That wasn’t your fault. The page hit an error while loading, and it’s been logged.</p>
+    <p class="hero-cta"><a class="btn" href={Astro.url.pathname}>Try again</a><a class="btn ghost" href="/">Go home</a></p>
+  </ErrorView>
+</Base>

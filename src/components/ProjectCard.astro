@@ -1,0 +1,19 @@
+---
+import Img from './Img.astro';
+import type { Project } from '../lib/projects';
+interface Props { project: Project; eager?: boolean; level?: 2 | 3; }
+const { project: p, eager = false, level = 3 } = Astro.props;
+const Heading = `h${level}` as 'h2' | 'h3'; // h2 on the Projects page (straight under the page title), h3 under a section heading
+---
+<article class="pcard card lift" data-search={`${p.title} ${p.summary} ${p.tags.join(' ')}`.toLowerCase()}>
+  <div class="pcard-media">
+    {p.cover
+      ? <Img asset={p.cover} sizes="(min-width: 60rem) 24rem, (min-width: 40rem) 45vw, 100vw" eager={eager} />
+      : <span class="pcard-initial" aria-hidden="true">{p.title.slice(0, 1)}</span>}
+  </div>
+  <div class="pcard-body">
+    {p.tags.length > 0 && <ul class="tags">{p.tags.slice(0, 3).map((t) => <li class="tag">{t}</li>)}</ul>}
+    <Heading><a class="pcard-link" href={`/projects/${p.slug}`} data-astro-prefetch="hover">{p.title}</a></Heading>
+    {p.summary && <p>{p.summary}</p>}
+  </div>
+</article>

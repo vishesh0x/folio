@@ -1,0 +1,155 @@
+---
+import Dash from '../../layouts/Dash.astro';
+import PageHead from '../../components/PageHead.astro';
+import { loadBoard, monthValue, MAX_CATEGORIES, MAX_ITEMS, type Item } from '../../lib/now-admin';
+import { getSettings } from '../../lib/settings';
+
+const board = await loadBoard();
+const s = await getSettings();
+const ok = Astro.url.searchParams.get('ok'), error = Astro.url.searchParams.get('error');
+const thisMonth = new Date().toISOString().slice(0, 7);
+const fmt = new Intl.DateTimeFormat('en', { month: 'short', year: 'numeric', timeZone: 'UTC' });
+const when = (i: Item) => {
+  const a = i.started_at ? fmt.format(new Date(i.started_at * 1000)) : '', b = i.finished_at ? fmt.format(new Date(i.finished_at * 1000)) : '';
+  return i.status === 'done' ? (a && b ? `${a} – ${b}` : b ? `Finished ${b}` : '') : a ? `Since ${a}` : '';
+};
+const total = board.reduce((n, c) => n + c.items.length, 0);
+---
+<Dash title="Now board">
+  <PageHead title="Now board" lede="What you are doing at the moment, and what you have finished: projects, books, drawing, anything. Group things into categories you choose.">
+    <a class="btn ghost sm" href="/now" target="_blank" rel="noopener">View public page ↗</a>
+  </PageHead>
+  {ok && <p class="flash" role="status">{ok}</p>}
+  {error && <p class="flash error" role="alert">{error}</p>}
+
+  <div class="two board-top">
+    <form class="card stack" method="post" action="/api/admin/now" style="--stack:12px">
+      <input type="hidden" name="action" value="intro" />
+      <div class="field">
+        <label for="intro">Page intro</label>
+        <textarea id="intro" name="intro" rows="2" maxlength="400">{s.now_intro}</textarea>
+        <span class="hint">Shown under the “Now” heading. Empty uses a default line.</span>
+      </div>
+      <div><button class="btn ghost sm" type="submit">Save intro</button></div>
+    </form>
+    <form class="card stack" method="post" action="/api/admin/now" style="--stack:12px">
+      <input type="hidden" name="action" value="cat-add" />
+      <h2 class="card-h">Add a category</h2>
+      <div class="cat-add-row">
+        <div class="field"><label for="c-name">Name</label><input id="c-name" name="name" maxlength="40" placeholder="Reading, Drawing, Building…" required /></div>
+        <div class="field"><label for="c-icon">Icon <span class="opt">(optional)</span></label><input id="c-icon" name="icon" maxlength="12" placeholder="📚" /></div>
+      </div>
+      <div class="row-gap"><button class="btn sm" type="submit" disabled={board.length >= MAX_CATEGORIES}>Add category</button><span class="hint">{board.length} of {MAX_CATEGORIES} used</span></div>
+    </form>
+  </div>
+
+  {board.length === 0 && <div class="empty" style="margin-top:16px"><h2>No categories yet</h2><p>Add one above, for example “Reading”, then add what you are reading.</p></div>}
+
+  <div class="stack" style="--stack:14px;margin-top:16px">
+  {board.map((cat, ci) => {
+    const current = cat.items.filter((i) => i.status === 'current');
+    const done = cat.items.filter((i) => i.status === 'done');
+    const dots = '<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>';
+    const row = (i: Item, idx: number, list: Item[]) => (
+      <li class="entry-wrap" id={`item-${i.id}`}>
+        <details class="entry">
+          <summary class="entry-sum">
+            <span class="entry-main">
+              <span class="row-title">{i.title}</span>
+              {i.note && <span class="row-meta">{i.note}</span>}
+              {(i.progress != null && i.status === 'current') && <span class="mini-prog" role="img" aria-label={`${i.progress}% done`}><span class="bar"><i style={`width:${i.progress}%`}></i></span><span>{i.progress}%</span></span>}
+              {when(i) && <span class="row-meta">{when(i)}</span>}
+            </span>
+            <span class="entry-edit" aria-hidden="true">Edit</span>
+            <span class="visually-hidden">Edit “{i.title}”</span>
+          </summary>
+          <form method="post" action="/api/admin/now" class="edit-form">
+            <input type="hidden" name="action" value="item-update" /><input type="hidden" name="id" value={i.id} /><input type="hidden" name="status" value={i.status} />
+            <div class="field"><label for={`t-${i.id}`}>Title</label><input id={`t-${i.id}`} name="title" value={i.title} maxlength="120" required /></div>
+            <div class="field"><label for={`n-${i.id}`}>Note</label><textarea id={`n-${i.id}`} name="note" rows="2" maxlength="400">{i.note}</textarea></div>
+            <div class="two">
+              <div class="field"><label for={`l-${i.id}`}>Link <span class="opt">(optional)</span></label><input id={`l-${i.id}`} name="link" type="url" value={i.link ?? ''} placeholder="https://" /></div>
+              <div class="field"><label for={`c-${i.id}`}>Category</label><select id={`c-${i.id}`} name="category_id">{board.map((c) => <option value={c.id} selected={c.id === cat.id}>{c.name}</option>)}</select></div>
+            </div>
+            <div class="two">
+              <div class="field"><label for={`s-${i.id}`}>Started</label><input id={`s-${i.id}`} name="started" type="month" max={thisMonth} value={monthValue(i.started_at)} /></div>
+              {i.status === 'current' && <div class="field"><label for={`pg-${i.id}`}>Progress <span class="opt">(0 to 100, optional)</span></label><input id={`pg-${i.id}`} name="progress" type="number" min="0" max="100" step="1" inputmode="numeric" value={i.progress ?? ''} /></div>}
+              {i.status === 'done' && <div class="field"><label for={`f-${i.id}`}>Finished</label><input id={`f-${i.id}`} name="finished" type="month" max={thisMonth} value={monthValue(i.finished_at)} /></div>}
+            </div>
+            <div><button class="btn sm" type="submit">Save changes</button></div>
+          </form>
+        </details>
+        <div class="entry-menu">
+          <details class="more">
+            <summary aria-label={`Actions for ${i.title}`}><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" set:html={dots} /></summary>
+            <div class="more-panel">
+              <form method="post" action="/api/admin/now"><input type="hidden" name="id" value={i.id} /><input type="hidden" name="category_id" value={cat.id} /><button name="action" value={i.status === 'current' ? 'item-done' : 'item-reopen'}>{i.status === 'current' ? 'Mark finished' : 'Reopen'}</button></form>
+              {i.link && <a href={i.link} target="_blank" rel="noopener noreferrer">Open link ↗</a>}
+              <form method="post" action="/api/admin/now"><input type="hidden" name="id" value={i.id} /><input type="hidden" name="category_id" value={cat.id} /><button name="action" value="item-up" disabled={idx === 0}>Move earlier</button></form>
+              <form method="post" action="/api/admin/now"><input type="hidden" name="id" value={i.id} /><input type="hidden" name="category_id" value={cat.id} /><button name="action" value="item-down" disabled={idx === list.length - 1}>Move later</button></form>
+              <div class="sep" role="separator"></div>
+              <form method="post" action="/api/admin/now" data-confirm={`Remove “${i.title}”?`}><input type="hidden" name="id" value={i.id} /><input type="hidden" name="category_id" value={cat.id} /><button class="bad" name="action" value="item-delete">Remove…</button></form>
+            </div>
+          </details>
+        </div>
+      </li>
+    );
+    return (
+      <section class="card sec" id={`cat-${cat.id}`} aria-labelledby={`cat-h-${cat.id}`}>
+        <header class="sec-head">
+          <div class="cat-title">
+            <span class="cat-ico" aria-hidden="true">{cat.icon || '•'}</span>
+            <div class="sec-titles"><h2 class="card-h" id={`cat-h-${cat.id}`}>{cat.name}</h2><p class="row-meta">{current.length} doing now · {done.length} finished</p></div>
+          </div>
+          <div class="row-actions">
+            <details class="more">
+              <summary aria-label={`Actions for the ${cat.name} category`}><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" set:html={dots} /></summary>
+              <div class="more-panel">
+                <form method="post" action="/api/admin/now"><input type="hidden" name="id" value={cat.id} /><button name="action" value="cat-up" disabled={ci === 0}>Move up</button></form>
+                <form method="post" action="/api/admin/now"><input type="hidden" name="id" value={cat.id} /><button name="action" value="cat-down" disabled={ci === board.length - 1}>Move down</button></form>
+                <div class="sep" role="separator"></div>
+                <form method="post" action="/api/admin/now" data-confirm={`Delete the category “${cat.name}”${cat.items.length ? ` and its ${cat.items.length} item${cat.items.length === 1 ? '' : 's'}` : ''}? This cannot be undone.`}>
+                  <input type="hidden" name="id" value={cat.id} /><button class="bad" name="action" value="cat-delete">Delete category…</button></form>
+              </div>
+            </details>
+          </div>
+        </header>
+        <details class="rename">
+          <summary>Rename or change icon</summary>
+          <form method="post" action="/api/admin/now" class="rename-form">
+            <input type="hidden" name="action" value="cat-rename" /><input type="hidden" name="id" value={cat.id} />
+            <div class="field" style="flex:0 0 5rem"><label for={`ci-${cat.id}`} class="visually-hidden">Icon for {cat.name}</label><input id={`ci-${cat.id}`} name="icon" value={cat.icon ?? ''} maxlength="12" placeholder="🙂" /></div>
+            <div class="field"><label for={`cn-${cat.id}`} class="visually-hidden">Name of category {cat.name}</label><input id={`cn-${cat.id}`} name="name" value={cat.name} maxlength="40" required /></div>
+            <button class="btn ghost sm" type="submit">Save</button>
+          </form>
+        </details>
+
+        {cat.items.length === 0 && <p class="note-line">Nothing here yet. Add the first thing below.</p>}
+        {current.length > 0 && <><h3 class="group-h">Doing now</h3><ul class="entries">{current.map(row)}</ul></>}
+        {done.length > 0 && <><h3 class="group-h">Finished</h3><ul class="entries">{done.map(row)}</ul></>}
+
+        <details class="add">
+          <summary><span aria-hidden="true">＋</span> Add to {cat.name}</summary>
+          <form method="post" action="/api/admin/now" class="edit-form">
+            <input type="hidden" name="action" value="item-add" /><input type="hidden" name="category_id" value={cat.id} />
+            <div class="field"><label for={`at-${cat.id}`}>Title</label><input id={`at-${cat.id}`} name="title" maxlength="120" required placeholder="What is it?" /></div>
+            <div class="field"><label for={`an-${cat.id}`}>Note <span class="opt">(optional)</span></label><textarea id={`an-${cat.id}`} name="note" rows="2" maxlength="400" placeholder="A line about it"></textarea></div>
+            <div class="field"><label for={`al-${cat.id}`}>Link <span class="opt">(optional)</span></label><input id={`al-${cat.id}`} name="link" type="url" placeholder="https://" /></div>
+            <fieldset class="field"><legend>Status</legend>
+              <div class="toggles">
+                <label class="toggle"><input type="radio" name="status" value="current" checked /> Doing it now</label>
+                <label class="toggle"><input type="radio" name="status" value="done" /> Finished</label>
+              </div></fieldset>
+            <div class="two">
+              <div class="field"><label for={`ap-${cat.id}`}>Progress <span class="opt">(0 to 100, optional)</span></label><input id={`ap-${cat.id}`} name="progress" type="number" min="0" max="100" step="1" inputmode="numeric" /><span class="hint">Only for things you are doing now; shown as a bar.</span></div>
+              <div class="field"><label for={`as-${cat.id}`}>Started <span class="opt">(optional)</span></label><input id={`as-${cat.id}`} name="started" type="month" max={thisMonth} /></div>
+            </div>
+            <div><button class="btn sm" type="submit" disabled={cat.items.length >= MAX_ITEMS}>Add</button></div>
+          </form>
+        </details>
+      </section>
+    );
+  })}
+  </div>
+  {total > 0 && <p class="hint" style="margin-top:14px">The public page shows “Doing now” items first in each category, and tucks finished ones into a collapsed section.</p>}
+</Dash>

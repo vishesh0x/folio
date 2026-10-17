@@ -1,0 +1,49 @@
+---
+// The fields for one resume entry, chosen by the section's kind. Used for both "add" and "edit".
+interface Props { kind: string; idp: string; v: Record<string, string>; }
+const { kind, idp, v } = Astro.props;
+const f = (n: string) => `${idp}-${n}`;
+---
+{kind === 'summary' && <div class="field"><label for={f('text')}>Summary</label><textarea id={f('text')} name="text" rows="5" maxlength="3000">{v.text}</textarea><span class="hint">Two or three sentences. A blank line starts a new paragraph.</span></div>}
+
+{kind === 'experience' && <>
+  <div class="two"><div class="field"><label for={f('role')}>Role</label><input id={f('role')} name="role" value={v.role} maxlength="120" /></div>
+  <div class="field"><label for={f('company')}>Company</label><input id={f('company')} name="company" value={v.company} maxlength="120" /></div></div>
+  <div class="two"><div class="field"><label for={f('location')}>Location <span class="opt">(optional)</span></label><input id={f('location')} name="location" value={v.location} maxlength="120" /></div>
+  <div class="field"><label for={f('start')}>Start</label><input id={f('start')} name="start" value={v.start} maxlength="30" placeholder="Jan 2022" /></div></div>
+  <div class="two"><div class="field"><label for={f('end')}>End</label><input id={f('end')} name="end" value={v.end} maxlength="30" placeholder="Dec 2024" /></div>
+  <label class="check" style="align-self:end;padding-bottom:.8rem"><input type="checkbox" name="current" checked={v.current === 'on'} /> I still work here</label></div>
+  <div class="field"><label for={f('description')}>Short description <span class="opt">(optional)</span></label><textarea id={f('description')} name="description" rows="2" maxlength="1200">{v.description}</textarea></div>
+  <div class="field"><label for={f('bullets')}>Highlights</label><textarea id={f('bullets')} name="bullets" rows="4" maxlength="6000">{v.bullets}</textarea><span class="hint">One per line.</span></div>
+</>}
+
+{kind === 'education' && <>
+  <div class="two"><div class="field"><label for={f('degree')}>Degree or course</label><input id={f('degree')} name="degree" value={v.degree} maxlength="160" /></div>
+  <div class="field"><label for={f('school')}>School</label><input id={f('school')} name="school" value={v.school} maxlength="160" /></div></div>
+  <div class="two"><div class="field"><label for={f('start')}>Start</label><input id={f('start')} name="start" value={v.start} maxlength="30" placeholder="2014" /></div>
+  <div class="field"><label for={f('end')}>End</label><input id={f('end')} name="end" value={v.end} maxlength="30" placeholder="2018" /></div></div>
+  <div class="field"><label for={f('location')}>Location <span class="opt">(optional)</span></label><input id={f('location')} name="location" value={v.location} maxlength="120" /></div>
+  <div class="field"><label for={f('details')}>Details <span class="opt">(optional)</span></label><textarea id={f('details')} name="details" rows="2" maxlength="800">{v.details}</textarea></div>
+</>}
+
+{kind === 'skills' && <>
+  <div class="field"><label for={f('group')}>Group <span class="opt">(optional)</span></label><input id={f('group')} name="group" value={v.group} maxlength="80" placeholder="Languages" /></div>
+  <div class="field"><label for={f('items')}>Skills</label><input id={f('items')} name="items" value={v.items} maxlength="600" placeholder="TypeScript, Python, SQL" /><span class="hint">Separate with commas.</span></div>
+</>}
+
+{kind === 'certifications' && <>
+  <div class="field"><label for={f('name')}>Certification</label><input id={f('name')} name="name" value={v.name} maxlength="160" /></div>
+  <div class="two"><div class="field"><label for={f('issuer')}>Issued by <span class="opt">(optional)</span></label><input id={f('issuer')} name="issuer" value={v.issuer} maxlength="120" /></div>
+  <div class="field"><label for={f('date')}>Date</label><input id={f('date')} name="date" value={v.date} maxlength="30" placeholder="2024" /></div></div>
+  <div class="field"><label for={f('url')}>Link <span class="opt">(optional)</span></label><input id={f('url')} name="url" type="url" value={v.url} placeholder="https://" /></div>
+</>}
+
+{kind === 'projects' && <div class="field"><label for={f('blurb')}>Resume blurb <span class="opt">(optional)</span></label><input id={f('blurb')} name="blurb" value={v.blurb} maxlength="400" /><span class="hint">Replaces the project’s own summary on the resume only.</span></div>}
+
+{kind === 'custom' && <>
+  <div class="two"><div class="field"><label for={f('heading')}>Heading</label><input id={f('heading')} name="heading" value={v.heading} maxlength="160" /></div>
+  <div class="field"><label for={f('subheading')}>Subheading <span class="opt">(optional)</span></label><input id={f('subheading')} name="subheading" value={v.subheading} maxlength="160" /></div></div>
+  <div class="field"><label for={f('date')}>Date <span class="opt">(optional)</span></label><input id={f('date')} name="date" value={v.date} maxlength="40" /></div>
+  <div class="field"><label for={f('text')}>Text <span class="opt">(optional)</span></label><textarea id={f('text')} name="text" rows="3" maxlength="2000">{v.text}</textarea></div>
+  <div class="field"><label for={f('bullets')}>Highlights <span class="opt">(optional)</span></label><textarea id={f('bullets')} name="bullets" rows="3" maxlength="6000">{v.bullets}</textarea><span class="hint">One per line.</span></div>
+</>}

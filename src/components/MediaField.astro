@@ -1,0 +1,112 @@
+---
+// A file field with the upload built in: shows what is chosen, lets you drop or pick a new file right here, or choose one you
+// already uploaded, or remove it. Saves the asset id in a hidden input named `name`. Needs <MediaData> once on the page.
+// Without JavaScript it falls back to a plain <select> of your uploaded files.
+import { assetView, isImage, RASTER_MIMES, type Asset } from '../lib/assets';
+interface Props {
+  name: string; value: string | null; assets: Asset[];
+  kind?: 'image' | 'pdf' | 'any'; label: string; none?: string; raster?: boolean;
+  aspect?: string;            // shape of the preview, matching how it is shown on the site: "16 / 10", "4 / 5", "1.91 / 1", "1 / 1"
+  empty?: string;             // text in the empty box
+  pickTitle?: string; compact?: boolean; labelHidden?: boolean;
+  side?: boolean;             // preview and details side by side (wide containers); default is stacked (narrow sidebars)
+  exclude?: string[];         // mime types this field refuses (a GIF favicon, for example)
+  help?: string | string[];   // small print shown under the buttons
+  thumbWidth?: string;        // width of the preview when shown side by side, for example "120px"
+}
+const { name, value, assets, kind = 'image', label, none, raster = false, aspect = '16 / 10', empty, pickTitle, compact = false, labelHidden = false, side = false, exclude = [], help, thumbWidth } = Astro.props;
+const helps = help ? (Array.isArray(help) ? help : [help]) : [];
+const NEVER = ['image/x-icon', ...exclude];
+const usable = assets.filter((a) => !NEVER.includes(a.mime) && (kind === 'any' ? true : kind === 'pdf' ? a.mime === 'application/pdf' : isImage(a.mime)) && (!raster || RASTER_MIMES.includes(a.mime)) );
+const cur = value ? assets.find((a) => a.id === value) : undefined;
+const v = cur ? assetView(cur) : null;
+const noun = kind === 'pdf' ? 'PDF' : 'image';
+const size = (n: number) => (n < 1024 ? `${n} B` : n < 1048576 ? `${Math.round(n / 1024)} KB` : `${(n / 1048576).toFixed(1)} MB`);
+const uid = `mf-${name.replace(/[^a-z0-9]+/gi, '-')}`;
+---
+<div class:list={['mfield', compact && 'compact', side && 'side']} data-mfield data-exclude={exclude.join(',') || undefined} data-name={name} data-kind={kind} data-value={value ?? ''} data-none={none} data-raster={raster ? '1' : undefined}
+     data-title={pickTitle ?? (kind === 'pdf' ? 'Choose a PDF' : `Choose ${label.toLowerCase().startsWith('the ') ? '' : 'the '}${label.toLowerCase()}`)} data-label={label} data-empty={empty ?? `Add ${kind === 'pdf' ? 'a PDF' : 'an image'}`} style={`--ar:${aspect}${thumbWidth ? `;--tw:${thumbWidth}` : ''}`}>
+  <p class:list={['mfield-label', labelHidden && 'visually-hidden']} id={`${uid}-l`}>{label}</p>
+  <div class="mfield-body" aria-labelledby={`${uid}-l`}>
+    <button type="button" class:list={['mfield-thumb', !v && 'is-empty']} data-mf-open aria-label={v ? `Change: ${label}` : undefined}>
+      {v && v.kind === 'image' && <img src={v.thumb} alt="" width={v.width ?? undefined} height={v.height ?? undefined} />}
+      {v && v.kind !== 'image' && <span class="mfield-doc"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg>PDF</span>}
+      {!v && <span class="mfield-empty"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg><strong>{empty ?? `Add ${kind === 'pdf' ? 'a PDF' : 'an image'}`}</strong><small>Drop a file or click</small></span>}
+    </button>
+    <div class="mfield-info">
+      <p class="mfield-name">{v ? v.filename : (none ?? `No ${noun} chosen`)}</p>
+      <p class="mfield-sub">{v ? [v.width && v.height ? `${v.width}×${v.height}` : null, size(v.size)].filter(Boolean).join(' · ') : 'Nothing selected'}</p>
+      <div class="mfield-actions">
+        <button type="button" class="btn ghost sm" data-mf-open>{v ? 'Replace' : `Upload or choose`}</button>
+        <button type="button" class="btn ghost sm" data-mf-clear hidden={!v}>Remove</button>
+        {helps.map((h) => <p class="hint mfield-help">{h}</p>)}
+      </div>
+    </div>
+  </div>
+  <noscript>
+    <label class="visually-hidden" for={uid}>{label}</label>
+    <select id={uid} name={name}>
+      <option value="" selected={!value}>{none ?? 'None'}</option>
+      {usable.map((a) => <option value={a.id} selected={a.id === value}>{a.filename}</option>)}
+    </select>
+    <span class="hint">Without JavaScript you can only choose files that are already uploaded (Assets page).</span>
+  </noscript>
+</div>
+
+<script>
+  import { findItem, openPicker, problemWith, bytes, icons, type Item, type Kind } from '../scripts/media';
+
+  const el = <K extends keyof HTMLElementTagNameMap>(tag: K, cls = '', text = '') => { const e = document.createElement(tag); if (cls) e.className = cls; if (text) e.textContent = text; return e; };
+
+  function init(root: HTMLElement) {
+    const name = root.dataset.name!, kind = (root.dataset.kind ?? 'image') as Kind, none = root.dataset.none, raster = root.dataset.raster === '1';
+    const exclude = (root.dataset.exclude ?? '').split(',').filter(Boolean);
+    const label = root.dataset.label ?? 'file', noun = kind === 'pdf' ? 'PDF' : 'image';
+    const input = document.createElement('input'); input.type = 'hidden'; input.name = name; input.value = root.dataset.value ?? '';
+    root.prepend(input);
+    const body = root.querySelector<HTMLElement>('.mfield-body')!;
+    const helps = [...root.querySelectorAll<HTMLElement>('.mfield-help')]; // small print survives re-painting
+
+    const paint = () => {
+      const it = findItem(input.value);
+      const thumb = el('button', 'mfield-thumb' + (it ? '' : ' is-empty')) as HTMLButtonElement;
+      thumb.type = 'button'; thumb.dataset.mfOpen = ''; if (it) thumb.setAttribute('aria-label', `Change: ${label}`); // an empty box is named by the text it shows
+      if (it && it.kind === 'image') { const i = el('img') as HTMLImageElement; i.src = it.thumb; i.alt = ''; if (it.width) i.width = it.width; if (it.height) i.height = it.height; thumb.append(i); }
+      else if (it) { const d = el('span', 'mfield-doc'); d.innerHTML = icons.file; d.append('PDF'); thumb.append(d); }
+      else { const d = el('span', 'mfield-empty'); d.innerHTML = icons.upload; d.append(el('strong', '', root.dataset.empty ?? `Add ${noun}`), el('small', '', 'Drop a file or click')); thumb.append(d); }
+      const info = el('div', 'mfield-info');
+      info.append(el('p', 'mfield-name', it ? it.filename : none ?? `No ${noun} chosen`), el('p', 'mfield-sub', it ? [it.width && it.height ? `${it.width}×${it.height}` : '', bytes(it.size)].filter(Boolean).join(' · ') : 'Nothing selected'));
+      const act = el('div', 'mfield-actions');
+      const open = el('button', 'btn ghost sm', it ? 'Replace' : 'Upload or choose') as HTMLButtonElement; open.type = 'button'; open.dataset.mfOpen = '';
+      act.append(open);
+      if (it) { const rm = el('button', 'btn ghost sm', 'Remove') as HTMLButtonElement; rm.type = 'button'; rm.dataset.mfClear = ''; act.append(rm); }
+      info.append(act, ...helps.map((h) => h.cloneNode(true)));
+      body.replaceChildren(thumb, info);
+    };
+    const set = (it: Item | null) => {
+      input.value = it?.id ?? '';
+      paint();
+      input.dispatchEvent(new Event('input', { bubbles: true })); // lets the page notice there is something to save
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    };
+    const open = (file?: File) => openPicker({ kind, title: root.dataset.title ?? 'Choose a file', current: input.value || null, none, raster, exclude, file, onPick: set });
+
+    root.addEventListener('click', (e) => {
+      const t = e.target as HTMLElement;
+      if (t.closest('[data-mf-clear]')) { set(null); (root.querySelector('[data-mf-open]') as HTMLElement | null)?.focus(); }
+      else if (t.closest('[data-mf-open]')) open();
+    });
+    // drop a file straight onto the field
+    for (const ev of ['dragenter', 'dragover']) root.addEventListener(ev, (e) => { e.preventDefault(); root.classList.add('is-over'); });
+    root.addEventListener('dragleave', (e) => { if (!root.contains((e as DragEvent).relatedTarget as Node)) root.classList.remove('is-over'); });
+    root.addEventListener('drop', (e) => {
+      e.preventDefault(); root.classList.remove('is-over');
+      const f = (e as DragEvent).dataTransfer?.files?.[0]; if (!f) return;
+      const why = problemWith(f, kind, raster, exclude);
+      if (why) { const sub = root.querySelector('.mfield-sub'); if (sub) { sub.textContent = why; sub.classList.add('is-error'); } return; }
+      open(f);
+    });
+    paint();
+  }
+  document.querySelectorAll<HTMLElement>('[data-mfield]').forEach(init);
+</script>

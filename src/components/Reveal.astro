@@ -1,0 +1,99 @@
+---
+// Shows a "Show email" / "Show phone" button. The value itself is not in the HTML (see /api/reveal).
+// When Turnstile is set up (both keys), the click first runs a check that is invisible for almost everyone and only
+// shows a box when Cloudflare wants more proof. The script for it is fetched on the first click, never before.
+import { turnstileSiteKey } from '../lib/turnstile';
+interface Props { kind: 'email' | 'phone'; }
+const { kind } = Astro.props;
+const sitekey = turnstileSiteKey();
+---
+<span class="reveal" data-reveal-wrap data-sitekey={sitekey}>
+  <button type="button" class="btn ghost sm" data-reveal={kind}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>Show {kind === 'email' ? 'email' : 'phone'}</button>
+  <span class="reveal-msg" role="status" aria-live="polite"></span>
+  <noscript><span class="hint">Turn on JavaScript to show this, or use the contact form.</span></noscript>
+</span>
+
+<script>
+  const API = 'https://challenges.cloudflare.com/turnstile/v0/api.js';
+  type Turnstile = { render(el: HTMLElement, options: Record<string, unknown>): string; remove(id: string): void };
+  const win = window as unknown as { turnstile?: Turnstile };
+
+  // Fetches Turnstile once, on the first click. The contact page already loads its own copy; that one is reused.
+  function loadTurnstile(): Promise<Turnstile> {
+    return new Promise((resolve, reject) => {
+      if (!document.querySelector(`script[src^="${API}"]`)) {
+        const s = document.createElement('script');
+        s.src = `${API}?render=explicit`; s.async = true;
+        s.onerror = () => reject(new Error('blocked'));
+        document.head.append(s);
+      }
+      const started = Date.now();
+      (function wait() {
+        if (win.turnstile) return resolve(win.turnstile);
+        if (Date.now() - started > 10000) return reject(new Error('blocked'));
+        setTimeout(wait, 50);
+      })();
+    });
+  }
+
+  // Runs one check and returns its single-use token. The widget is removed again as soon as it has answered.
+  async function getToken(wrap: Element, sitekey: string): Promise<string> {
+    const ts = await loadTurnstile();
+    return new Promise<string>((resolve, reject) => {
+      const box = document.createElement('div');
+      box.className = 'reveal-ts';
+      wrap.append(box);
+      let id = '', finished = false;
+      const finish = (fn: () => void) => {
+        finished = true;
+        if (id) { try { ts.remove(id); } catch { /* already gone */ } }
+        box.remove();
+        fn();
+      };
+      const fail = () => finish(() => reject(new Error('check')));
+      try {
+        id = ts.render(box, {
+          sitekey, action: 'reveal', appearance: 'interaction-only',
+          callback: (token: string) => finish(() => resolve(token)),
+          'error-callback': fail, 'timeout-callback': fail, 'unsupported-callback': fail,
+        });
+        if (finished) { try { ts.remove(id); } catch { /* ignore */ } } // it answered before render() returned
+      } catch { fail(); }
+    });
+  }
+
+  const SAYS: Record<string, string> = {
+    blocked: 'The spam check could not load. Check your connection or any content blocker, then try again.',
+    check: 'The spam check did not pass. Please try again.',
+  };
+
+  document.addEventListener('click', async (e) => {
+    const btn = (e.target as Element).closest<HTMLButtonElement>('[data-reveal]');
+    if (!btn || btn.disabled) return;
+    const kind = btn.dataset.reveal!;
+    const wrap = btn.closest<HTMLElement>('[data-reveal-wrap]')!;
+    const msg = wrap.querySelector<HTMLElement>('.reveal-msg')!;
+    btn.disabled = true; msg.textContent = ''; delete msg.dataset.state;
+    try {
+      let token: string | undefined;
+      if (wrap.dataset.sitekey) {
+        msg.dataset.state = 'busy'; msg.textContent = 'Checking that you are a person…';
+        token = await getToken(wrap, wrap.dataset.sitekey);
+        msg.textContent = ''; delete msg.dataset.state;
+      }
+      const res = await fetch('/api/reveal', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind, token }) });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.value) throw new Error(data.error || 'Failed');
+      const a = document.createElement('a');
+      a.href = (kind === 'email' ? 'mailto:' : 'tel:') + data.value.replace(/\s+/g, kind === 'phone' ? '' : ' ');
+      a.textContent = data.value;
+      a.className = 'revealed';
+      btn.replaceWith(a);
+    } catch (err) {
+      btn.disabled = false;
+      delete msg.dataset.state;
+      const m = (err as Error).message;
+      msg.textContent = SAYS[m] ?? (m === 'Failed' ? 'Could not load. Try again.' : m);
+    }
+  });
+</script>

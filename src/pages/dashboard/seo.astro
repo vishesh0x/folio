@@ -1,0 +1,111 @@
+---
+import { env } from 'cloudflare:workers';
+import Dash from '../../layouts/Dash.astro';
+import PageHead from '../../components/PageHead.astro';
+import MediaField from '../../components/MediaField.astro';
+import MediaData from '../../components/MediaData.astro';
+import { getSettings } from '../../lib/settings';
+import { listAssets } from '../../lib/assets';
+
+const PAGES = [
+  { key: 'home', label: 'Home', path: '/', fallbackTitle: '' },
+  { key: 'projects', label: 'Projects', path: '/projects', fallbackTitle: 'Projects' },
+  { key: 'now', label: 'Now', path: '/now', fallbackTitle: 'Now' },
+  { key: 'resume', label: 'Resume', path: '/resume', fallbackTitle: 'Resume' },
+  { key: 'contact', label: 'Contact', path: '/contact', fallbackTitle: 'Contact' },
+] as const;
+const FALLBACK_DESC: Record<string, string> = {
+  projects: 'Things I have built, with notes on how and why.', now: 'What I am working on, reading and making right now.', contact: '',
+};
+
+const s = await getSettings();
+const assets = await listAssets();
+const images = assets.filter((a) => ['image/png', 'image/jpeg', 'image/webp', 'image/avif'].includes(a.mime));
+let saved = false, error = '';
+
+if (Astro.request.method === 'POST') {
+  const f = await Astro.request.formData();
+  const text = (k: string, max: number) => String(f.get(k) ?? '').replace(/\s+/g, ' ').trim().slice(0, max);
+  const stmts = [];
+  for (const p of PAGES) {
+    const title = text(`${p.key}_title`, 120), description = text(`${p.key}_description`, 300);
+    const og = String(f.get(`${p.key}_og`) ?? '');
+    const ogId = images.some((a) => a.id === og) ? og : null; // only real uploaded images are accepted
+    const noindex = f.get(`${p.key}_noindex`) === 'on' ? 1 : 0;
+    stmts.push(!title && !description && !ogId && !noindex
+      ? env.DB.prepare('DELETE FROM seo_pages WHERE page = ?').bind(p.key)
+      : env.DB.prepare(`INSERT INTO seo_pages (page, title, description, og_asset, noindex) VALUES (?1, ?2, ?3, ?4, ?5)
+          ON CONFLICT(page) DO UPDATE SET title = ?2, description = ?3, og_asset = ?4, noindex = ?5`).bind(p.key, title || null, description || null, ogId, noindex));
+  }
+  await env.DB.batch(stmts);
+  saved = true;
+}
+
+const rows = new Map((await env.DB.prepare('SELECT page, title, description, og_asset, noindex FROM seo_pages').all<any>()).results.map((r) => [r.page, r]));
+const origin = (s.site_url || Astro.url.origin).replace(/\/$/, '');
+const host = origin.replace(/^https?:\/\//, '');
+---
+<Dash title="Search & sharing">
+  <MediaData assets={assets} />
+  <PageHead title="Search & sharing" lede="How each main page appears in search results and link previews. Leave a field empty to use the page’s own default. Project pages have their own fields in the project editor." />
+  {saved && <p class="flash" role="status">Saved.</p>}
+  {error && <p class="flash error" role="alert">{error}</p>}
+
+  <form method="post" class="stack seo-form" style="--stack:12px" data-savebar>
+    {PAGES.map((p, idx) => {
+      const r = rows.get(p.key) ?? {};
+      const custom = !!(r.title || r.description || r.og_asset || r.noindex);
+      const defTitle = p.fallbackTitle ? `${p.fallbackTitle} · ${s.name}` : s.name;
+      const defDesc = FALLBACK_DESC[p.key] ?? s.meta_description;
+      return (
+        <details class="card fold seo-card" data-seo={p.key} open={idx === 0 || custom}>
+          <summary>
+            <span class="card-h">{p.label}</span>
+            <span class="slug"><span class="pre">{host}</span><span class="val">{p.path === '/' ? '' : p.path}</span></span>
+            <span class:list={['pill', 'plain', r.noindex && 'warn']} style="margin-left:auto">{r.noindex ? 'Hidden from search' : custom ? 'Customised' : 'Default'}</span>
+          </summary>
+          <div class="stack" style="--stack:16px;margin-top:16px">
+            <div class="serp" aria-hidden="true">
+              <p class="serp-url">{host}{p.path === '/' ? '' : ' › ' + p.path.slice(1)}</p>
+              <p class="serp-title" data-pv-title data-fallback={defTitle}>{r.title ? `${r.title} · ${s.name}` : defTitle}</p>
+              <p class="serp-desc" data-pv-desc data-fallback={defDesc}>{r.description || defDesc}</p>
+            </div>
+            <div class="field">
+              <label for={`${p.key}_title`}>Title</label>
+              <input id={`${p.key}_title`} name={`${p.key}_title`} value={r.title ?? ''} maxlength="120" placeholder={defTitle} data-soft="60" data-site={s.name} aria-describedby={`${p.key}_title_h`} />
+              <span class="hint" id={`${p.key}_title_h`}><span data-count>0</span> / 60 recommended. “ · {s.name}” is added after it.</span>
+            </div>
+            <div class="field">
+              <label for={`${p.key}_description`}>Description</label>
+              <textarea id={`${p.key}_description`} name={`${p.key}_description`} rows="2" maxlength="300" placeholder={defDesc} data-soft="160" aria-describedby={`${p.key}_desc_h`}>{r.description ?? ''}</textarea>
+              <span class="hint" id={`${p.key}_desc_h`}><span data-count>0</span> / 160 recommended.</span>
+            </div>
+            <MediaField side name={`${p.key}_og`} value={r.og_asset ?? null} assets={assets} kind="image" raster label="Share image" none="Site default" aspect="1.91 / 1" empty="Add a share image" pickTitle={`Choose a share image for ${p.label}`} thumbWidth="230px" />
+            <label class="check"><input type="checkbox" name={`${p.key}_noindex`} checked={!!r.noindex} /> Hide this page from search engines <span class="hint">(<code>noindex</code>)</span></label>
+          </div>
+        </details>
+      );
+    })}
+    <div class="savebar"><button class="btn" type="submit">Save</button><span class="state">No changes yet</span></div>
+  </form>
+</Dash>
+
+<script>
+  // Live character counts and a search-result preview that follow what you type.
+  document.querySelectorAll<HTMLElement>('[data-seo]').forEach((card) => {
+    const t = card.querySelector<HTMLInputElement>('input[data-soft]')!;
+    const d = card.querySelector<HTMLTextAreaElement>('textarea[data-soft]')!;
+    const pvT = card.querySelector<HTMLElement>('[data-pv-title]')!;
+    const pvD = card.querySelector<HTMLElement>('[data-pv-desc]')!;
+    const update = () => {
+      for (const el of [t, d]) {
+        const n = el.value.length, count = el.parentElement!.querySelector<HTMLElement>('[data-count]')!;
+        count.textContent = String(n);
+        count.classList.toggle('over', n > Number(el.dataset.soft));
+      }
+      pvT.textContent = t.value.trim() ? `${t.value.trim()} · ${t.dataset.site}` : pvT.dataset.fallback!;
+      pvD.textContent = d.value.trim() || pvD.dataset.fallback!;
+    };
+    t.addEventListener('input', update); d.addEventListener('input', update); update();
+  });
+</script>

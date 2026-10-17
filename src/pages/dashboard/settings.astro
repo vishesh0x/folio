@@ -1,0 +1,161 @@
+---
+import Dash from '../../layouts/Dash.astro';
+import PageHead from '../../components/PageHead.astro';
+import MediaField from '../../components/MediaField.astro';
+import MediaData from '../../components/MediaData.astro';
+import { getSettings, saveSettings, type Social } from '../../lib/settings';
+import { listAssets, isImage } from '../../lib/assets';
+import { validateEmail } from '../../lib/auth';
+
+let s = await getSettings();
+const assets = await listAssets();
+const images = assets.filter((a) => isImage(a.mime));
+const pdfs = assets.filter((a) => a.mime === 'application/pdf');
+const MAX_SOCIALS = 8;
+let error = '', saved = false;
+
+const cleanUrl = (u: string, allowMail = false) => {
+  u = u.trim();
+  if (!u) return '';
+  if (allowMail && u.startsWith('mailto:')) return u.slice(0, 300);
+  try { const x = new URL(u); return x.protocol === 'https:' || x.protocol === 'http:' ? x.href : null; } catch { return null; }
+};
+
+if (Astro.request.method === 'POST') {
+  const f = await Astro.request.formData();
+  const t = (k: string, max: number) => String(f.get(k) ?? '').trim().slice(0, max);
+  const next = { ...s, headline: t('headline', 160), availability: t('availability', 60), name: t('name', 80) || s.name, tagline: t('tagline', 140), bio: t('bio', 1200), location: t('location', 80), email: t('email', 254), phone: t('phone', 30), now_intro: t('now_intro', 400), meta_description: t('meta_description', 300) };
+  const site = cleanUrl(t('site_url', 200));
+  const socials: Social[] = [];
+  for (let i = 0; i < MAX_SOCIALS; i++) {
+    const label = t(`social_label_${i}`, 40), raw = t(`social_url_${i}`, 300);
+    if (!label && !raw) continue;
+    const url = cleanUrl(raw, true);
+    if (!label || !url) { error = `Social link ${i + 1} needs a name and a valid http(s) or mailto: address.`; break; }
+    socials.push({ label, url });
+  }
+  const highlights: { value: string; label: string }[] = [];
+  for (let i = 0; i < 4; i++) { const value = t(`hl_value_${i}`, 12), label = t(`hl_label_${i}`, 40); if (!value && !label) continue; if (!value || !label) { error = `Highlight ${i + 1} needs both a number and a label.`; break; } highlights.push({ value, label }); }
+  const pick = (k: string, list: { id: string }[]) => { const v = t(k, 40); return list.some((a) => a.id === v) ? v : null; };
+  if (!error && next.email && validateEmail(next.email)) error = 'That email address does not look right.';
+  if (!error && next.phone && !/^[+\d\s().-]{5,30}$/.test(next.phone)) error = 'Phone numbers can only contain digits, spaces, + ( ) . and -.';
+  if (!error && site === null) error = 'Site URL must start with https:// (or http://).';
+  const candidate = { ...next, highlights, site_url: (site ?? t('site_url', 200)).replace(/\/$/, ''), socials,
+    favicon_asset: pick('favicon_asset', images), portrait_asset: pick('portrait_asset', images.filter((a) => a.mime !== 'image/x-icon')), og_asset: pick('og_asset', images.filter((a) => a.mime !== 'image/svg+xml')), resume_asset: pick('resume_asset', pdfs) };
+  s = candidate; // on an error the form shows what was typed, not the old values
+  if (error) Astro.response.status = 400;
+  else { await saveSettings(s); saved = true; }
+}
+const fav = images.find((a) => a.id === s.favicon_asset);
+const favNotes: string[] = [];
+if (fav?.mime === 'image/svg+xml') favNotes.push('SVG favicon: great for browsers, but iPhones need a PNG for the home-screen icon. Upload a square PNG (512×512) instead if you want that.');
+if (fav && fav.mime !== 'image/svg+xml' && fav.width && fav.height && fav.width !== fav.height) favNotes.push(`This image is ${fav.width}×${fav.height}, not square. It will be centred on a transparent square, not cropped.`);
+if (fav && fav.mime !== 'image/svg+xml' && fav.width && Math.min(fav.width, fav.height ?? 0) < 512) favNotes.push('Under 512 px: fine for the browser tab, but it will look soft as an app icon.');
+const hlRows = Array.from({ length: 4 }, (_, i) => s.highlights[i] ?? { value: '', label: '' });
+const rows = Array.from({ length: MAX_SOCIALS }, (_, i) => s.socials[i] ?? { label: '', url: '' });
+---
+<Dash title="Settings">
+  <MediaData assets={assets} />
+  <PageHead title="Settings" lede="Your name, the home page, your pictures, and how the site looks in search results and link previews." />
+  {saved && <p class="flash" role="status">Saved. Your changes are live.</p>}
+  {error && <p class="flash error" role="alert">{error} Nothing was saved.</p>}
+
+  <div class="settings">
+    <nav class="jump" aria-label="On this page">
+      <a href="#home">Home page</a><a href="#about">About you</a><a href="#images">Pictures</a><a href="#search">Search & sharing</a><a href="#resume-file">Resume PDF</a><a href="#social">Social links</a>
+    </nav>
+
+    <form method="post" class="stack settings-form" style="--stack:16px" data-savebar>
+      <section class="card" id="home" aria-labelledby="h-home">
+        <div class="card-head"><div><h2 class="card-h" id="h-home">Home page</h2><p class="card-sub">The first thing visitors see.</p></div></div>
+        <div class="stack" style="--stack:14px">
+          <div class="field"><label for="headline">Headline</label><input id="headline" name="headline" value={s.headline} maxlength="160" placeholder="Hi, I’m *Your Name*." /><span class="hint">The big line at the top. Put a word in *asterisks* to colour it, like <code>Building *small, sharp* things</code>. Empty uses “Hi, I’m (your name)”.</span></div>
+          <div class="field"><label for="availability">Availability badge</label><input id="availability" name="availability" value={s.availability} maxlength="60" placeholder="Open to new work" /><span class="hint">A gold badge on the home page and the resume. Empty hides it, so clear it when it stops being true.</span></div>
+          <fieldset class="field"><legend>Highlights <span class="opt">(optional)</span></legend>
+            <div class="hl-grid">
+              {hlRows.map((r, i) => (
+                <>
+                  <div class="field"><label for={`hv${i}`} class="visually-hidden">Highlight {i + 1} number</label><input id={`hv${i}`} name={`hl_value_${i}`} value={r.value} maxlength="12" placeholder="8y" /></div>
+                  <div class="field"><label for={`hl${i}`} class="visually-hidden">Highlight {i + 1} label</label><input id={`hl${i}`} name={`hl_label_${i}`} value={r.label} maxlength="40" placeholder="building for the web" /></div>
+                </>
+              ))}
+            </div>
+            <span class="hint">Up to four numbers in a band on the home page, like “8y · building for the web”. Only real ones, please. Leave them all empty to hide the band.</span>
+          </fieldset>
+        </div>
+      </section>
+
+      <section class="card" id="about" aria-labelledby="h-about">
+        <div class="card-head"><div><h2 class="card-h" id="h-about">About you</h2></div></div>
+        <div class="stack" style="--stack:14px">
+          <div class="two">
+            <div class="field"><label for="name">Name</label><input id="name" name="name" value={s.name} required maxlength="80" /></div>
+            <div class="field"><label for="location">Location</label><input id="location" name="location" value={s.location} maxlength="80" /></div>
+          </div>
+          <div class="field"><label for="tagline">Tagline</label><input id="tagline" name="tagline" value={s.tagline} maxlength="140" /></div>
+          <div class="field"><label for="bio">Short bio</label><textarea id="bio" name="bio" rows="4" maxlength="1200">{s.bio}</textarea></div>
+          <div class="two">
+            <div class="field"><label for="email">Public email</label><input id="email" name="email" type="email" value={s.email} /><span class="hint">Never written into the page. Visitors click “Show email”, which stops scrapers that only read HTML.</span></div>
+            <div class="field"><label for="phone">Phone <span class="opt">(optional)</span></label><input id="phone" name="phone" type="tel" value={s.phone} maxlength="30" /><span class="hint">Protected the same way. Used on the resume page.</span></div>
+          </div>
+          <div class="field"><label for="now_intro">Intro for the Now page</label><textarea id="now_intro" name="now_intro" rows="2" maxlength="400">{s.now_intro}</textarea></div>
+        </div>
+      </section>
+
+      <section class="card" id="images" aria-labelledby="h-images">
+        <div class="card-head"><div><h2 class="card-h" id="h-images">Pictures</h2><p class="card-sub">Upload here or pick something you already uploaded. Nothing is ever cropped.</p></div></div>
+        <div class="stack" style="--stack:22px">
+          <MediaField side name="portrait_asset" value={s.portrait_asset} assets={assets} kind="image" label="Portrait" none="No portrait" aspect="4 / 5" empty="Add a portrait" pickTitle="Choose a portrait" thumbWidth="170px" help="Shown whole on the home page." />
+          <hr class="rule" />
+          <MediaField side name="favicon_asset" value={s.favicon_asset} assets={assets} kind="image" label="Favicon (the tab icon)" none="Default icon" aspect="1 / 1" empty="Add a favicon" pickTitle="Choose a favicon" exclude={['image/gif']} thumbWidth="96px" help={[...favNotes, 'Browsers cache favicons hard. Changing it here changes its address, so new visitors pick it up straight away; an open tab may need a reload.']} />
+        </div>
+      </section>
+
+      <section class="card" id="search" aria-labelledby="h-search">
+        <div class="card-head"><div><h2 class="card-h" id="h-search">Search and sharing</h2><p class="card-sub">What Google and link previews show for your site. Each page can override this under “Search &amp; sharing”.</p></div></div>
+        <div class="stack" style="--stack:16px">
+          <div class="field"><label for="site_url">Site address</label><input id="site_url" name="site_url" type="url" value={s.site_url} placeholder="https://yourname.com" /><span class="hint">Used for canonical links and share previews. Empty uses the address people visit.</span></div>
+          <div class="field"><label for="meta_description">Default description</label><textarea id="meta_description" name="meta_description" rows="2" maxlength="300">{s.meta_description}</textarea></div>
+          <MediaField side name="og_asset" value={s.og_asset} assets={assets} kind="image" raster label="Default share image" none="No share image" aspect="1.91 / 1" empty="Add a share image" pickTitle="Choose a share image" thumbWidth="260px" help="PNG, JPEG, WebP or AVIF. Facebook, LinkedIn and X do not show SVG or GIF previews. 1200×630 works best." />
+        </div>
+      </section>
+
+      <section class="card" id="resume-file" aria-labelledby="h-resume">
+        <div class="card-head"><div><h2 class="card-h" id="h-resume">Resume PDF</h2><p class="card-sub">The file behind the “Download PDF” button on your resume page. You can also set it from the Resume page.</p></div></div>
+        <MediaField side name="resume_asset" value={s.resume_asset} assets={assets} kind="pdf" label="PDF visitors can download" none="No PDF" aspect="4 / 3" empty="Upload your resume PDF" pickTitle="Choose your resume PDF" thumbWidth="150px" help="Its own text is yours to control: if the PDF contains your phone number, anyone who downloads it has it." />
+      </section>
+
+      <section class="card" id="social" aria-labelledby="h-social">
+        <div class="card-head"><div><h2 class="card-h" id="h-social">Social links</h2><p class="card-sub">Shown in the footer and on the resume. Up to {MAX_SOCIALS}.</p></div></div>
+        <div class="stack" style="--stack:10px" data-socials>
+          {rows.map((r, i) => (
+            <div class="social-row" data-social-row data-filled={r.label || r.url ? '1' : undefined}>
+              <div class="field"><label for={`sl${i}`} class="visually-hidden">Link {i + 1} name</label><input id={`sl${i}`} name={`social_label_${i}`} value={r.label} placeholder="GitHub" maxlength="40" /></div>
+              <div class="field"><label for={`su${i}`} class="visually-hidden">Link {i + 1} address</label><input id={`su${i}`} name={`social_url_${i}`} value={r.url} placeholder="https://github.com/you" maxlength="300" /></div>
+            </div>
+          ))}
+          <div><button type="button" class="btn ghost sm" data-add-social hidden>Add another link</button></div>
+        </div>
+      </section>
+
+      <div class="savebar"><button class="btn" type="submit">Save settings</button><span class="state">No changes yet</span></div>
+    </form>
+  </div>
+</Dash>
+
+<script>
+  // Show only the filled social-link rows plus one empty one; "Add another" reveals the next. Without JavaScript all rows show.
+  const rows = [...document.querySelectorAll<HTMLElement>('[data-social-row]')];
+  const add = document.querySelector<HTMLButtonElement>('[data-add-social]')!;
+  const sync = () => {
+    let shownEmpty = 0;
+    rows.forEach((r) => {
+      const filled = [...r.querySelectorAll('input')].some((i) => (i as HTMLInputElement).value.trim());
+      if (filled) { r.hidden = false; return; }
+      r.hidden = shownEmpty >= 1; if (!r.hidden) shownEmpty++;
+    });
+    add.hidden = !rows.some((r) => r.hidden);
+  };
+  add.addEventListener('click', () => { const next = rows.find((r) => r.hidden); if (next) { next.hidden = false; next.querySelector('input')?.focus(); } add.hidden = !rows.some((r) => r.hidden); });
+  sync();
+</script>

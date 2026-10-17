@@ -1,0 +1,9 @@
+---
+// Puts the list of uploaded files on the page once, as data, for the pickers in scripts/media.ts.
+// A JSON data block is never executed, so the Content-Security-Policy has nothing to object to.
+import { assetView, type Asset } from '../lib/assets';
+interface Props { assets: Asset[]; }
+const { assets } = Astro.props;
+const json = JSON.stringify(assets.map(assetView)).replace(/</g, '\\u003c').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029');
+---
+<script type="application/json" id="media-data" is:inline set:html={json}></script>

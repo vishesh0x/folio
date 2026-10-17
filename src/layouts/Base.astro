@@ -1,0 +1,96 @@
+---
+import '../styles/global.css';
+import ThemeSwitch from '../components/ThemeSwitch.astro';
+import { NAV } from '../lib/site';
+import { getSettings } from '../lib/settings';
+import { loadAsset } from '../lib/media';
+import { THEME_INIT, THEME_TOGGLE } from '../lib/inline-scripts';
+import paperMono from '../assets/fonts/PaperMono-VF.woff2?url';
+
+interface Props { title?: string; description?: string; noindex?: boolean; bare?: boolean; ogImage?: string | null; ogType?: 'website' | 'article'; }
+const { title, description, noindex = false, bare = false, ogImage, ogType = 'website' } = Astro.props;
+
+const s = await getSettings();
+let fav = null, og = null;
+try { // a database problem must never stop an error page from rendering
+  fav = await loadAsset(s.favicon_asset ?? undefined);
+  og = ogImage === undefined ? await loadAsset(s.og_asset ?? undefined) : null;
+} catch {}
+
+const origin = (s.site_url || Astro.url.origin).replace(/\/$/, '');
+const path = Astro.url.pathname;
+const desc = description || s.meta_description;
+const fullTitle = title ? `${title} · ${s.name}` : s.name;
+const v = fav?.id ?? 'default';
+const svgIcon = !fav || fav.mime === 'image/svg+xml';
+const ogUrl = ogImage ? new URL(ogImage, origin).href
+  : og && og.mime !== 'image/svg+xml' ? `${origin}/media/${og.id}/${encodeURIComponent(og.filename)}?w=1280&f=jpeg` : null;
+---
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{fullTitle}</title>
+    <meta name="description" content={desc} />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#f7f7f4" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#141217" media="(prefers-color-scheme: dark)" />
+    {noindex && <meta name="robots" content="noindex" />}
+    <link rel="canonical" href={origin + path} />
+    {svgIcon
+      ? <link rel="icon" type="image/svg+xml" href={`/icons/favicon.svg?v=${v}`} />
+      : <>
+          <link rel="icon" type="image/png" sizes="32x32" href={`/icons/32.png?v=${v}`} />
+          <link rel="icon" type="image/png" sizes="192x192" href={`/icons/192.png?v=${v}`} />
+          <link rel="apple-touch-icon" href={`/icons/180.png?v=${v}`} />
+        </>}
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta property="og:site_name" content={s.name} />
+    <meta property="og:title" content={fullTitle} />
+    <meta property="og:description" content={desc} />
+    <meta property="og:type" content={ogType} />
+    <meta property="og:url" content={origin + path} />
+    {ogUrl && <meta property="og:image" content={ogUrl} />}
+    <meta name="twitter:card" content={ogUrl ? 'summary_large_image' : 'summary'} />
+    {!bare && <>
+      <link rel="preload" href={paperMono} as="font" type="font/woff2" crossorigin />
+    </>}
+    <slot name="head" />
+    <!-- Runs before first paint so there is never a light/dark flash. No saved choice = no attribute = follow the OS. -->
+    <script is:inline set:html={THEME_INIT}></script>
+  </head>
+  <body>
+    {!bare && <>
+      <a class="skip" href="#main">Skip to content</a>
+      <header class="site-header">
+        <div class="wrap bar">
+          <a class="logo" href="/" title={s.name}>{s.name}<b>.</b></a>
+          <button class="burger" type="button" data-burger aria-expanded="false" aria-controls="site-menu">Menu</button>
+          <div class="menu" id="site-menu">
+            <nav class="nav" aria-label="Main">
+              {NAV.map((n) => (
+                <a href={n.href} class={n.cta ? 'cta' : undefined} data-astro-prefetch="hover" aria-current={path === n.href || path.startsWith(n.href + '/') ? 'page' : undefined}>{n.label}</a>
+              ))}
+            </nav>
+            <ThemeSwitch />
+          </div>
+        </div>
+      </header>
+    </>}
+    {bare ? <slot /> : <main id="main"><slot /></main>}
+    {!bare && (
+      <footer class="site-footer">
+        <div class="wrap">
+          <span class="mono">© {new Date().getFullYear()} {s.name} · Built on the edge</span>
+          {s.socials.length > 0 && (
+            <ul class="footer-links">
+              {s.socials.map((l) => <li><a href={l.url} rel="me noopener" target="_blank">{l.label}</a></li>)}
+            </ul>
+          )}
+        </div>
+      </footer>
+    )}
+    <script is:inline set:html={THEME_TOGGLE}></script>
+  </body>
+</html>

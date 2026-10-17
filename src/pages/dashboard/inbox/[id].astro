@@ -1,0 +1,38 @@
+---
+import Dash from '../../../layouts/Dash.astro';
+import { getMessage, setRead } from '../../../lib/inbox';
+
+const id = Number(Astro.params.id);
+const m = Number.isInteger(id) && id > 0 ? await getMessage(id) : null;
+if (!m) return Astro.rewrite('/404');
+if (!m.is_read) { await setRead(m.id, true); m.is_read = 1; } // opening a message marks it as read
+const subject = m.subject || '(no subject)';
+const reply = `mailto:${encodeURIComponent(m.email).replace(/%40/g, '@')}?subject=${encodeURIComponent('Re: ' + (m.subject || 'your message'))}`;
+const initials = m.name.trim().split(/\s+/).slice(0, 2).map((x) => x[0] ?? '').join('').toUpperCase() || '?';
+const here = `/dashboard/inbox/${m.id}`;
+---
+<Dash title={subject}>
+  <p class="crumb"><a href="/dashboard/inbox">← Inbox</a></p>
+  <article class="card message">
+    <header class="message-head">
+      <span class="avatar big" aria-hidden="true">{initials}</span>
+      <div class="message-who">
+        <h1>{subject}</h1>
+        <p class="row-meta"><strong>{m.name}</strong><span>{m.email}</span><time data-local datetime={new Date(m.created_at * 1000).toISOString()}>{new Date(m.created_at * 1000).toUTCString()}</time></p>
+      </div>
+    </header>
+    <div class="msg-body">{m.body}</div>
+    <footer class="message-actions">
+      <a class="btn" href={reply}>Reply by email</a>
+      <button class="btn ghost" type="button" data-copy-text={m.email}>Copy address</button>
+      <form method="post" action="/api/admin/inbox">
+        <input type="hidden" name="action" value="unread" /><input type="hidden" name="id" value={m.id} /><input type="hidden" name="redirect" value="/dashboard/inbox" />
+        <button class="btn ghost" type="submit">Mark as unread</button>
+      </form>
+      <form method="post" action="/api/admin/inbox" data-confirm="Delete this message for good?" style="margin-left:auto">
+        <input type="hidden" name="action" value="delete" /><input type="hidden" name="id" value={m.id} />
+        <button class="btn ghost danger" type="submit">Delete</button>
+      </form>
+    </footer>
+  </article>
+</Dash>

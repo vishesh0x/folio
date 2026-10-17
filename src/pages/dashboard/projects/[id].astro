@@ -1,0 +1,357 @@
+---
+import Dash from '../../../layouts/Dash.astro';
+import MediaField from '../../../components/MediaField.astro';
+import MediaData from '../../../components/MediaData.astro';
+import { getSettings } from '../../../lib/settings';
+import { listAssets, isImage } from '../../../lib/assets';
+import { getById, parseForm, slugTaken, updateProject, LIMITS, type AdminProject } from '../../../lib/projects-admin';
+
+const id = Number(Astro.params.id);
+const project = Number.isInteger(id) && id > 0 ? await getById(id) : null;
+if (!project) return Astro.rewrite('/404');
+
+const assets = await listAssets();
+const images = assets.filter((a) => isImage(a.mime) && a.mime !== 'image/x-icon');
+const ogImages = images.filter((a) => ['image/png', 'image/jpeg', 'image/webp', 'image/avif'].includes(a.mime));
+
+let p: AdminProject = { ...project };
+let loadedAt = project.updated_at;
+let errors: Record<string, string> = {};
+let formError = '';
+
+if (Astro.request.method === 'POST') {
+  const f = await Astro.request.formData();
+  const intent = String(f.get('intent') ?? 'save');
+  loadedAt = Number(f.get('v')) || project.updated_at;
+  const parsed = parseForm(f, new Set(images.map((a) => a.id)), new Set(ogImages.map((a) => a.id)), intent, project);
+  errors = parsed.errors;
+  p = { ...project, ...parsed.input }; // keep what the person typed if anything goes wrong
+  if (!errors.slug && await slugTaken(p.slug, id)) errors.slug = 'Another project already uses that address.';
+  if (Object.keys(errors).length) { Astro.response.status = 400; formError = 'Please fix the highlighted fields. Nothing was saved.'; }
+  else {
+    const r = await updateProject(id, parsed.input, loadedAt);
+    if (r === 'ok') return Astro.redirect(`/dashboard/projects/${id}?saved=${intent === 'publish' ? 'published' : intent === 'unpublish' ? 'unpublished' : '1'}`, 303);
+    Astro.response.status = 409;
+    if (r === 'slug-taken') { errors.slug = 'Another project already uses that address.'; formError = 'Please fix the highlighted fields. Nothing was saved.'; }
+    else formError = 'This project was changed in another tab or window since you opened it, so nothing was saved. Copy your text from here, reload the page, and paste it back in.';
+  }
+}
+
+const q = Astro.url.searchParams;
+const saved = q.get('saved'), created = q.get('created');
+const isPub = p.status === 'published';
+const site = await getSettings();
+const origin = (site.site_url || Astro.url.origin).replace(/\/$/, '');
+const hasSeo = !!(p.seo_title || p.seo_desc || p.seo_image);
+const words = p.body_md.trim() ? p.body_md.trim().split(/\s+/).length : 0;
+---
+<Dash title={p.title || 'Edit project'}>
+  <MediaData assets={assets} />
+  <p class="crumb"><a href="/dashboard/projects">← Projects</a></p>
+  <h1 class="visually-hidden">Edit project: {p.title || 'Untitled'}</h1>
+  {created && !formError && <p class="flash" role="status">Draft created. Give it a title and start writing.</p>}
+  {saved && !formError && <p class="flash" role="status">{saved === 'published' ? 'Published. It is live on your site.' : saved === 'unpublished' ? 'Moved back to drafts.' : 'Saved.'}</p>}
+  {formError && <p class="flash error" role="alert" id="form-error">{formError}</p>}
+
+  <form method="post" id="editor" class="editor" data-status={p.status} data-new={created ? '1' : undefined} novalidate>
+    <input type="hidden" name="v" value={loadedAt} />
+
+    <div class="editor-bar">
+      <span class:list={['pill', isPub && 'pub']}>{isPub ? 'Published' : 'Draft'}</span>
+      <span class="editor-bar-note" data-state aria-live="polite">{words} words</span>
+      <span class="editor-bar-spacer"></span>
+      {isPub && <a class="btn ghost sm" href={`/projects/${project.slug}`} target="_blank" rel="noopener">View ↗</a>}
+      <button class="btn ghost sm" type="submit" name="intent" value="save" data-save>{isPub ? 'Save changes' : 'Save draft'}</button>
+      <button class="btn sm" type="submit" name="intent" value={isPub ? 'unpublish' : 'publish'}>{isPub ? 'Unpublish' : 'Publish'}</button>
+    </div>
+
+    <div class="editor-grid">
+      <div class="editor-main stack" style="--stack:16px">
+        <div class="field" data-invalid={!!errors.title}>
+          <label for="title">Title</label>
+          <input id="title" name="title" class="title-input" value={p.title} maxlength={LIMITS.title} required placeholder="What is this project called?" aria-invalid={errors.title ? 'true' : undefined} aria-describedby={errors.title ? 'title-err' : undefined} />
+          {errors.title && <span class="error" id="title-err">{errors.title}</span>}
+        </div>
+        <div class="field">
+          <label for="summary">Summary</label>
+          <textarea id="summary" name="summary" rows="2" maxlength={LIMITS.summary} aria-describedby="summary-h" placeholder="One or two sentences for cards and search results">{p.summary}</textarea>
+          <span class="hint" id="summary-h">Shown on cards and in search results. <span data-count-for="summary">0</span> / {LIMITS.summary}</span>
+        </div>
+
+        <div class="md-editor">
+          <div class="md-top">
+            <div class="tabs seg" role="tablist" aria-label="Editor mode" data-tabs hidden>
+              <button type="button" role="tab" aria-selected="true" data-tab="write" id="tab-write" aria-controls="pane-write">Write</button>
+              <button type="button" role="tab" aria-selected="false" data-tab="preview" id="tab-preview" aria-controls="pane-preview" tabindex="-1">Preview</button>
+            </div>
+            <div class="md-tools" role="toolbar" aria-label="Formatting" data-tools hidden>
+              <span class="md-grp"><button type="button" data-md="bold" title="Bold (Ctrl/Cmd+B)">Bold</button><button type="button" data-md="italic" title="Emphasis (Ctrl/Cmd+I)">Emphasis</button><button type="button" data-md="h2" title="Heading">Heading</button></span>
+              <span class="md-grp"><button type="button" data-md="link" title="Link (Ctrl/Cmd+K)">Link</button><button type="button" data-md="image" title="Insert or upload an image">Image</button><button type="button" data-md="code" title="Code">Code</button><button type="button" data-md="quote" title="Quote">Quote</button></span>
+              <span class="md-grp"><button type="button" data-md="ul" title="Bulleted list">List</button><button type="button" data-md="task" title="Task list">Tasks</button><button type="button" data-md="callout" title="Callout">Callout</button><button type="button" data-md="mark" title="Highlight">Highlight</button><button type="button" data-md="wiki" title="Link to another project">Link project</button></span>
+            </div>
+          </div>
+
+          <div id="pane-write" role="tabpanel" aria-labelledby="tab-write">
+            <label class="visually-hidden" for="body">Project body in Markdown</label>
+            <textarea id="body" name="body" class="md-input" rows="22" spellcheck="true" maxlength={LIMITS.body} placeholder="Write in Markdown. Use the Image button to upload a picture right here.">{'\n' + p.body_md}</textarea>
+            <p class="hint md-foot"><span data-words>{words}</span> words · <span data-read>{Math.max(1, Math.round(words / 220))}</span> min read</p>
+          </div>
+          <div id="pane-preview" role="tabpanel" aria-labelledby="tab-preview" hidden>
+            <div class="md preview" data-preview aria-live="polite"></div>
+          </div>
+        </div>
+
+        <details class="help">
+          <summary>Markdown and Obsidian syntax</summary>
+          <ul class="syntax">
+            <li><code>==highlight==</code> highlights text</li>
+            <li><code>&gt; [!tip] Title</code> starts a callout (note, tip, warning, danger…)</li>
+            <li><code>[[Project title]]</code> or <code>[[slug|label]]</code> links to another published project</li>
+            <li><code>![[file.png|alt text]]</code> embeds an uploaded image (the Image button writes this for you)</li>
+            <li><code>%%comment%%</code> is hidden from the page; front matter at the top is ignored</li>
+            <li>Tables, <code>- [ ]</code> task lists, and fenced code with a language (<code>```ts</code>) all work</li>
+            <li>Raw HTML is shown as text, and external images become links: upload images instead</li>
+          </ul>
+        </details>
+      </div>
+
+      <div class="editor-side stack" style="--stack:14px">
+        <section class="card stack" style="--stack:14px" aria-labelledby="s-addr">
+          <h2 class="card-h" id="s-addr">Address</h2>
+          <div class="field slugbox" data-invalid={!!errors.slug} data-slug data-keep-open={errors.slug ? '1' : undefined}>
+            <div class="slug-view" data-slug-view hidden>
+              <p class="slug-full"><span class="slug"><span class="pre">{origin}/projects/</span><span class="val" data-slug-text>{p.slug}</span></span></p>
+              <div class="row-gap">
+                <button type="button" class="btn ghost sm" data-slug-edit>Edit address</button>
+                {isPub && <button type="button" class="btn ghost sm" data-copy={`/projects/${project.slug}`}>Copy link</button>}
+              </div>
+            </div>
+            <div class="slug-edit" data-slug-edit-box>
+              <label for="slug">Address <span class="opt">(the end of the link)</span></label>
+              <div class="slug-input"><span class="pre" aria-hidden="true">{origin}/projects/</span><textarea id="slug" name="slug" rows="2" maxlength="80" spellcheck="false" autocapitalize="off" autocomplete="off" aria-invalid={errors.slug ? 'true' : undefined} aria-describedby={errors.slug ? 'slug-err' : 'slug-h'}>{p.slug}</textarea></div>
+              <div class="row-gap"><button type="button" class="btn ghost sm" data-slug-make hidden>Make it from the title</button></div>
+            </div>
+            {errors.slug ? <span class="error" id="slug-err">{errors.slug}</span> : <span class="hint" id="slug-h">{isPub ? 'This project is live. Changing the address breaks links people already have.' : 'Made from the title until you edit it.'}</span>}
+          </div>
+          <label class="check"><input type="checkbox" name="featured" checked={!!p.featured} /> Feature on the home page</label>
+        </section>
+
+        <section class="card" aria-labelledby="s-cover">
+          <h2 class="card-h" id="s-cover" style="margin-bottom:12px">Cover image</h2>
+          <MediaField name="cover" value={p.cover_asset} assets={assets} kind="image" label="Cover image" labelHidden none="No cover" aspect="16 / 10" empty="Add a cover image" pickTitle="Choose a cover image" />
+          <div class="field" style="margin-top:14px">
+            <label for="cover_alt">Alt text for the cover <span class="opt">(optional)</span></label>
+            <input id="cover_alt" name="cover_alt" value={p.cover_alt} maxlength="300" aria-describedby="cover-alt-h" />
+            <span class="hint" id="cover-alt-h">Leave empty to use the image’s own alt text. The image is never cropped.</span>
+          </div>
+        </section>
+
+        <section class="card stack" style="--stack:14px" aria-labelledby="s-meta">
+          <h2 class="card-h" id="s-meta">Tags and links</h2>
+          <div class="field" data-invalid={!!errors.tags}>
+            <label for="tags">Tags</label>
+            <input id="tags" name="tags" value={p.tags.join(', ')} placeholder="typescript, design, open source" aria-describedby="tags-h" />
+            <span class="hint" id="tags-h">Separate with commas. Up to {LIMITS.tags}.</span>
+            {errors.tags && <span class="error">{errors.tags}</span>}
+          </div>
+          <div class="field" data-invalid={!!errors.live_url}>
+            <label for="live_url">Live site</label>
+            <input id="live_url" name="live_url" type="url" value={p.live_url} placeholder="https://" aria-describedby={errors.live_url ? 'live-err' : undefined} />
+            {errors.live_url && <span class="error" id="live-err">{errors.live_url}</span>}
+          </div>
+          <div class="field" data-invalid={!!errors.source_url}>
+            <label for="source_url">Source code</label>
+            <input id="source_url" name="source_url" type="url" value={p.source_url} placeholder="https://github.com/…" aria-describedby={errors.source_url ? 'src-err' : undefined} />
+            {errors.source_url && <span class="error" id="src-err">{errors.source_url}</span>}
+          </div>
+        </section>
+
+        <details class="card fold" open={hasSeo} data-seo-project>
+          <summary><span class="card-h">Search and sharing</span><span class="hint">Optional</span></summary>
+          <div class="stack" style="--stack:14px;margin-top:14px">
+            <div class="serp" aria-hidden="true">
+              <p class="serp-url" data-pv-url>{origin}/projects/{p.slug}</p>
+              <p class="serp-title" data-pv-title>{p.seo_title || p.title}</p>
+              <p class="serp-desc" data-pv-desc>{p.seo_desc || p.summary || 'The first words of your project text.'}</p>
+            </div>
+            <div class="field">
+              <label for="seo_title">SEO title</label>
+              <input id="seo_title" name="seo_title" value={p.seo_title} maxlength={LIMITS.seoTitle} placeholder={p.title} data-soft="60" />
+              <span class="hint"><span data-count>0</span> / 60 recommended. Empty uses the project title.</span>
+            </div>
+            <div class="field">
+              <label for="seo_desc">SEO description</label>
+              <textarea id="seo_desc" name="seo_desc" rows="3" maxlength={LIMITS.seoDesc} data-soft="160">{p.seo_desc}</textarea>
+              <span class="hint"><span data-count>0</span> / 160 recommended. Empty uses the summary.</span>
+            </div>
+            <MediaField name="seo_image" value={p.seo_image} assets={assets} kind="image" raster label="Share image" none="Use the cover" aspect="1.91 / 1" empty="Add a share image" pickTitle="Choose a share image" compact />
+          </div>
+        </details>
+
+        <section class="card stack" style="--stack:10px" aria-labelledby="s-file">
+          <h2 class="card-h" id="s-file">Markdown file</h2>
+          <p class="hint" style="margin:0">Bring a note in from Obsidian, or take this one out as a <code>.md</code> file with front matter.</p>
+          <div class="row-gap">
+            <label class="btn ghost sm" style="cursor:pointer" data-import-label hidden>Import .md<input type="file" id="import" accept=".md,.markdown,.txt,text/markdown,text/plain" class="visually-hidden" /></label>
+            <a class="btn ghost sm" href={`/api/admin/projects/${id}/export`}>Download .md</a>
+          </div>
+        </section>
+      </div>
+    </div>
+  </form>
+
+  <section class="card danger-zone" aria-labelledby="dz">
+    <div><h2 class="card-h" id="dz">More</h2><p class="card-sub">Duplicate keeps everything as a new draft. Deleting also removes this project from your resume and cannot be undone.</p></div>
+    <div class="row-gap">
+      <form method="post" action="/api/admin/projects"><input type="hidden" name="id" value={id} /><button class="btn ghost sm" name="action" value="duplicate">Duplicate as draft</button></form>
+      <form method="post" action="/api/admin/projects" data-confirm={`Delete “${project.title}”? This also removes it from your resume. It cannot be undone.`}><input type="hidden" name="id" value={id} /><button class="btn ghost danger sm" name="action" value="delete">Delete project</button></form>
+    </div>
+  </section>
+</Dash>
+
+<script>
+  import { openPicker } from '../../../scripts/media';
+  const form = document.getElementById('editor') as HTMLFormElement;
+  const body = form.querySelector<HTMLTextAreaElement>('#body')!;
+  const titleEl = form.querySelector<HTMLInputElement>('#title')!;
+  const slugEl = form.querySelector<HTMLTextAreaElement>('#slug')!;
+  const q = <T extends Element>(s: string) => form.querySelector<T>(s)!;
+
+  // Show the controls that need JavaScript
+  form.querySelectorAll<HTMLElement>('[data-tabs],[data-tools],[data-import-label],[data-slug-make]').forEach((el) => (el.hidden = false));
+
+  // ── editing helpers (execCommand keeps the browser's undo history working)
+  const insert = (text: string) => {
+    body.focus();
+    if (typeof document.execCommand !== 'function' || !document.execCommand('insertText', false, text)) body.setRangeText(text, body.selectionStart, body.selectionEnd, 'end');
+    body.dispatchEvent(new Event('input', { bubbles: true }));
+  };
+  const selected = () => body.value.slice(body.selectionStart, body.selectionEnd);
+  const wrap = (a: string, b: string, ph: string) => {
+    const s = selected() || ph; const start = body.selectionStart;
+    insert(a + s + b);
+    if (!selected() && s === ph) body.setSelectionRange(start + a.length, start + a.length + ph.length);
+  };
+  const linePrefix = (p: string) => {
+    const start = body.value.lastIndexOf('\n', body.selectionStart - 1) + 1;
+    body.setSelectionRange(start, body.selectionEnd);
+    insert(selected().split('\n').map((l) => p + l).join('\n'));
+  };
+  const actions: Record<string, () => void> = {
+    bold: () => wrap('**', '**', 'bold text'), italic: () => wrap('*', '*', 'emphasised text'), mark: () => wrap('==', '==', 'highlighted'),
+    link: () => { const s = selected() || 'link text'; const start = body.selectionStart; insert(`[${s}](https://)`); body.setSelectionRange(start + s.length + 3, start + s.length + 11); },
+    code: () => (selected().includes('\n') ? wrap('```\n', '\n```', '') : wrap('`', '`', 'code')),
+    h2: () => linePrefix('## '), quote: () => linePrefix('> '), ul: () => linePrefix('- '), task: () => linePrefix('- [ ] '),
+    callout: () => insert('> [!tip] Title\n> Write the callout here.\n'),
+    wiki: () => { const s = selected(); const start = body.selectionStart; insert(`[[${s}]]`); if (!s) body.setSelectionRange(start + 2, start + 2); },
+    // Choose or upload an image without leaving the editor. The caret is remembered, because the dialog takes the focus.
+    image: () => {
+      const from = body.selectionStart, to = body.selectionEnd;
+      openPicker({
+        kind: 'image', title: 'Insert an image',
+        onPick: (it) => {
+          if (!it) return;
+          body.focus(); body.setSelectionRange(from, to);
+          const alt = it.alt.replace(/[\]|]/g, ' ').trim();
+          insert(`![[${it.filename}${alt ? '|' + alt : ''}]]\n`);
+        },
+      });
+    },
+  };
+  form.querySelectorAll<HTMLButtonElement>('[data-md]').forEach((b) => b.addEventListener('click', () => actions[b.dataset.md!]?.()));
+  body.addEventListener('keydown', (e) => {
+    if (!(e.metaKey || e.ctrlKey)) return;
+    const k = e.key.toLowerCase();
+    if (k === 'b') { e.preventDefault(); actions.bold(); } else if (k === 'i') { e.preventDefault(); actions.italic(); } else if (k === 'k') { e.preventDefault(); actions.link(); }
+  });
+  document.addEventListener('keydown', (e) => { if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') { e.preventDefault(); form.requestSubmit(q<HTMLButtonElement>('[data-save]')); } });
+
+  // ── write / preview
+  const tabs = [...form.querySelectorAll<HTMLButtonElement>('[data-tab]')];
+  const panes = { write: q<HTMLElement>('#pane-write'), preview: q<HTMLElement>('#pane-preview') };
+  const preview = q<HTMLElement>('[data-preview]');
+  const show = async (which: 'write' | 'preview') => {
+    tabs.forEach((t) => { const on = t.dataset.tab === which; t.setAttribute('aria-selected', String(on)); t.tabIndex = on ? 0 : -1; });
+    panes.write.hidden = which !== 'write'; panes.preview.hidden = which !== 'preview';
+    q<HTMLElement>('[data-tools]').style.visibility = which === 'write' ? 'visible' : 'hidden';
+    if (which === 'preview') {
+      preview.textContent = 'Rendering…';
+      try {
+        const r = await fetch('/api/admin/preview', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ md: body.value }) });
+        if (!r.ok) throw new Error();
+        preview.innerHTML = (await r.json()).html || '<p class="muted">Nothing to preview yet.</p>';
+      } catch { preview.textContent = 'The preview could not be loaded. Your text is safe; try again.'; }
+    }
+  };
+  tabs.forEach((t) => {
+    t.addEventListener('click', () => show(t.dataset.tab as 'write' | 'preview'));
+    t.addEventListener('keydown', (e) => { if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') { const o = tabs.find((x) => x !== t)!; o.focus(); show(o.dataset.tab as 'write' | 'preview'); } });
+  });
+
+  // ── address (slug): a readable, wrapping view with an Edit button; the field itself is a self-sizing box so nothing is cut off
+  const slugify = (s: string) => s.toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 80).replace(/-+$/, '');
+  const box = q<HTMLElement>('[data-slug]'), view = q<HTMLElement>('[data-slug-view]'), edit = q<HTMLElement>('[data-slug-edit-box]'), slugText = q<HTMLElement>('[data-slug-text]');
+  const editing = (on: boolean) => { view.hidden = on; edit.hidden = !on; if (on) { slugEl.focus(); slugEl.select(); } };
+  if (!box.dataset.keepOpen) { view.hidden = false; edit.hidden = true; }
+  q<HTMLButtonElement>('[data-slug-edit]').addEventListener('click', () => editing(true));
+  slugEl.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); editing(false); } });
+  slugEl.addEventListener('input', () => { slugEl.value = slugEl.value.replace(/[\r\n]+/g, ''); slugTouched = true; });
+  slugEl.addEventListener('blur', (e) => {
+    if (edit.contains(e.relatedTarget as Node)) return; // moving to "Make it from the title": keep the box open
+    slugEl.value = slugify(slugEl.value) || slugEl.value.trim(); slugText.textContent = slugEl.value;
+    refresh(); // the search preview shows the tidied address
+    if (slugEl.value) editing(false);
+  });
+  q<HTMLButtonElement>('[data-slug-make]').addEventListener('click', () => { slugEl.value = slugify(titleEl.value) || 'untitled'; slugTouched = true; slugText.textContent = slugEl.value; form.dispatchEvent(new Event('input')); slugEl.focus(); });
+
+  // ── counters, word count, search preview
+  const summary = q<HTMLTextAreaElement>('#summary'), seoT = q<HTMLInputElement>('#seo_title'), seoD = q<HTMLTextAreaElement>('#seo_desc');
+  const pvT = q<HTMLElement>('[data-pv-title]'), pvD = q<HTMLElement>('[data-pv-desc]'), pvU = q<HTMLElement>('[data-pv-url]');
+  const base = pvU.textContent!.slice(0, pvU.textContent!.lastIndexOf('/projects/') + '/projects/'.length);
+  const refresh = () => {
+    q<HTMLElement>('[data-count-for="summary"]').textContent = String(summary.value.length);
+    for (const el of [seoT, seoD]) { const c = el.parentElement!.querySelector<HTMLElement>('[data-count]')!; c.textContent = String(el.value.length); c.classList.toggle('over', el.value.length > Number(el.dataset.soft)); }
+    pvT.textContent = seoT.value.trim() || titleEl.value.trim() || 'Untitled';
+    pvD.textContent = seoD.value.trim() || summary.value.trim() || 'The first words of your project text.';
+    pvU.textContent = base + slugEl.value;
+    const n = body.value.trim() ? body.value.trim().split(/\s+/).length : 0;
+    q<HTMLElement>('[data-words]').textContent = String(n); q<HTMLElement>('[data-read]').textContent = String(Math.max(1, Math.round(n / 220)));
+  };
+  let slugTouched = false;
+  titleEl.addEventListener('input', () => { if (!slugTouched && form.dataset.status === 'draft') { slugEl.value = slugify(titleEl.value); slugText.textContent = slugEl.value; } });
+  form.addEventListener('input', refresh); refresh();
+
+  // ── unsaved-changes guard
+  const note = q<HTMLElement>('[data-state]');
+  let dirty = false, submitting = false;
+  form.addEventListener('input', () => { if (!dirty) { dirty = true; note.textContent = 'Unsaved changes'; note.classList.add('dirty'); } });
+  form.addEventListener('submit', () => (submitting = true));
+  window.addEventListener('beforeunload', (e) => { if (dirty && !submitting) { e.preventDefault(); e.returnValue = ''; } });
+  if (form.dataset.new) titleEl.select();
+
+  // ── import an Obsidian note
+  q<HTMLInputElement>('#import').addEventListener('change', async (e) => {
+    const file = (e.target as HTMLInputElement).files?.[0]; if (!file) return;
+    if (file.size > 400_000) { alert('That file is too large to import.'); return; }
+    let text = (await file.text()).replace(/\r\n?/g, '\n');
+    const fm: Record<string, string> = {};
+    const m = text.match(/^---\n([\s\S]*?)\n---\n?/);
+    if (m) {
+      text = text.slice(m[0].length);
+      let key = '';
+      for (const line of m[1].split('\n')) {
+        const kv = line.match(/^([A-Za-z_]+):\s*(.*)$/);
+        if (kv) { key = kv[1].toLowerCase(); fm[key] = kv[2].replace(/^["']|["']$/g, ''); }
+        else if (key && /^\s*-\s+/.test(line)) fm[key] = (fm[key] ? fm[key] + ',' : '') + line.replace(/^\s*-\s+/, '').replace(/^["']|["']$/g, '');
+      }
+    }
+    if (body.value.trim() && !confirm('Replace the current text with the imported note?')) { (e.target as HTMLInputElement).value = ''; return; }
+    body.value = text.replace(/^\n+/, '');
+    const put = (el: HTMLInputElement | HTMLTextAreaElement, v?: string) => { if (v && !el.value.trim()) el.value = v; };
+    put(titleEl, fm.title || file.name.replace(/\.(md|markdown|txt)$/i, ''));
+    put(summary, fm.summary || fm.description);
+    put(q<HTMLInputElement>('#tags'), (fm.tags || '').replace(/^\[|\]$/g, '').replace(/["']/g, ''));
+    put(q<HTMLInputElement>('#live_url'), fm.live || fm.url); put(q<HTMLInputElement>('#source_url'), fm.source || fm.repo);
+    dirty = true; form.dispatchEvent(new Event('input')); (e.target as HTMLInputElement).value = '';
+  });
+</script>

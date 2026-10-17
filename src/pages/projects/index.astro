@@ -1,0 +1,60 @@
+---
+import Base from '../../layouts/Base.astro';
+import ProjectCard from '../../components/ProjectCard.astro';
+import { listPublished, allTags } from '../../lib/projects';
+import { pageSeo } from '../../lib/seo';
+
+const seo = await pageSeo('projects');
+const all = await listPublished();
+const tags = allTags(all);
+const requested = Astro.url.searchParams.get('tag');
+const tag = requested && tags.includes(requested) ? requested : undefined;
+const shown = tag ? all.filter((p) => p.tags.includes(tag)) : all;
+---
+<Base title={seo.title ?? 'Projects'} description={seo.description ?? 'Things I have built, with notes on how and why.'} noindex={seo.noindex} ogImage={seo.ogImage}>
+  <section class="wrap page-title">
+    <p class="eyebrow">Index</p>
+    <h1>Projects<span class="dot">.</span></h1>
+    <p class="lead">Things I’ve built, with notes on how and why.</p>
+    <div class="filters">
+      <div class="js-only" hidden data-search-wrap>
+        <label class="visually-hidden" for="q">Search projects</label>
+        <input id="q" class="search" type="search" placeholder="Search projects…" autocomplete="off" />
+      </div>
+      {tags.length > 0 && (
+        <nav class="chips" aria-label="Filter by tag">
+          <a class="chip" href="/projects" aria-current={tag ? undefined : 'true'}>All <span>{all.length}</span></a>
+          {tags.map((t) => <a class="chip" href={`/projects?tag=${encodeURIComponent(t)}`} aria-current={tag === t ? 'true' : undefined}>{t}</a>)}
+        </nav>
+      )}
+    </div>
+    <p class="result-count" id="count" aria-live="polite">{shown.length} project{shown.length === 1 ? '' : 's'}</p>
+  </section>
+
+  <section class="wrap section" style="padding-top:1.5rem">
+    {shown.length === 0
+      ? <p class="empty">{all.length === 0 ? 'Projects will appear here soon.' : 'Nothing with that tag yet.'}</p>
+      : <div class="pgrid" id="grid">{shown.map((p, i) => <ProjectCard project={p} eager={i < 2} level={2} />)}</div>}
+    <p class="no-results" id="none" hidden>No projects match your search. <button type="button" class="btn ghost sm" id="clear">Clear search</button></p>
+  </section>
+</Base>
+
+<script>
+  // Search is an extra on top of the tag links, which work without JavaScript.
+  const wrap = document.querySelector<HTMLElement>('[data-search-wrap]');
+  const input = document.getElementById('q') as HTMLInputElement | null;
+  const cards = [...document.querySelectorAll<HTMLElement>('#grid .pcard')];
+  if (wrap && input && cards.length) {
+    wrap.hidden = false;
+    const count = document.getElementById('count')!, none = document.getElementById('none')!, grid = document.getElementById('grid')!;
+    const run = () => {
+      const terms = input.value.toLowerCase().split(/\s+/).filter(Boolean);
+      let n = 0;
+      for (const c of cards) { const hit = terms.every((t) => (c.dataset.search ?? '').includes(t)); c.hidden = !hit; if (hit) n++; }
+      count.textContent = `${n} project${n === 1 ? '' : 's'}`;
+      none.hidden = n > 0; grid.hidden = n === 0;
+    };
+    input.addEventListener('input', run);
+    document.getElementById('clear')!.addEventListener('click', () => { input.value = ''; run(); input.focus(); });
+  }
+</script>

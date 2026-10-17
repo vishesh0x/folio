@@ -1,0 +1,112 @@
+---
+import { env } from 'cloudflare:workers';
+import Base from '../layouts/Base.astro';
+import Reveal from '../components/Reveal.astro';
+import { getSettings } from '../lib/settings';
+import { pageSeo } from '../lib/seo';
+import { validateEmail } from '../lib/auth';
+import { issueToken, checkToken } from '../lib/formtoken';
+import { allow, ipOf } from '../lib/throttle';
+import { turnstileOn, turnstileSiteKey, verifyTurnstile } from '../lib/turnstile';
+
+const s = await getSettings();
+const seo = await pageSeo('contact');
+const sent = Astro.url.searchParams.get('sent') === '1';
+const turnstileKey = turnstileSiteKey();
+
+const v = { name: '', email: '', subject: '', message: '' };
+const errors: Record<string, string> = {};
+let formError = '';
+
+if (Astro.request.method === 'POST') {
+  const f = await Astro.request.formData();
+  const get = (k: string, max: number) => String(f.get(k) ?? '').replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '').trim().slice(0, max);
+  v.name = get('name', 100); v.email = get('email', 254); v.subject = get('subject', 150); v.message = get('message', 5000);
+
+  const trap = String(f.get('website') ?? '');         // hidden field: people leave it empty, bots fill it
+  const timing = await checkToken(String(f.get('t') ?? ''), 'contact');
+
+  if (trap) {
+    return Astro.redirect('/contact?sent=1', 303);     // pretend it worked so bots do not adapt; nothing is stored
+  } else if (timing === 'invalid' || timing === 'expired') {
+    Astro.response.status = 400; formError = 'This form expired. Please check your message and send it again.';
+  } else if (timing === 'too-fast') {
+    Astro.response.status = 400; formError = 'That was quick. Please send it again.';
+  } else {
+    if (v.name.length < 1) errors.name = 'Please tell me your name.';
+    const em = validateEmail(v.email); if (em) errors.email = 'Enter an email address I can reply to.';
+    if (v.message.length < 10) errors.message = 'Please write at least a sentence or two.';
+    if ((v.message.match(/https?:\/\//gi) ?? []).length > 3) errors.message = 'That has a lot of links. Please trim it down.';
+    if (Object.keys(errors).length) { Astro.response.status = 400; formError = 'Please fix the highlighted fields.'; }
+    else if (!(await allow(`contact:${ipOf(Astro.request)}`, 5, 3600))) {
+      Astro.response.status = 429; formError = 'You have sent several messages recently. Please try again in an hour.';
+    } else if (turnstileOn() && !(await verifyTurnstile(String(f.get('cf-turnstile-response') ?? ''), ipOf(Astro.request)))) {
+      Astro.response.status = 400; formError = 'The spam check did not pass. Please try again.';
+    } else {
+      await env.DB.prepare('INSERT INTO messages (name, email, subject, body) VALUES (?, ?, ?, ?)').bind(v.name, v.email, v.subject || null, v.message).run();
+      return Astro.redirect('/contact?sent=1', 303);
+    }
+  }
+}
+
+const token = await issueToken('contact');
+const links = s.socials;
+---
+<Base title={seo.title ?? 'Contact'} description={seo.description ?? `Get in touch with ${s.name}.`} noindex={seo.noindex} ogImage={seo.ogImage}>
+  {turnstileKey && <script slot="head" src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>}
+  <section class="wrap page-title">
+    <p class="eyebrow">Contact</p>
+    <h1>Say <em>hello</em><span class="dot">.</span></h1>
+    <p class="lead">Tell me about a project, ask a question, or just say hi.</p>
+  </section>
+  <section class="wrap section" style="padding-top:1.5rem">
+
+    <div class="contact-grid">
+      {sent ? (
+        <div class="card sent" role="status">
+          <h2>Thank you.</h2>
+          <p>Your message is in my inbox. If it needs a reply, you’ll hear back from me.</p>
+          <p><a class="btn ghost" href="/contact">Send another</a></p>
+        </div>
+      ) : (
+        <form class="card stack" method="post" action="/contact" novalidate style="--stack:1.1rem">
+          {formError && <p class="flash error" role="alert" tabindex="-1" id="form-error">{formError}</p>}
+          <div class="field" data-invalid={!!errors.name}>
+            <label for="name">Your name</label>
+            <input id="name" name="name" value={v.name} required maxlength="100" autocomplete="name" aria-invalid={errors.name ? 'true' : undefined} aria-describedby={errors.name ? 'name-err' : undefined} />
+            {errors.name && <span class="error" id="name-err">{errors.name}</span>}
+          </div>
+          <div class="field" data-invalid={!!errors.email}>
+            <label for="email">Your email</label>
+            <input id="email" name="email" type="email" value={v.email} required maxlength="254" autocomplete="email" aria-invalid={errors.email ? 'true' : undefined} aria-describedby={errors.email ? 'email-err' : undefined} />
+            {errors.email && <span class="error" id="email-err">{errors.email}</span>}
+          </div>
+          <div class="field">
+            <label for="subject">Subject <span class="opt">(optional)</span></label>
+            <input id="subject" name="subject" value={v.subject} maxlength="150" />
+          </div>
+          <div class="field" data-invalid={!!errors.message}>
+            <label for="message">Message</label>
+            <textarea id="message" name="message" rows="7" required maxlength="5000" aria-invalid={errors.message ? 'true' : undefined} aria-describedby={errors.message ? 'message-err' : undefined}>{v.message}</textarea>
+            {errors.message && <span class="error" id="message-err">{errors.message}</span>}
+          </div>
+          <div class="hp" aria-hidden="true"><label>Leave this empty<input name="website" tabindex="-1" autocomplete="off" /></label></div>
+          <input type="hidden" name="t" value={token} />
+          {turnstileKey && <div class="cf-turnstile" data-sitekey={turnstileKey} data-action="contact"></div>}
+          <div><button class="btn" type="submit">Send message</button></div>
+        </form>
+      )}
+
+      <aside class="contact-side card">
+        <h2>Other ways</h2>
+        {s.email && <p><strong>Email</strong><br /><Reveal kind="email" /></p>}
+        {s.location && <p><strong>Based in</strong><br />{s.location}</p>}
+        {links.length > 0 && (
+          <ul class="link-rows">
+            {links.map((l) => <li><a href={l.url} rel="me noopener" target="_blank"><span>{l.label}</span><span aria-hidden="true">↗</span></a></li>)}
+          </ul>
+        )}
+      </aside>
+    </div>
+  </section>
+</Base>

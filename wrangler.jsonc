@@ -1,0 +1,16 @@
+{
+  // The Astro adapter fills in `main` and `assets` at build time.
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "folio",
+  "compatibility_date": "2026-09-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "images": { "binding": "IMAGES" },
+  "observability": { "enabled": true }, // keeps logs, so errors behind the "Something broke" page can be found
+  "d1_databases": [
+    { "binding": "DB", "database_name": "folio-db", "database_id": "REPLACE_WITH_ID_FROM_wrangler_d1_create", "migrations_dir": "migrations" }
+  ],
+  "r2_buckets": [
+    { "binding": "ASSETS_BUCKET", "bucket_name": "folio-assets" }
+  ]
+  // Secret (never commit):  npx wrangler secret put ADMIN_SETUP_TOKEN
+}

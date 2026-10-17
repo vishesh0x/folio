@@ -1,0 +1,133 @@
+---
+import Dash from '../../layouts/Dash.astro';
+import PageHead from '../../components/PageHead.astro';
+import { listAssets, usageMap, assetView } from '../../lib/assets';
+
+const assets = await listAssets();
+const usage = await usageMap(assets);
+const ok = Astro.url.searchParams.get('ok');
+const error = Astro.url.searchParams.get('error');
+const kb = (n: number) => (n > 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB');
+const views = assets.map((a) => ({ a, v: assetView(a), used: usage.get(a.id) ?? [] }));
+const counts = { all: views.length, image: views.filter((x) => x.v.kind === 'image').length, pdf: views.filter((x) => x.v.kind !== 'image').length };
+const dots = '<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>';
+---
+<Dash title="Files">
+  <PageHead title="Files" lede="Everything you have uploaded: pictures for your pages and PDFs. You can also upload straight from the editor that needs the file, such as a project cover or the resume.">
+    <button class="btn" type="button" data-upload hidden>Upload files</button>
+  </PageHead>
+  {ok && <p class="flash" role="status">{ok}</p>}
+  {error && <p class="flash error" role="alert">{error}</p>}
+
+  <div class="dropzone" data-drop hidden>
+    <span class="dz-ico" aria-hidden="true"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg></span>
+    <div><p class="dz-t"><strong>Drop files here</strong> or <button type="button" class="mpick-link" data-upload>browse</button></p><p class="hint">PNG, JPEG, WebP, AVIF, GIF, SVG or ICO up to 10 MB; PDFs up to 15 MB. You will add a short description for each image.</p></div>
+  </div>
+  <input type="file" id="files-input" class="visually-hidden" multiple tabindex="-1" aria-hidden="true" accept="image/png,image/jpeg,image/webp,image/avif,image/gif,image/svg+xml,image/x-icon,application/pdf" />
+
+  <noscript>
+    <form class="card stack" method="post" action="/api/admin/assets" enctype="multipart/form-data" style="--stack:12px;max-width:34rem">
+      <h2 class="card-h">Upload a file</h2>
+      <div class="field"><label for="file">File</label><input id="file" name="file" type="file" required /></div>
+      <div class="field"><label for="alt">Alt text</label><input id="alt" name="alt" maxlength="300" placeholder="Describe what the image shows" /><span class="hint">Required for images. Not needed for PDFs.</span></div>
+      <label class="check"><input type="checkbox" name="decorative" /> Decorative image (screen readers should skip it)</label>
+      <div><button class="btn" type="submit">Upload</button></div>
+    </form>
+  </noscript>
+
+  {views.length === 0 ? (
+    <div class="empty"><h2>No files yet</h2><p>Drop your first picture or PDF above. Everything you upload here can be chosen from the project, resume and settings pages.</p></div>
+  ) : (
+    <>
+      <div class="files-bar" data-filter-bar hidden>
+        <div class="filters" role="group" aria-label="Filter files" style="margin:0">
+          <a href="#all" role="button" data-filter="all" aria-current="true">All <span>{counts.all}</span></a>
+          <a href="#images" role="button" data-filter="image">Images <span>{counts.image}</span></a>
+          <a href="#pdfs" role="button" data-filter="pdf">PDFs <span>{counts.pdf}</span></a>
+        </div>
+        <input type="search" class="search" placeholder="Search files" aria-label="Search files" data-search />
+      </div>
+      <p class="hint" role="status" data-none hidden style="margin:12px 0">No files match.</p>
+      <ul class="files-grid">
+        {views.map(({ a, v, used }) => (
+          <li class="file" data-kind={v.kind === 'image' ? 'image' : 'pdf'} data-name={`${a.filename} ${a.alt}`.toLowerCase()}>
+            <a class="file-thumb" href={v.url} target="_blank" rel="noopener" aria-label={`Open ${a.filename} in a new tab`}>
+              {v.kind === 'image'
+                ? <img src={v.thumb} alt="" loading="lazy" width={a.width ?? undefined} height={a.height ?? undefined} />
+                : <span class="file-doc"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg>{v.kind === 'pdf' ? 'PDF' : 'File'}</span>}
+            </a>
+            <div class="file-body">
+              <p class="file-name" title={a.filename}>{a.filename}</p>
+              <p class="row-meta">{[v.kind === 'image' ? (a.mime.replace('image/', '').replace('svg+xml', 'svg').toUpperCase()) : 'PDF', a.width && a.height ? `${a.width}×${a.height}` : null, kb(a.size)].filter(Boolean).join(' · ')}</p>
+              <p class="file-used">{used.length === 0 ? <span class="muted">Not used anywhere yet</span> : <><span class="pill pub">In use</span> <span class="muted">{used[0]}{used.length > 1 ? ` and ${used.length - 1} more` : ''}</span></>}</p>
+              {v.kind === 'image' && (
+                <details class="alt-edit">
+                  <summary><span class="muted">Alt text:</span> {a.decorative ? <em>decorative</em> : a.alt || <em>missing</em>}</summary>
+                  <form method="post" action="/api/admin/assets/update" class="stack" style="--stack:8px">
+                    <input type="hidden" name="id" value={a.id} />
+                    <div class="field"><label for={`alt-${a.id}`} class="visually-hidden">Alt text for {a.filename}</label><input id={`alt-${a.id}`} name="alt" value={a.alt} maxlength="300" placeholder="Describe what the image shows" /></div>
+                    <label class="check"><input type="checkbox" name="decorative" checked={!!a.decorative} /> Decorative</label>
+                    <div><button class="btn ghost sm" type="submit">Save alt text</button></div>
+                  </form>
+                </details>
+              )}
+            </div>
+            <div class="file-actions">
+              <button type="button" class="btn ghost sm" data-copy={v.url}>Copy link</button>
+              <details class="more">
+                <summary aria-label={`More actions for ${a.filename}`}><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" set:html={dots} /></summary>
+                <div class="more-panel">
+                  <a href={v.url} target="_blank" rel="noopener">Open in a new tab ↗</a>
+                  <div class="sep" role="separator"></div>
+                  {used.length > 0
+                    ? <button type="button" disabled title={`In use: ${used[0]}. Change it there first.`}>Delete (in use)</button>
+                    : <form method="post" action="/api/admin/assets/delete" data-confirm={`Delete ${a.filename}? This cannot be undone.`}><input type="hidden" name="id" value={a.id} /><button class="bad">Delete…</button></form>}
+                </div>
+              </details>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </>
+  )}
+</Dash>
+
+<script>
+  import { openPicker } from '../../scripts/media';
+
+  // Upload: one dialog per file (so each picture gets its description), one after another.
+  const drop = document.querySelector<HTMLElement>('[data-drop]')!, input = document.getElementById('files-input') as HTMLInputElement;
+  document.querySelectorAll<HTMLElement>('[data-upload]').forEach((b) => (b.hidden = false));
+  drop.hidden = false;
+  const run = (files: File[]) => {
+    const queue = [...files];
+    const next = () => {
+      const f = queue.shift();
+      if (!f) { location.href = '/dashboard/assets?ok=' + encodeURIComponent(files.length === 1 ? 'Uploaded.' : `Uploaded ${files.length} files.`); return; }
+      openPicker({ kind: 'any', title: files.length > 1 ? `Upload ${files.length - queue.length - 1 + 1} of ${files.length}` : 'Upload a file', file: f, uploadOnly: true, onPick: () => next() });
+    };
+    next();
+  };
+  document.querySelectorAll('[data-upload]').forEach((b) => b.addEventListener('click', () => input.click()));
+  drop.addEventListener('click', (e) => { if (!(e.target as HTMLElement).closest('button')) input.click(); });
+  input.addEventListener('change', () => { if (input.files?.length) run([...input.files]); input.value = ''; });
+  for (const ev of ['dragenter', 'dragover']) drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add('is-over'); });
+  for (const ev of ['dragleave', 'drop']) drop.addEventListener(ev, () => drop.classList.remove('is-over'));
+  drop.addEventListener('drop', (e) => { e.preventDefault(); const f = (e as DragEvent).dataTransfer?.files; if (f?.length) run([...f]); });
+
+  // Filter and search (the grid works without this; it is only a convenience)
+  const bar = document.querySelector<HTMLElement>('[data-filter-bar]');
+  if (bar) {
+    bar.hidden = false;
+    const cards = [...document.querySelectorAll<HTMLElement>('.file')], none = document.querySelector<HTMLElement>('[data-none]')!;
+    const search = bar.querySelector<HTMLInputElement>('[data-search]')!, chips = [...bar.querySelectorAll<HTMLAnchorElement>('[data-filter]')];
+    let kind = 'all';
+    const apply = () => {
+      const q = search.value.trim().toLowerCase(); let n = 0;
+      for (const c of cards) { const show = (kind === 'all' || c.dataset.kind === kind) && (!q || (c.dataset.name ?? '').includes(q)); c.hidden = !show; if (show) n++; }
+      none.hidden = n > 0;
+    };
+    chips.forEach((c) => c.addEventListener('click', (e) => { e.preventDefault(); kind = c.dataset.filter!; chips.forEach((x) => x.setAttribute('aria-current', String(x === c))); apply(); }));
+    search.addEventListener('input', apply);
+  }
+</script>

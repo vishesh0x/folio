@@ -1,0 +1,54 @@
+---
+import Dash from '../../../layouts/Dash.astro';
+import PageHead from '../../../components/PageHead.astro';
+import { listMessages } from '../../../lib/inbox';
+import { ago } from '../../../lib/format';
+
+const filter = Astro.url.searchParams.get('filter') === 'unread' ? 'unread' : 'all';
+const { rows, total, pages, page } = await listMessages(filter, Number(Astro.url.searchParams.get('page')) || 1);
+const q = (p: number) => `/dashboard/inbox?${filter === 'unread' ? 'filter=unread&' : ''}page=${p}`;
+const here = `/dashboard/inbox?${filter === 'unread' ? 'filter=unread&' : ''}page=${page}`;
+const initials = (n: string) => n.trim().split(/\s+/).slice(0, 2).map((x) => x[0] ?? '').join('').toUpperCase() || '?';
+const snippet = (t: string) => (t.length > 110 ? t.slice(0, 110).trimEnd() + '…' : t).replace(/\s+/g, ' ');
+---
+<Dash title="Inbox">
+  <PageHead title="Inbox" lede="Messages from your contact form. Opening one marks it as read.">
+    <form method="post" action="/api/admin/inbox">
+      <input type="hidden" name="action" value="mark-all-read" /><input type="hidden" name="redirect" value="/dashboard/inbox" />
+      <button class="btn ghost sm" type="submit">Mark all as read</button>
+    </form>
+  </PageHead>
+  <nav class="filters" aria-label="Filter messages">
+    <a href="/dashboard/inbox" aria-current={filter === 'all' ? 'true' : undefined}>All</a>
+    <a href="/dashboard/inbox?filter=unread" aria-current={filter === 'unread' ? 'true' : undefined}>Unread</a>
+  </nav>
+
+  {rows.length === 0 ? (
+    <div class="empty"><h2>{filter === 'unread' ? 'All caught up' : 'No messages yet'}</h2><p>{filter === 'unread' ? 'There are no unread messages.' : 'They appear here when someone uses the contact form on your site.'}</p></div>
+  ) : (
+    <div class="card rows-card">
+      <ul class="rows">
+        {rows.map((m) => (
+          <li>
+            <a class:list={['mrow', !m.is_read && 'unread']} href={`/dashboard/inbox/${m.id}`}>
+              <span class="avatar" aria-hidden="true">{initials(m.name)}</span>
+              <span class="mrow-main">
+                <span class="mrow-top"><span class="msg-from">{m.name}{!m.is_read && <span class="visually-hidden"> (unread)</span>}</span><time class="msg-when" datetime={new Date(m.created_at * 1000).toISOString()}>{ago(m.created_at)}</time></span>
+                <span class="mrow-subject">{m.subject || '(no subject)'}</span>
+                <span class="msg-snip">{snippet(m.body)}</span>
+              </span>
+            </a>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )}
+
+  {pages > 1 && (
+    <nav class="pager-d" aria-label="Pages">
+      {page > 1 ? <a class="btn ghost sm" href={q(page - 1)}>← Newer</a> : <span></span>}
+      <span class="muted">Page {page} of {pages} · {total} messages</span>
+      {page < pages ? <a class="btn ghost sm" href={q(page + 1)}>Older →</a> : <span></span>}
+    </nav>
+  )}
+</Dash>

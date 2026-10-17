@@ -1,0 +1,17 @@
+---
+// Shared layout for the error pages. Each page supplies its own wording and picture so they feel different.
+interface Props { code: string; kicker: string; title: string; art: 'compass' | 'lock' | 'bolt'; }
+const { code, kicker, title, art } = Astro.props;
+---
+<section class="wrap err">
+  <div class="err-text">
+    <p class="eyebrow">{kicker}</p>
+    <h1><span class="err-code">{code}</span> {title}</h1>
+    <slot />
+  </div>
+  <div class="err-art" aria-hidden="true">
+    {art === 'compass' && <svg viewBox="0 0 120 120" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><circle cx="60" cy="60" r="48"/><path d="M60 8v10M60 102v10M8 60h10M102 60h10"/><path d="M80 40 66 66 40 80l14-26z" fill="var(--hi)"/><circle cx="60" cy="60" r="3" fill="currentColor"/></svg>}
+    {art === 'lock' && <svg viewBox="0 0 120 120" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><rect x="26" y="52" width="68" height="52" rx="12" fill="var(--hi)"/><path d="M42 52V38a18 18 0 0 1 36 0v14"/><circle cx="60" cy="76" r="6" fill="currentColor"/><path d="M60 80v10"/></svg>}
+    {art === 'bolt' && <svg viewBox="0 0 120 120" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M68 8 28 66h28l-6 46 42-62H64z" fill="var(--hi)"/><path d="M14 30l10 6M104 84l-10-6M18 96l9-7" /></svg>}
+  </div>
+</section>

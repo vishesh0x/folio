@@ -1,0 +1,72 @@
+---
+// One resume section. Timeline-style kinds (experience, education, projects, custom) share the same look.
+import type { Section, Entry } from '../lib/resume';
+interface Props { sec: Section }
+const { sec } = Astro.props;
+const range = (d: Record<string, any>) => { const end = d.current ? 'Present' : d.end; return d.start && end ? `${d.start} – ${end}` : d.start || end || ''; };
+const paras = (t: string) => t.split(/\n{2,}/).map((p) => p.trim()).filter(Boolean);
+const hid = `h-${sec.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'section'}-${sec.id}`;
+const join = (...p: string[]) => p.filter(Boolean).join(' · ');
+---
+<section class="cv-section" aria-labelledby={hid}>
+  <h2 class="cv-h" id={hid}>{sec.title}</h2>
+
+  {sec.kind === 'summary' && sec.entries.map((e: Entry) => paras(e.d.text).map((p) => <p class="cv-summary">{p}</p>))}
+
+  {sec.kind === 'experience' && sec.entries.map((e: Entry) => (
+    <div class="tl">
+      <div class="tl-top"><h3>{e.d.role || e.d.company}</h3><span class="cv-when">{range(e.d)}</span></div>
+      {(e.d.role && e.d.company || e.d.location) && <p class="cv-org">{join(e.d.role ? e.d.company : '', e.d.location)}</p>}
+      {e.d.description && <p>{e.d.description}</p>}
+      {e.d.bullets.length > 0 && <ul>{e.d.bullets.map((b: string) => <li>{b}</li>)}</ul>}
+    </div>
+  ))}
+
+  {sec.kind === 'education' && sec.entries.map((e: Entry) => (
+    <div class="tl">
+      <div class="tl-top"><h3>{e.d.degree || e.d.school}</h3><span class="cv-when">{range(e.d)}</span></div>
+      {(e.d.degree && e.d.school || e.d.location) && <p class="cv-org">{join(e.d.degree ? e.d.school : '', e.d.location)}</p>}
+      {e.d.details && <p>{e.d.details}</p>}
+    </div>
+  ))}
+
+  {sec.kind === 'projects' && sec.entries.map((e: Entry) => e.project && (
+    <div class="tl">
+      <div class="tl-top"><h3><a href={`/projects/${e.project.slug}`}>{e.project.title}</a></h3></div>
+      {(e.d.blurb || e.project.summary) && <p>{e.d.blurb || e.project.summary}</p>}
+      {e.project.tags.length > 0 && <ul class="tags" style="margin-top:8px">{e.project.tags.slice(0, 5).map((t) => <li class="tag">{t}</li>)}</ul>}
+      {(e.project.live_url || e.project.source_url) && (
+        <p class="cv-links">
+          {e.project.live_url && <a href={e.project.live_url} target="_blank" rel="noopener noreferrer">Live site</a>}
+          {e.project.source_url && <a href={e.project.source_url} target="_blank" rel="noopener noreferrer">Source code</a>}
+        </p>
+      )}
+    </div>
+  ))}
+
+  {sec.kind === 'custom' && sec.entries.map((e: Entry) => (
+    e.d.date || e.d.text || e.d.bullets.length || e.d.subheading
+      ? (
+        <div class="tl">
+          <div class="tl-top"><h3>{e.d.heading}</h3>{e.d.date && <span class="cv-when">{e.d.date}</span>}</div>
+          {e.d.subheading && <p class="cv-org">{e.d.subheading}</p>}
+          {paras(e.d.text).map((p) => <p>{p}</p>)}
+          {e.d.bullets.length > 0 && <ul>{e.d.bullets.map((b: string) => <li>{b}</li>)}</ul>}
+        </div>
+      )
+      : <p class="cv-plain">{e.d.heading}</p>
+  ))}
+
+  {sec.kind === 'skills' && (
+    <dl class="cv-skill">
+      {sec.entries.map((e: Entry) => <div>{e.d.group && <dt>{e.d.group}</dt>}<dd>{e.d.items}</dd></div>)}
+    </dl>
+  )}
+
+  {sec.kind === 'certifications' && sec.entries.map((e: Entry) => (
+    <p class="cv-cert">
+      <strong>{e.d.url ? <a href={e.d.url} target="_blank" rel="noopener noreferrer">{e.d.name}</a> : e.d.name}</strong>
+      {(e.d.issuer || e.d.date) && <span>{join(e.d.issuer, e.d.date)}</span>}
+    </p>
+  ))}
+</section>

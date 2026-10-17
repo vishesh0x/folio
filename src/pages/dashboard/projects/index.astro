@@ -1,0 +1,74 @@
+---
+import Dash from '../../../layouts/Dash.astro';
+import PageHead from '../../../components/PageHead.astro';
+import { listAll } from '../../../lib/projects-admin';
+import { ago } from '../../../lib/format';
+
+const f = Astro.url.searchParams.get('filter');
+const filter = f === 'published' || f === 'draft' ? f : 'all';
+const all = await listAll('all');
+const rows = filter === 'all' ? all : all.filter((p) => p.status === filter);
+const counts = { all: all.length, published: all.filter((p) => p.status === 'published').length, draft: all.filter((p) => p.status === 'draft').length };
+const deleted = Astro.url.searchParams.get('deleted');
+const thumb = (id: string | null) => (id ? `/media/${id}/cover?w=160&f=webp` : null); // only the id matters to the media route
+const dots = '<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>';
+---
+<Dash title="Projects">
+  <PageHead title="Projects" lede="Write each one in Markdown. The order here is the order on your Projects page; featured ones also appear on the home page.">
+    <form method="post" action="/api/admin/projects"><input type="hidden" name="action" value="create" /><button class="btn" type="submit">New project</button></form>
+  </PageHead>
+  {deleted && <p class="flash" role="status">Project deleted.</p>}
+
+  <nav class="filters" aria-label="Filter projects">
+    <a href="/dashboard/projects" aria-current={filter === 'all' ? 'true' : undefined}>All <span>{counts.all}</span></a>
+    <a href="/dashboard/projects?filter=published" aria-current={filter === 'published' ? 'true' : undefined}>Published <span>{counts.published}</span></a>
+    <a href="/dashboard/projects?filter=draft" aria-current={filter === 'draft' ? 'true' : undefined}>Drafts <span>{counts.draft}</span></a>
+  </nav>
+
+  {rows.length === 0 ? (
+    <div class="empty">
+      <h2>{all.length === 0 ? 'No projects yet' : 'Nothing in this view'}</h2>
+      <p>{all.length === 0 ? 'Create your first project, then write it in Markdown. It stays a draft until you publish it.' : 'Try another filter.'}</p>
+      {all.length === 0 && <form method="post" action="/api/admin/projects"><input type="hidden" name="action" value="create" /><button class="btn" type="submit">Create a project</button></form>}
+    </div>
+  ) : (
+    <div class="card rows-card">
+      <ul class="rows">
+        {rows.map((p, i) => (
+          <li class="row">
+            <a href={`/dashboard/projects/${p.id}`} tabindex="-1" aria-hidden="true">
+              {thumb(p.cover_asset) ? <img class="thumb" src={thumb(p.cover_asset)!} alt="" width="84" height="56" loading="lazy" /> : <span class="thumb">no cover</span>}
+            </a>
+            <div class="row-main">
+              <p class="row-title"><a href={`/dashboard/projects/${p.id}`}>{p.title || 'Untitled project'}</a></p>
+              <div class="row-meta">
+                <span class:list={['pill', p.status === 'published' && 'pub']}>{p.status === 'published' ? 'Published' : 'Draft'}</span>
+                {p.featured ? <span class="pill feat">Featured</span> : null}
+                <span>Edited <time datetime={new Date(p.updated_at * 1000).toISOString()}>{ago(p.updated_at)}</time></span>
+              </div>
+              <span class="slug" title={`/projects/${p.slug}`}><span class="pre">/projects/</span><span class="val">{p.slug}</span></span>
+            </div>
+            <div class="row-actions">
+              <a class="btn ghost sm" href={`/dashboard/projects/${p.id}`}>Edit</a>
+              <details class="more">
+                <summary aria-label={`More actions for ${p.title || 'this project'}`}><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" set:html={dots} /></summary>
+                <div class="more-panel">
+                  {p.status === 'published' && <a href={`/projects/${p.slug}`} target="_blank" rel="noopener">View on site ↗</a>}
+                  {p.status === 'published' && <button type="button" data-copy={`/projects/${p.slug}`}>Copy link</button>}
+                  <form method="post" action="/api/admin/projects"><input type="hidden" name="id" value={p.id} /><button name="action" value={p.status === 'published' ? 'unpublish' : 'publish'}>{p.status === 'published' ? 'Move back to drafts' : 'Publish'}</button></form>
+                  <form method="post" action="/api/admin/projects"><input type="hidden" name="id" value={p.id} /><button name="action" value={p.featured ? 'unfeature' : 'feature'}>{p.featured ? 'Remove from home page' : 'Feature on home page'}</button></form>
+                  <form method="post" action="/api/admin/projects"><input type="hidden" name="id" value={p.id} /><button name="action" value="duplicate">Duplicate as draft</button></form>
+                  {filter === 'all' && <div class="sep" role="separator"></div>}
+                  {filter === 'all' && <form method="post" action="/api/admin/projects"><input type="hidden" name="id" value={p.id} /><button name="action" value="up" disabled={i === 0}>Move earlier</button></form>}
+                  {filter === 'all' && <form method="post" action="/api/admin/projects"><input type="hidden" name="id" value={p.id} /><button name="action" value="down" disabled={i === rows.length - 1}>Move later</button></form>}
+                  <div class="sep" role="separator"></div>
+                  <form method="post" action="/api/admin/projects" data-confirm={`Delete “${p.title || 'Untitled project'}”? This also removes it from your resume. It cannot be undone.`}><input type="hidden" name="id" value={p.id} /><button class="bad" name="action" value="delete">Delete…</button></form>
+                </div>
+              </details>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )}
+</Dash>

@@ -1,0 +1,97 @@
+---
+import Base from '../../layouts/Base.astro';
+import Reveal from '../../components/Reveal.astro';
+import ResumeSection from '../../components/ResumeSection.astro';
+import { getSettings } from '../../lib/settings';
+import { getResumeOpts, loadResume, httpUrl, type Entry } from '../../lib/resume';
+import { loadAsset } from '../../lib/media';
+import { pageSeo } from '../../lib/seo';
+
+const [s, o, sections, seo] = await Promise.all([getSettings(), getResumeOpts(), loadResume(), pageSeo('resume')]);
+const pdf = o.show_download && s.resume_asset ? await loadAsset(s.resume_asset) : null;
+const hasPdf = !!pdf && pdf.mime === 'application/pdf';
+const headline = o.headline || s.tagline;
+const name = o.name || s.name; // the resume can carry a different name from the site (for example a full legal name); empty uses the site's
+const site = s.site_url ? s.site_url.replace(/^https?:\/\//, '') : '';
+const socials = o.show_socials ? s.socials.filter((l) => /^https?:/.test(l.url)) : [];
+const email = o.show_email && s.email, phone = o.show_phone && s.phone;
+const kb = (n: number) => (n > 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB');
+const twoCol = o.layout === 'two';
+const SIDE = new Set(['skills', 'certifications']); // these two live in the narrow right-hand column in the two-column layout
+const mainSections = twoCol ? sections.filter((x) => !SIDE.has(x.kind)) : sections;
+const sideSections = twoCol ? sections.filter((x) => SIDE.has(x.kind)) : [];
+const hasContact = !!(site || email || phone || socials.length);
+---
+<Base title={seo.title ?? 'Resume'} description={seo.description ?? `${name}’s resume: experience, education, skills and projects.`} noindex={seo.noindex} ogImage={seo.ogImage}>
+  <article class="wrap cv">
+    <div class="cv-top no-print">
+      <div><p class="eyebrow">Resume</p><p class="muted">Print this page or download the PDF.{o.contact_mode === 'reveal' ? ' Contact details load on click, so scrapers can’t read them.' : ''}</p></div>
+      <div class="cv-actions">
+        {hasPdf && <a class="btn" href="/resume/download" download>Download PDF <span class="btn-meta">{kb(pdf!.size)}</span></a>}
+        {sections.length > 0 && <button class="btn ghost" type="button" data-print data-print-reveal={o.print_reveal && o.contact_mode === 'reveal' ? '1' : undefined}>Print this page</button>}
+      </div>
+    </div>
+
+    <div class="paper">
+      <header class="paper-head">
+        {s.availability && <p class="avail">{s.availability}</p>}
+        <h1>{name}</h1>
+        {headline && <p class="role">{headline}</p>}
+        {o.show_location && s.location && <p class="where mono">{s.location}</p>}
+        {!twoCol && hasContact && (
+          <ul class="cv-contact" style="margin-top:18px;display:flex;flex-wrap:wrap;gap:6px 22px">
+            {site && <li><a href={s.site_url}>{site}</a></li>}
+            {email && <li>{o.contact_mode === 'reveal' && <Reveal kind="email" />}{o.contact_mode === 'plain' && <a href={`mailto:${s.email}`}>{s.email}</a>}{o.contact_mode === 'hidden' && <a href="/contact">Email via contact form</a>}</li>}
+            {phone && o.contact_mode === 'reveal' && <li><Reveal kind="phone" /></li>}
+            {phone && o.contact_mode === 'plain' && <li><a href={`tel:${s.phone.replace(/\s+/g, '')}`}>{s.phone}</a></li>}
+            {socials.map((l) => <li><a href={l.url} rel="me noopener" target="_blank">{l.label}</a></li>)}
+          </ul>
+        )}
+      </header>
+
+      {sections.length === 0 && <div class="paper-main"><p class="empty" style="margin:0">The online version of my resume is on its way.{hasPdf ? ' The PDF is available above.' : ''}</p></div>}
+
+      {sections.length > 0 && (
+        <div class={`paper-body ${twoCol ? 'two' : 'one'}`}>
+          <div class="paper-main">
+            {mainSections.map((sec) => <ResumeSection sec={sec} />)}
+          </div>
+          {twoCol && (hasContact || sideSections.length > 0) && (
+            <aside class="paper-side" aria-label="Contact, skills and certifications">
+              {hasContact && (
+                <section class="cv-section">
+                  <h2 class="cv-h">Contact</h2>
+                  <ul class="cv-contact">
+                    {site && <li><a href={s.site_url}>{site}</a></li>}
+                    {email && <li>{o.contact_mode === 'reveal' && <Reveal kind="email" />}{o.contact_mode === 'plain' && <a href={`mailto:${s.email}`}>{s.email}</a>}{o.contact_mode === 'hidden' && <a href="/contact">Email via contact form</a>}</li>}
+                    {phone && o.contact_mode === 'reveal' && <li><Reveal kind="phone" /></li>}
+                    {phone && o.contact_mode === 'plain' && <li><a href={`tel:${s.phone.replace(/\s+/g, '')}`}>{s.phone}</a></li>}
+                    {socials.map((l) => <li><a href={l.url} rel="me noopener" target="_blank">{l.label}</a></li>)}
+                  </ul>
+                </section>
+              )}
+              {sideSections.map((sec) => <ResumeSection sec={sec} />)}
+            </aside>
+          )}
+        </div>
+      )}
+    </div>
+  </article>
+</Base>
+
+<script>
+  // "Print this page". If you chose to include contact details in the printout, reveal them first and wait for them to load.
+  const btn = document.querySelector<HTMLButtonElement>('[data-print]');
+  btn?.addEventListener('click', async () => {
+    if (btn.dataset.printReveal) {
+      // With Turnstile on, each reveal runs a check first (usually invisible, a second or two); without it, the wait is short.
+      const checks = !!document.querySelector('[data-reveal-wrap][data-sitekey]');
+      btn.disabled = true; btn.setAttribute('aria-busy', 'true');
+      document.querySelectorAll<HTMLButtonElement>('[data-reveal]').forEach((b) => b.click());
+      const until = Date.now() + (checks ? 25000 : 4000);
+      while (document.querySelector('[data-reveal]') && Date.now() < until) await new Promise((r) => setTimeout(r, 80));
+      btn.disabled = false; btn.removeAttribute('aria-busy');
+    }
+    window.print();
+  });
+</script>

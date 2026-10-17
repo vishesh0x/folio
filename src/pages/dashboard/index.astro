@@ -1,0 +1,96 @@
+---
+import Dash from '../../layouts/Dash.astro';
+import PageHead from '../../components/PageHead.astro';
+import { overview } from '../../lib/dashboard';
+import { ago, bytes } from '../../lib/format';
+
+const user = Astro.locals.user!;
+const o = await overview();
+const todo = o.checklist.filter((c) => !c.done);
+const done = o.checklist.length - todo.length;
+const pct = Math.round((done / o.checklist.length) * 100);
+const snippet = (t: string) => (t.length > 90 ? t.slice(0, 90).trimEnd() + '…' : t).replace(/\s+/g, ' ');
+const RASTER = ['image/png', 'image/jpeg', 'image/webp', 'image/avif'];
+const thumb = (p: { cover_asset: string | null; cover_name: string | null; cover_mime: string | null }) =>
+  p.cover_asset && p.cover_name ? `/media/${p.cover_asset}/${encodeURIComponent(p.cover_name)}${RASTER.includes(p.cover_mime ?? '') ? '?w=160&f=webp' : ''}` : null;
+---
+<Dash title="Overview">
+  <PageHead title="Overview" lede={`Signed in as ${user.email}.`}>
+    <form method="post" action="/api/admin/projects"><button class="btn" name="action" value="create">New project</button></form>
+  </PageHead>
+
+  <div class="stats">
+    <a class:list={['stat', (o.messages.unread ?? 0) > 0 && 'alert']} href="/dashboard/inbox">
+      <span class="stat-top">Unread messages</span><span class="stat-n">{o.messages.unread ?? 0}</span><span class="stat-s">{o.messages.total ?? 0} in total</span>
+    </a>
+    <a class="stat" href="/dashboard/projects">
+      <span class="stat-top">Published projects</span><span class="stat-n">{o.projects.pub ?? 0}</span><span class="stat-s">{o.projects.draft ?? 0} draft{o.projects.draft === 1 ? '' : 's'}</span>
+    </a>
+    <a class="stat" href="/dashboard/now">
+      <span class="stat-top">On your Now page</span><span class="stat-n">{o.now.cur ?? 0}</span><span class="stat-s">{o.now.done ?? 0} finished</span>
+    </a>
+    <a class="stat" href="/dashboard/assets">
+      <span class="stat-top">Files</span><span class="stat-n">{o.assets.n ?? 0}</span><span class="stat-s">{bytes(o.assets.bytes ?? 0)} used</span>
+    </a>
+  </div>
+
+  <div class="dash-grid">
+    <div class="stack" style="--stack:16px">
+      <section class="card" aria-labelledby="setup-h">
+        <div class="card-head">
+          <div><h2 id="setup-h" class="card-h">{todo.length ? 'Next steps' : 'Set-up'}</h2><p class="card-sub">{todo.length ? `${done} of ${o.checklist.length} done. These make the biggest difference to how your site looks and is found.` : 'Everything on the checklist is done.'}</p></div>
+          <span class="pill plain">{pct}%</span>
+        </div>
+        <div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow={pct} aria-label="Set-up progress"><i style={`width:${pct}%`}></i></div>
+        {todo.length > 0
+          ? <ul class="todo">{todo.map((c) => <li><a href={c.href!}>{c.label}<span class="visually-hidden"> (to do)</span></a></li>)}</ul>
+          : <p class="allset"><svg width="20" height="20" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5l3.2 3L13 4.8" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>Your site is fully set up. Nice.</p>}
+      </section>
+
+      <section class="card" aria-labelledby="recent-h">
+        <div class="card-head"><h2 id="recent-h" class="card-h">Latest messages</h2><a href="/dashboard/inbox">Open inbox →</a></div>
+        {o.recentMessages.length === 0
+          ? <p class="muted" style="margin:0">No messages yet. They show up here when someone uses your contact form.</p>
+          : o.recentMessages.map((m) => (
+            <a class:list={['msg', !m.is_read && 'unread']} href={`/dashboard/inbox/${m.id}`}>
+              <span class="msg-dot" aria-hidden="true"></span>
+              <span class="msg-from">{m.name}{!m.is_read && <span class="visually-hidden"> (unread)</span>}</span>
+              <time class="msg-when" datetime={new Date(m.created_at * 1000).toISOString()}>{ago(m.created_at)}</time>
+              <span class="msg-snip">{snippet(m.subject || m.body)}</span>
+            </a>
+          ))}
+      </section>
+    </div>
+
+    <div class="stack" style="--stack:16px">
+      <section class="card rows-card" aria-labelledby="proj-h">
+        <div class="card-head" style="padding:18px 18px 0;margin-bottom:6px"><h2 id="proj-h" class="card-h">Recently edited</h2><a href="/dashboard/projects">All projects →</a></div>
+        {o.recentProjects.length === 0 ? <p class="muted" style="padding:0 18px 18px;margin:0">No projects yet.</p> : (
+          <ul class="rows">
+            {o.recentProjects.map((p) => (
+              <li class="row">
+                {thumb(p) ? <img class="thumb" src={thumb(p)!} alt="" width="84" height="56" loading="lazy" /> : <span class="thumb" aria-hidden="true">no cover</span>}
+                <div class="row-main">
+                  <p class="row-title"><a href={`/dashboard/projects/${p.id}`}>{p.title || 'Untitled project'}</a></p>
+                  <div class="row-meta"><span class:list={['pill', p.status === 'published' && 'pub']}>{p.status === 'published' ? 'Published' : 'Draft'}</span><time datetime={new Date(p.updated_at * 1000).toISOString()}>{ago(p.updated_at)}</time></div>
+                </div>
+                <span></span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section class="card" aria-labelledby="status-h">
+        <h2 id="status-h" class="card-h">Site status</h2>
+        <ul class="kv">
+          <li><span>Spam check</span><span>{o.turnstile ? 'Turnstile is on' : o.turnstileHalf ? 'Off: set BOTH Turnstile keys' : 'Basic protection'}</span></li>
+          <li><span>Site address</span><span>{o.settings.site_url || 'Not set'}</span></li>
+          <li><span>Resume PDF</span><span>{o.settings.resume_asset ? 'Chosen' : 'None chosen'}</span></li>
+          <li><span>Resume sections</span><span>{o.resume.sections ?? 0}</span></li>
+        </ul>
+        {!o.turnstile && !o.turnstileHalf && <p class="hint" style="margin:12px 0 0">Turnstile adds a stronger check to the contact form and the Show email / phone buttons. See the README to turn it on.</p>}
+      </section>
+    </div>
+  </div>
+</Dash>

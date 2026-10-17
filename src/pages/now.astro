@@ -1,0 +1,77 @@
+---
+import { env } from 'cloudflare:workers';
+import Base from '../layouts/Base.astro';
+import { getSettings } from '../lib/settings';
+import { pageSeo } from '../lib/seo';
+
+type Row = { id: number; title: string; note: string; link: string | null; status: 'current' | 'done'; started_at: number | null; finished_at: number | null; progress: number | null; updated_at: number; cname: string; icon: string | null };
+const rows = (await env.DB.prepare(
+  `SELECT i.id, i.title, i.note, i.link, i.status, i.started_at, i.finished_at, i.progress, i.updated_at, c.name AS cname, c.icon, c.id AS cid
+   FROM now_items i JOIN now_categories c ON c.id = i.category_id ORDER BY c.sort_order, c.id, i.sort_order, i.id`
+).all<Row & { cid: number }>()).results;
+
+const cats = new Map<number, { id: number; name: string; icon: string | null; current: Row[]; done: Row[] }>();
+for (const r of rows) {
+  if (!cats.has(r.cid)) cats.set(r.cid, { id: r.cid, name: r.cname, icon: r.icon, current: [], done: [] });
+  cats.get(r.cid)![r.status === 'done' ? 'done' : 'current'].push(r);
+}
+const groups = [...cats.values()];
+const s = await getSettings();
+const seo = await pageSeo('now');
+
+const fmt = new Intl.DateTimeFormat('en', { month: 'short', year: 'numeric' });
+const when = (t: number | null) => (t ? fmt.format(new Date(t * 1000)) : '');
+const stamp = Math.max(0, ...rows.map((r) => Math.max(r.updated_at, r.finished_at ?? 0, r.started_at ?? 0)));
+const safe = (u: string | null) => (u && /^https?:\/\//i.test(u) ? u : null);
+const span = (r: Row) => (r.started_at && r.finished_at ? `${when(r.started_at)} – ${when(r.finished_at)}` : r.finished_at ? `Finished ${when(r.finished_at)}` : when(r.started_at) ? `Since ${when(r.started_at)}` : '');
+---
+<Base title={seo.title ?? 'Now'} description={seo.description ?? 'What I am working on, reading and making right now.'} noindex={seo.noindex} ogImage={seo.ogImage}>
+  <section class="wrap page-title">
+    {stamp > 0 && <p class="eyebrow updated">Updated <time datetime={new Date(stamp * 1000).toISOString().slice(0, 10)}>{new Intl.DateTimeFormat('en', { month: 'short', year: 'numeric', timeZone: 'UTC' }).format(new Date(stamp * 1000))}</time></p>}
+    <h1>Now<span class="dot">.</span></h1>
+    <p class="lead">{s.now_intro || 'What I’m working on, reading and making at the moment.'}</p>
+  </section>
+
+  <section class="wrap section" style="padding-top:1.5rem">
+    {groups.length === 0 ? <p class="empty">Nothing here yet. Check back soon.</p> : (
+      <div class="now-grid">
+        {groups.map((g, gi) => (
+          <section class="now-cat" aria-labelledby={`now-cat-${g.id}`}>
+            <h2 id={`now-cat-${g.id}`}>{g.icon ? <span class="cat-icon" aria-hidden="true">{g.icon}</span> : <span class={`cdot c${gi % 3}`} aria-hidden="true"></span>}{g.name}</h2>
+            {g.current.length > 0 && (
+              <ul class="now-cards">
+                {g.current.map((r) => (
+                  <li class="card now-item">
+                    <h3>{safe(r.link) ? <a href={safe(r.link)!} target="_blank" rel="noopener noreferrer">{r.title}</a> : r.title}</h3>
+                    {r.note && <p>{r.note}</p>}
+                    {r.progress != null && (
+                      <>
+                        <div class="pbar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow={r.progress} aria-label={`Progress on ${r.title}`} data-zero={r.progress === 0 ? '' : undefined}><span style={`width:${r.progress}%`}></span></div>
+                        <span class="pct" aria-hidden="true">{r.progress}%</span>
+                      </>
+                    )}
+                    {span(r) && <small>{span(r)}</small>}
+                  </li>
+                ))}
+              </ul>
+            )}
+            {g.done.length > 0 && (
+              <details class="now-done">
+                <summary>Finished ({g.done.length})</summary>
+                <ul class="now-cards">
+                  {g.done.map((r) => (
+                    <li class="card now-item">
+                      <h3><svg class="now-tick" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8.5l3.2 3L13 4.8" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg> {safe(r.link) ? <a href={safe(r.link)!} target="_blank" rel="noopener noreferrer">{r.title}</a> : r.title}</h3>
+                      {r.note && <p>{r.note}</p>}
+                      {span(r) && <small>{span(r)}</small>}
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            )}
+          </section>
+        ))}
+      </div>
+    )}
+  </section>
+</Base>
