@@ -14,6 +14,8 @@ const EDGE_TTL = 300; // seconds an unchanged page may live in the edge cache (a
 const json = (body: unknown, status: number, extra: Record<string, string> = {}) =>
   new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json', 'Cache-Control': 'no-store', ...extra } });
 
+const CF_WEB_ANALYTICS = true;
+
 export const onRequest = defineMiddleware(async (ctx, next) => {
   const nonce = btoa(crypto.randomUUID());
   ctx.locals.nonce = nonce;
@@ -64,15 +66,19 @@ export const onRequest = defineMiddleware(async (ctx, next) => {
     h.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
     // The dev server injects its own inline scripts, so the strict policy is production-only.
     const ts = turnstileOn() && TURNSTILE_PAGE.test(path) ? ' https://challenges.cloudflare.com' : ''; // optional spam check widget
+    // Cloudflare Web Analytics: when it is switched on in the Cloudflare dashboard, Cloudflare adds its beacon script to every HTML page
+    // and the beacon reports to cloudflareinsights.com. Allowed on public pages only (never sign-in or the dashboard). To stop using it,
+    // turn it off in Cloudflare (Analytics & Logs > Web Analytics) and set this to false.
+    const beacon = CF_WEB_ANALYTICS && !PROTECTED.test(path) && !path.startsWith('/auth') && !path.startsWith('/api/');
     // Cached pages must not contain a per-request nonce, so they rely on script hashes only.
     const script = ["'self'", ...(await inlineScriptHashes()), ...(cacheable ? [] : [`'nonce-${nonce}'`])].join(' ');
     if (!h.has('Content-Security-Policy')) h.set('Content-Security-Policy', [
       "default-src 'self'",
-      `script-src ${script}${ts}`,
+      `script-src ${script}${ts}${beacon ? ' https://static.cloudflareinsights.com' : ''}`,
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob:",
       "font-src 'self'",
-      `connect-src 'self'${ts}`,
+      `connect-src 'self'${ts}${beacon ? ' https://cloudflareinsights.com' : ''}`,
       ...(ts ? [`frame-src${ts}`] : []),
       "object-src 'none'",
       "base-uri 'none'",

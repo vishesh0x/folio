@@ -5,6 +5,7 @@ import { getPublished, neighbours } from '../../lib/projects';
 import { renderMarkdown, excerpt } from '../../lib/markdown';
 import { loadAsset } from '../../lib/media';
 import { getSettings } from '../../lib/settings';
+import codeFont from '@fontsource-variable/jetbrains-mono/files/jetbrains-mono-latin-wght-normal.woff2?url';
 
 const p = await getPublished(Astro.params.slug ?? '');
 if (!p) return Astro.rewrite('/404');
@@ -13,6 +14,7 @@ const [{ html, toc }, { prev, next }, s] = await Promise.all([renderMarkdown(p.b
 const seoImg = await loadAsset(p.seo_image ?? undefined);
 const ogImage = seoImg && seoImg.mime !== 'image/svg+xml' ? `/media/${seoImg.id}/${encodeURIComponent(seoImg.filename)}?w=1280&f=jpeg`
   : p.cover && p.cover.mime !== 'image/svg+xml' ? `/media/${p.cover.id}/${encodeURIComponent(p.cover.filename)}?w=1280&f=jpeg` : undefined;
+const hasCode = /<code[\s>]/.test(html); // the code font is only needed (and only fetched early) on pages that show code
 const description = p.seo_desc || p.summary || excerpt(p.body_md);
 const year = new Date(p.created_at * 1000).getFullYear();
 const ld = { '@context': 'https://schema.org', '@type': 'CreativeWork', name: p.title, description, author: { '@type': 'Person', name: s.name },
@@ -20,6 +22,7 @@ const ld = { '@context': 'https://schema.org', '@type': 'CreativeWork', name: p.
   codeRepository: p.source_url || undefined };
 ---
 <Base title={p.seo_title || p.title} description={description} ogImage={ogImage} ogType="article">
+  {hasCode && <link slot="head" rel="preload" href={codeFont} as="font" type="font/woff2" crossorigin />}
   <script slot="head" type="application/ld+json" set:html={JSON.stringify(ld).replace(/</g, '\\u003c')} />
 
   <article class="wrap project">
@@ -36,7 +39,7 @@ const ld = { '@context': 'https://schema.org', '@type': 'CreativeWork', name: p.
       )}
     </header>
 
-    {p.cover && <figure class="project-cover" style="margin-inline:0"><div class="frame"><Img asset={p.cover} eager sizes="(min-width: 72rem) 72rem, 100vw" /></div></figure>}
+    {p.cover && <figure class="project-cover" style="margin-inline:0"><div class="frame"><Img asset={p.cover} eager natural sizes="(min-width: 72rem) 72rem, 100vw" /></div></figure>}
 
     <div class={toc.length >= 3 ? 'project-body has-toc' : 'project-body'}>
       <div class="md" set:html={html} />
@@ -56,3 +59,8 @@ const ld = { '@context': 'https://schema.org', '@type': 'CreativeWork', name: p.
     )}
   </article>
 </Base>
+
+<script>
+  // Diagrams (```mermaid): Mermaid is downloaded only if this page has one, and only when it is about to scroll into view.
+  if (document.querySelector('figure[data-diagram]')) import('../../scripts/diagrams').then((m) => m.renderDiagrams());
+</script>

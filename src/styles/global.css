@@ -7,6 +7,12 @@
   src: url('../assets/fonts/PaperMono-VF.woff2') format('woff2');
 }
 
+/* While Paper Mono downloads the browser shows a fallback. If the fallback is narrower, the text re-wraps when the real font arrives and
+   the page jumps. These faces are the common system monospaces scaled to Paper Mono's width, so nothing re-wraps. */
+@font-face { font-family: 'Paper Mono Fallback Consolas'; src: local('Consolas'); size-adjust: 110.2%; }   /* Windows: 0.55em wide */
+@font-face { font-family: 'Paper Mono Fallback'; size-adjust: 101%;                                          /* macOS, iOS, Linux, Android: ~0.60em wide */
+  src: local('SF Mono'), local('SFMono-Regular'), local('Menlo'), local('Courier New'), local('DejaVu Sans Mono'), local('Liberation Mono'), local('Roboto Mono'), local('Noto Sans Mono'); }
+
 /* ───────── Design tokens ─────────
    Look: heavy Paper Mono headlines, 2px outlined cards, hard offset shadows, dashed rules.
    Palette: vermilion #e43d12, rose #d6536d, pink #ffa2b6, marigold #efb11d, bone #ebe9e1.
@@ -43,7 +49,7 @@
   --text: var(--ink); --heading: var(--ink); --surface-2: var(--surface); --line-strong: var(--outline);
   --primary: var(--ink); --on-primary: var(--bg); --accent: var(--brand); --hi: var(--gold); --on-hi: var(--on-gold);
 
-  --font-body: 'Paper Mono', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+  --font-body: 'Paper Mono', 'Paper Mono Fallback Consolas', 'Paper Mono Fallback', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
   --font-display: var(--font-body);
   --font-mono: 'JetBrains Mono Variable', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace; /* CODE ONLY */
 
@@ -173,7 +179,7 @@ textarea { resize: vertical; }
 .seg button { border: 0; background: none; color: var(--ink); font: 500 .75rem/1 var(--font-body); padding: 7px 11px; border-radius: var(--r-pill); cursor: pointer; }
 .seg button[aria-pressed='true'] { background: var(--gold); color: var(--on-gold); }
 .seg button:focus-visible { outline-offset: 1px; }
-html:not(.js) .seg { display: none; }               /* the theme switch needs JavaScript */
+html:not(.js) .seg, html:not(.js) .js-only { display: none; }               /* the theme switch needs JavaScript */
 .burger { display: none; border: 2px solid var(--outline); background: var(--card); color: var(--ink); border-radius: var(--r-pill); padding: 8px 16px; font: 500 .75rem/1 var(--font-body); letter-spacing: .08em; text-transform: uppercase; cursor: pointer; }
 @media (max-width: 860px) {
   .js .burger { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; min-width: 44px; padding: 0 18px; flex: none; }
@@ -210,7 +216,7 @@ html:not(.js) .seg { display: none; }               /* the theme switch needs Ja
 .hero h1 { margin-bottom: .3em; }
 .hero-text > .lead { margin: 22px 0 30px; max-width: 36rem; font-size: clamp(1.1rem, 1rem + .6vw, 1.4rem); }
 .hero-cta { display: flex; gap: 14px; flex-wrap: wrap; margin: 0; }
-.portrait img { border: 2px solid var(--outline); border-radius: var(--r-card); background: var(--surface); box-shadow: 10px 10px 0 var(--brand); max-height: 34rem; width: auto; margin-inline: auto; }
+.portrait img { border: 2px solid var(--outline); border-radius: var(--r-card); background: var(--surface); box-shadow: 10px 10px 0 var(--brand); width: min(100%, calc(34rem * var(--nw, 1) / var(--nh, 1)), calc(var(--nw, 99999) * 1px)); height: auto; margin-inline: auto; }   /* same idea as .project-cover img */
 .portrait { padding: 0 12px 12px 0; }
 .hl-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
 .hl { border: 2px solid var(--outline); border-radius: var(--r-card); padding: 24px; background: var(--card); color: var(--ink); }
@@ -261,8 +267,10 @@ html:not(.js) .seg { display: none; }               /* the theme switch needs Ja
 .project-meta .tags { margin: 0; }
 .project-cover { margin: 2.5rem 0; }
 .project-cover picture { display: contents; }
-.project-cover .frame { display: grid; place-items: center; background: var(--surface); border: 2px solid var(--outline); border-radius: var(--r-card); overflow: hidden; }
-.project-cover img { width: auto; max-height: 80vh; margin-inline: auto; }
+.project-cover .frame { display: block; background: var(--surface); border: 2px solid var(--outline); border-radius: var(--r-card); overflow: hidden; }
+.project-cover img { width: min(100%, calc(80vh * var(--nw, 1) / var(--nh, 1)), calc(var(--nw, 99999) * 1px)); height: auto; margin-inline: auto; }
+/* ^ the width is known from the file's own size (--nw/--nh, set by <Img natural>): as wide as the frame, but no taller than 80% of the screen and
+     never bigger than the file. Being definite, it is reserved before the image loads, so nothing below it moves. */
 .project-body { display: grid; gap: 3rem; margin-top: 2rem; }
 @media (min-width: 64rem) { .project-body.has-toc { grid-template-columns: minmax(0, 40rem) 15rem; justify-content: space-between; align-items: start; } }
 .toc { position: sticky; top: calc(var(--header-h) + 20px); font-size: .9rem; border: 2px solid var(--outline); border-radius: 20px; background: var(--card); padding: 18px 20px; }
@@ -301,6 +309,14 @@ html:not(.js) .seg { display: none; }               /* the theme switch needs Ja
 .md th { background: var(--surface); } .md tr:last-child td { border-bottom: 0; }
 .md img.md-img { border-radius: 16px; margin: 1.25em 0; border: 2px solid var(--outline); background: var(--surface); }
 .md-missing { color: var(--muted); border-bottom: 1px dashed var(--muted); }
+.diagram { margin: 1.8em 0; }
+.diagram-view { overflow-x: auto; padding: 1rem; border: 2px solid var(--outline); border-radius: 16px; background: var(--card); display: grid; justify-items: center; }
+.diagram-view svg { display: block; max-width: 100%; overflow: visible; }
+.diagram-src { margin-top: .6rem; font-size: .85rem; color: var(--muted); }
+.diagram-src summary { cursor: pointer; padding-block: .35rem; }
+.diagram-src pre { margin-top: .5rem; }
+.diagram-error { margin: .6rem 0 0; font-size: .85rem; font-weight: 600; color: var(--danger); }
+.diagram[data-state="waiting"] pre, .diagram[data-state="loading"] pre { opacity: .85; }
 .callout { margin: 1.5em 0; padding: 1rem 1.25rem; border-radius: 16px; border: 2px solid var(--outline); border-left-width: 8px; background: var(--card); }
 .callout > :last-child { margin-bottom: 0; }
 .callout-title { font-weight: 800; margin-bottom: .35rem; }
@@ -412,7 +428,7 @@ html:not(.js) .seg { display: none; }               /* the theme switch needs Ja
   .chip { padding-block: 0; align-items: center; }
   .footer-links a { min-height: 44px; }
   .cv .reveal .btn { min-height: 44px; padding: 0 1rem; }
-  .now-done summary { display: flex; align-items: center; min-height: 44px; }
+  .now-done summary, .diagram-src summary { display: flex; align-items: center; min-height: 44px; }
   .toc a { display: flex; align-items: center; min-height: 44px; }
   .toc ol { gap: 0; }
   .pgrid .pcard-link { padding-block: 4px; }

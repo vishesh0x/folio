@@ -40,7 +40,7 @@ const ld = { '@context': 'https://schema.org', '@type': 'Person', name: s.name, 
         <a class="btn ghost" href="/contact">Say hello</a>
       </p>
     </div>
-    {portrait && <div class="portrait"><Img asset={portrait} eager sizes="(min-width: 60rem) 26rem, 80vw" /></div>}
+    {portrait && <div class="portrait"><Img asset={portrait} eager natural sizes="(min-width: 60rem) 26rem, 80vw" /></div>}
   </section>
 
   {s.highlights.length > 0 && (
@@ -57,7 +57,7 @@ const ld = { '@context': 'https://schema.org', '@type': 'Person', name: s.name, 
         <div><p class="eyebrow">Featured</p><h2 id="work-h">Recent <em>work</em></h2></div>
         <a class="btn ghost sm" href="/projects">All projects <span aria-hidden="true">→</span></a>
       </div>
-      <div class="pgrid">{work.map((p) => <ProjectCard project={p} />)}</div>
+      <div class="pgrid">{work.map((p, i) => <ProjectCard project={p} eager={i === 0} count={work.length} />)}</div>
     </section>
   )}
 

@@ -3,7 +3,8 @@
 // Supported: headings (with anchors + table of contents), GFM tables / task lists / strikethrough,
 // fenced code with syntax highlighting, ==highlights==, %%comments%%, YAML front matter (ignored),
 // callouts (> [!note] Title), [[wiki links]] to other projects, ![[image embeds]] of uploaded assets.
-// Not supported: footnotes, math, mermaid, transclusion of other notes, external images (see below).
+// ```mermaid fences become diagrams, drawn in the browser (src/scripts/diagrams.ts); their source stays in the page as text.
+// Not supported: footnotes, math, transclusion of other notes, external images (see below).
 //
 // Safety: raw HTML in the source is shown as text, never run. Links must be http(s), mailto, or
 // on-site. Images must be uploaded assets (the site's CSP blocks third-party images anyway), so
@@ -154,6 +155,9 @@ export async function renderMarkdown(source: string): Promise<Rendered> {
       },
       code(t: Tokens.Code) {
         const raw = (t.lang ?? '').trim().split(/\s/)[0].toLowerCase();
+        // The diagram source is escaped text inside a normal code block: it is the fallback shown without JavaScript, while the
+        // diagram loads, and when it has a mistake. src/scripts/diagrams.ts replaces it with the drawing.
+        if (raw === 'mermaid') return `<figure class="diagram" data-diagram><pre class="code" data-lang="mermaid" tabindex="0"><code>${esc(t.text)}</code></pre></figure>\n`;
         const lang = ALIAS[raw] ?? raw;
         const body = lang && hljs.getLanguage(lang) ? hljs.highlight(t.text, { language: lang, ignoreIllegals: true }).value : esc(t.text);
         const label = /^[\w+#-]{1,20}$/.test(raw) ? ` data-lang="${raw}"` : '';
