@@ -16,7 +16,11 @@ const worker = (port: number, inspector: number, dir: string, vars: Record<strin
   command: [
     `rm -rf .wrangler/${dir}`,
     `npx wrangler d1 migrations apply folio-db --local --persist-to .wrangler/${dir}`,
-    ...(seed ? [`npx wrangler d1 execute folio-db --local --persist-to .wrangler/${dir} --file tests/seed/demo.sql`] : []),
+    ...(seed ? [
+      `npx wrangler d1 execute folio-db --local --persist-to .wrangler/${dir} --file tests/seed/demo.sql`,
+      `npx wrangler d1 execute folio-db --local --persist-to .wrangler/${dir} --file tests/seed/demo-media.sql`,   // asset rows, covers, portrait, diagrams
+      `npx wrangler r2 object put folio-assets/assets/demoCover0001/demo-cover.png --file tests/seed/demo-cover.png --content-type image/png --local --persist-to .wrangler/${dir}`,
+    ] : []),
     `npx wrangler dev --port ${port} --inspector-port ${inspector} --persist-to .wrangler/${dir} ` +
       Object.entries(vars).map(([k, v]) => `--var ${k}:${v}`).join(' '),
   ].join(' && '),
@@ -56,6 +60,11 @@ export default defineConfig({
     {
       // layout on real phone sizes; each spec sets its own viewport / touch emulation
       name: 'responsive', testMatch: /responsive\/.*\.spec\.ts/, dependencies: ['setup'],
+      use: { ...devices['Desktop Chrome'], baseURL: `http://localhost:${PORT_A}` },
+    },
+    {
+      // page speed and diagrams: eager/lazy images, no layout jumps, inlined CSS, fonts, CSP for the analytics beacon, Mermaid
+      name: 'performance', testMatch: /performance\/.*\.spec\.ts/, dependencies: ['setup'],
       use: { ...devices['Desktop Chrome'], baseURL: `http://localhost:${PORT_A}` },
     },
     {

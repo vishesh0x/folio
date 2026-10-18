@@ -17,7 +17,7 @@ const shown = tag ? all.filter((p) => p.tags.includes(tag)) : all;
     <h1>Projects<span class="dot">.</span></h1>
     <p class="lead">Things I’ve built, with notes on how and why.</p>
     <div class="filters">
-      <div class="js-only" hidden data-search-wrap>
+      <div class="js-only" data-search-wrap>
         <label class="visually-hidden" for="q">Search projects</label>
         <input id="q" class="search" type="search" placeholder="Search projects…" autocomplete="off" />
       </div>
@@ -34,18 +34,18 @@ const shown = tag ? all.filter((p) => p.tags.includes(tag)) : all;
   <section class="wrap section" style="padding-top:1.5rem">
     {shown.length === 0
       ? <p class="empty">{all.length === 0 ? 'Projects will appear here soon.' : 'Nothing with that tag yet.'}</p>
-      : <div class="pgrid" id="grid">{shown.map((p, i) => <ProjectCard project={p} eager={i < 2} level={2} />)}</div>}
+      : <div class="pgrid" id="grid">{shown.map((p, i) => <ProjectCard project={p} eager={i < 2} level={2} count={shown.length} />)}</div>}
     <p class="no-results" id="none" hidden>No projects match your search. <button type="button" class="btn ghost sm" id="clear">Clear search</button></p>
   </section>
 </Base>
 
 <script>
-  // Search is an extra on top of the tag links, which work without JavaScript.
+  // Search is an extra on top of the tag links, which work without JavaScript. Its box is shown by CSS (html.js, set before first paint)
+  // rather than un-hidden here, so it takes its place from the first frame and the filters below it do not jump down when this runs.
   const wrap = document.querySelector<HTMLElement>('[data-search-wrap]');
   const input = document.getElementById('q') as HTMLInputElement | null;
   const cards = [...document.querySelectorAll<HTMLElement>('#grid .pcard')];
   if (wrap && input && cards.length) {
-    wrap.hidden = false;
     const count = document.getElementById('count')!, none = document.getElementById('none')!, grid = document.getElementById('grid')!;
     const run = () => {
       const terms = input.value.toLowerCase().split(/\s+/).filter(Boolean);

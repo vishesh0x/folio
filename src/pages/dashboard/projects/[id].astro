@@ -111,6 +111,7 @@ const words = p.body_md.trim() ? p.body_md.trim().split(/\s+/).length : 0;
             <li><code>![[file.png|alt text]]</code> embeds an uploaded image (the Image button writes this for you)</li>
             <li><code>%%comment%%</code> is hidden from the page; front matter at the top is ignored</li>
             <li>Tables, <code>- [ ]</code> task lists, and fenced code with a language (<code>```ts</code>) all work</li>
+            <li>A fenced block with the language <code>mermaid</code> becomes a diagram (flowcharts, sequence, class, state, ER, Gantt…), exactly as in Obsidian. Use Preview to check it</li>
             <li>Raw HTML is shown as text, and external images become links: upload images instead</li>
           </ul>
         </details>
@@ -281,6 +282,7 @@ const words = p.body_md.trim() ? p.body_md.trim().split(/\s+/).length : 0;
         const r = await fetch('/api/admin/preview', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ md: body.value }) });
         if (!r.ok) throw new Error();
         preview.innerHTML = (await r.json()).html || '<p class="muted">Nothing to preview yet.</p>';
+        if (preview.querySelector('figure[data-diagram]')) import('../../../scripts/diagrams').then((m) => m.renderDiagrams(preview, { immediate: true }));
       } catch { preview.textContent = 'The preview could not be loaded. Your text is safe; try again.'; }
     }
   };

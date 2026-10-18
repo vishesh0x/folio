@@ -10,5 +10,8 @@ export default defineConfig({
   // BUILD_ID changes on every build. It is part of the page-cache key and the ETag (src/middleware.ts), so after a deploy no
   // visitor, browser or edge cache is handed old HTML that points at CSS/JS files the new build no longer has.
   vite: { define: { __BUILD_ID__: JSON.stringify(Date.now().toString(36)) }, build: { assetsInlineLimit: 0 } },
+  // Put the stylesheet inside each page. A separate CSS file blocks first paint until it has been downloaded (an extra round trip);
+  // inline <style> is allowed by our CSP (style-src 'unsafe-inline'). Fonts and images are still separate files (assetsInlineLimit: 0).
+  build: { inlineStylesheets: 'always' },
   prefetch: { prefetchAll: false, defaultStrategy: 'hover' },
 });

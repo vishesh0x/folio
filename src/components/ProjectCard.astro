@@ -1,14 +1,19 @@
 ---
 import Img from './Img.astro';
 import type { Project } from '../lib/projects';
-interface Props { project: Project; eager?: boolean; level?: 2 | 3; }
-const { project: p, eager = false, level = 3 } = Astro.props;
+interface Props { project: Project; eager?: boolean; level?: 2 | 3; count?: number; }
+const { project: p, eager = false, level = 3, count = 3 } = Astro.props;
+// `sizes` must match how wide the card really is, or the browser downloads a bigger file than needed. The grid stretches 1 or 2
+// cards to fill the row (see .pgrid), so they are wider than when there are 3 or more.
+const sizes = count <= 1 ? '(min-width: 40rem) 34rem, 100vw'
+  : count === 2 ? '(min-width: 60rem) 35rem, (min-width: 40rem) 45vw, 100vw'
+  : '(min-width: 60rem) 24rem, (min-width: 40rem) 45vw, 100vw';
 const Heading = `h${level}` as 'h2' | 'h3'; // h2 on the Projects page (straight under the page title), h3 under a section heading
 ---
 <article class="pcard card lift" data-search={`${p.title} ${p.summary} ${p.tags.join(' ')}`.toLowerCase()}>
   <div class="pcard-media">
     {p.cover
-      ? <Img asset={p.cover} sizes="(min-width: 60rem) 24rem, (min-width: 40rem) 45vw, 100vw" eager={eager} />
+      ? <Img asset={p.cover} sizes={sizes} eager={eager} />
       : <span class="pcard-initial" aria-hidden="true">{p.title.slice(0, 1)}</span>}
   </div>
   <div class="pcard-body">
