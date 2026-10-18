@@ -6,6 +6,10 @@
 	"compatibility_flags": [
 		"nodejs_compat"
 	],
+	"vars": {
+    	// Optional: Cloudflare Turnstile *site* key to protect the contact form.
+    	"TURNSTILE_SITE_KEY": "0x4AAAAAAFNLlH_NrctHUs4o"
+    },
 	"observability": {
 		"enabled": true
 	}, // keeps logs, so errors behind the "Something broke" page can be found
