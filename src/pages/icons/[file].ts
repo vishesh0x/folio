@@ -1,14 +1,17 @@
 import type { APIRoute } from 'astro';
 import defaultIcon from '../../assets/default-favicon.svg?raw';
-import { cached, resizedResponse, originalResponse, loadAsset } from '../../lib/media';
+import { resizedResponse, originalResponse, loadAsset } from '../../lib/media';
+import { versionedCache } from '../../lib/content-version';
 import { getSettings } from '../../lib/settings';
 
 const SIZES: Record<string, number> = { '32.png': 32, '48.png': 48, '180.png': 180, '192.png': 192, '512.png': 512 };
 const LONG = 'public, max-age=31536000, immutable'; // safe: URLs carry ?v=<asset id>, so a new favicon is a new URL
 
-export const GET: APIRoute = async ({ request, params }) => {
+export const GET: APIRoute = async ({ request, params, url }) => {
   const file = params.file!;
-  return cached(request, async () => {
+  if (file !== 'favicon.svg' && !SIZES[file]) return new Response('Not found', { status: 404, headers: { 'Cache-Control': 'no-store' } }); // unknown names never reach the cache or database
+  // Cached per dashboard save (not per ?v= value, which anyone could vary): changing the favicon is a save, so it shows up at once.
+  return versionedCache(url.origin, `icon/${file}`, 86400, async () => {
     const s = await getSettings();
     const a = await loadAsset(s.favicon_asset ?? undefined);
 

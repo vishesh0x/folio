@@ -59,8 +59,11 @@ test.describe('Content-Security-Policy is strict', () => {
   test.fixme('FINDING S1-L3: send Cross-Origin-Opener-Policy: same-origin', async ({ request }) => {
     expect(header(await request.get('/'), 'cross-origin-opener-policy')).toBe('same-origin');
   });
-  test.fixme('FINDING S1-L4: /contact (per-render form token) should be Cache-Control: private, no-store', async ({ request }) => {
-    expect(header(await request.get('/contact'), 'cache-control')).toMatch(/no-store/);
+});
+
+test.describe('S1-L4 (fixed in Step 2): the contact form carries a one-time token, so it is never stored', () => {
+  test('/contact is private, no-store', async ({ request }) => {
+    expect(header(await request.get('/contact'), 'cache-control')).toBe('private, no-store');
   });
 });
 

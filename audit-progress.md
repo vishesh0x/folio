@@ -1,6 +1,6 @@
 # Folio audit progress
 
-Last updated: 2026-10-17 (fix round 1 added) · Baseline: `folio-main.zip` (GitHub export, commit `35ba891`) · Working one step at a time.
+Last updated: 2026-10-20 (Step 2 added) · Baseline: `folio-main.zip` (GitHub export, commit `35ba891`) · Working one step at a time.
 
 ## Plan and status
 
@@ -9,7 +9,7 @@ Last updated: 2026-10-17 (fix round 1 added) · Baseline: `folio-main.zip` (GitH
 | 1 | **Security & bot protection** (Turnstile, WAF/rate limits, CORS/CSP/headers) | **Done: audit + Playwright tests** |
 | F1 | **Fix round 1: mobile layout of the public site + dashboard visual bugs** (your request, done before Step 2) | **Done: fixed + 124 Playwright tests** |
 | F2 | **Fix round 2: Lighthouse findings (LCP, CLS, render-blocking CSS, fonts, CSP beacon) + Mermaid diagrams** | **Done: fixed + 61 Playwright tests** |
-| 2 | Performance: Astro client directives, cache rules, Cloudflare Images | Next |
+| 2 | **Performance: Astro client directives, cache rules, Cloudflare Images** | **Done: audit + fixes + 111 Playwright tests** |
 | 3 | Database: SQL injection, indexes (`EXPLAIN QUERY PLAN`), migrations/concurrency, degradation behaviour | Pending |
 | 4 | R2: access control, magic-number validation, lifecycle/orphans | Pending |
 | 5 | Workers: wrangler config and secrets, CPU limits, Smart Placement | Pending |
@@ -126,6 +126,68 @@ Lighthouse (local, mobile, DevTools throttling) after: home 100 / 100 / 100 / 10
 - **Whole suite after this round: 293 passed, 0 failed, 7 skipped** (the 7 are the Step 1 `fixme` findings), 4.3 min.
 - Local numbers are not field data. Lighthouse on your live site will differ (network, edge cache state). The production `TTFB` of 770 ms in your report is a cache miss on an uncached page; that belongs to Step 2 (cache rules).
 
+## Step 2: Frontend performance (islands, cache rules, images)
+
+Method: read the code, measured every route's headers and every page's JavaScript on the production build, then timed the image route with abusive URLs. All figures are from the local production build (`wrangler dev`), not your live site. **Not verifiable from the repo:** the Cloudflare dashboard settings and real cache-hit ratios (checklist below).
+
+### 2.1 Astro islands: clean, nothing to fix
+
+No `client:load`, `client:visible` or `client:idle` anywhere, and no UI-framework integration; pages are server-rendered HTML plus a few small hand-written scripts. Measured on the real pages (gzipped JavaScript actually downloaded):
+
+| Page | JS files | gzip | Inline scripts |
+|---|---|---|---|
+| Home, Projects, Now, Resume, Contact, 404 | 1 | 1.1 KB | 1-2 |
+| Project page (no diagram) | 2 | 2.3 KB | 2 |
+| Project page with diagrams | 2 | 4.3 KB, plus the diagram engine only when a diagram is near the screen | 2 |
+| Dashboard (busiest page, Settings/editor) | 2-3 | 5-9 KB | 1 |
+
+Observations (no action needed): dashboard pages also carry the public stylesheet inline (68 KB raw vs 32 KB on public pages), which only the owner pays; the HTML is revalidated on every view (`max-age=0`), so each page view is one Worker request (relevant to Step 7 quotas).
+
+### 2.2 Cache rules: findings and fixes
+
+How it works (correct design): public pages are cached at the edge by the Worker (Cache API) under a **content version** that moves on at every dashboard save, so edits show up immediately and nothing needs purging; browsers always revalidate with a cheap 304; `/_astro/*` is cached for a year as immutable. Per Cloudflare's documentation, Cache Rules do not apply to responses a Worker builds, so using the Cache API here is the right tool.
+
+| ID | Severity | Finding | Evidence | Status |
+|---|---|---|---|---|
+| S2-H1 | **High** (cost/abuse) | **The `/media` cache was keyed on the raw URL.** Any extra query string, a different file name, or a width that snaps to the same size created a new entry and re-read the original from R2 and re-encoded it. Anyone can loop `?x=1,2,3…` to burn R2 reads, Worker time and image transformations | Timed locally: first build 4.4 s, cache hit 7 ms, but 6 junk query strings = 6 x ~4.3 s, 6 file names = 6 x ~4.3 s, 6 widths that all snap to 1280 = 6 x ~4.3 s | **Fixed**: one key per (image, snapped width, format) = at most 37 entries per image; file name and extra parameters are ignored |
+| S2-M1 | Medium | Unknown or random asset ids hit the database on every request and were never cached | 404 each time, `no-store` | **Fixed**: ids that cannot be real (wrong shape) never reach the database; unknown real-looking ids are remembered for 60 s |
+| S2-M2 | Medium (likely, unverified live) | **Weak ETags.** When a CDN compresses a response it can turn our strong ETag into a weak one (`W/"…"`); the old exact-match comparison would then never match, so every revisit re-downloaded the whole page | Code review; compared with RFC 9110 (If-None-Match uses weak comparison). Not reproducible locally | **Fixed**: weak comparison, lists accepted; `*` deliberately not a match for pages |
+| S2-M3 | Medium | `/projects/` and `/now/` rendered as separate, uncached copies of the same page (duplicate content, extra Worker work) | `/projects/` had no cache headers at all | **Fixed**: 301 to the single address, query string kept; verified safe against `//evil.example/` style open redirects |
+| S2-L1 | Low | A missing page (`/projects/typo`) hit the database every time and had no `Cache-Control` | no headers | **Fixed**: remembered 60 s under the content version (publishing that project shows it immediately); never answered with 304 |
+| S2-L2 | Low | `sitemap.xml` ran 4 database queries per request and was cached only in browsers; `robots.txt`, `manifest` and icons likewise. Icon URLs accepted any `?v=` value, each a separate entry | uncached | **Fixed**: kept at the edge per content version; icon names validated; `?v=` ignored for caching |
+| S2-L3 | Low | `/favicon.ico` redirect was uncached; browsers request it on their own | no `Cache-Control` | **Fixed**: 1 hour |
+| S2-L4 | Low | `/contact` (one-time form token) had no `Cache-Control` | **closes Step 1 S1-L4** | **Fixed**: `private, no-store` |
+| S2-L5 | Low | `/media` had no `immutable`, and resized variants no validator | `max-age=604800` only | **Fixed**: `immutable` plus an ETag per variant; 304 on cache hits |
+
+Bug found and fixed while testing my own change: I first stored the "unknown id" marker under `/media/<id>#missing`, but cache keys ignore fragments, so it collided with the cached original and made every not-yet-built variant 404. A regression test now covers it.
+
+Not changed on purpose: `HEAD` requests are not cached (rare); each distinct bot-scanned path (e.g. `/wp-login.php`) still costs one render and database read, which is cheapest to stop with a Cloudflare WAF rule (Step 1 checklist, Step 7); the 5-second in-memory memo of the content version means another data center can show an edit up to ~5 s late.
+
+### 2.3 Images: the pipeline is sound
+
+Every dynamic image goes through `/media` with an explicit width from a fixed ladder (160…2000) and an explicit format, inside `<picture>` (AVIF, then WebP, then the original), with width/height attributes, `alt`, lazy/eager and `fetchpriority` set correctly (fixed in fix round 2). `sizes` matches the real column widths. Share images are 1280 px JPEGs on your own domain. Verified by tests: AVIF/WebP really are those formats and smaller than the original; only ladder widths appear in any page; nothing is upscaled.
+
+Open questions I cannot answer from here: JPEG/WebP/AVIF quality is a single fixed value (82) for every format. AVIF usually looks the same at about 60-70 and is noticeably smaller, so it is worth trying on your real photos (not changed, I cannot see them). Image transformations are billed per unique transformation on Cloudflare's side (Step 7), which the new cache key also keeps down.
+
+### 2.4 Cloudflare dashboard checklist (please check; not visible from the repo)
+
+1. **Custom domain** attached to the Worker. The Cache API does nothing on `*.workers.dev`.
+2. **Speed > Optimization: Rocket Loader OFF.** It rewrites script tags, which breaks the hashed inline scripts and the CSP.
+3. **Scrape Shield > Email Address Obfuscation OFF.** The site already hides emails behind a click; Cloudflare's injected decoder script would be blocked by the CSP and could break `mailto:` links.
+4. **Polish and Mirage OFF** (if present): images are already resized and converted by the site, double processing only adds risk.
+5. **Early Hints, HTTP/3 and Brotli ON** (defaults).
+6. **Web Analytics:** if you keep it, optionally add a Configuration Rule to exclude `/dashboard` and `/auth` (the CSP already blocks the beacon there).
+7. **Check real results after deploy:** `curl -sI https://your-domain/projects` twice and look for `X-Cache: HIT` and an `ETag`; send the ETag back as `If-None-Match` and expect 304; request `/projects/` and expect a 301. Cache API hits do not appear in the dashboard's Caching analytics, so use the `X-Cache` header (or `wrangler tail`) rather than the hit-ratio chart.
+
+### Tests added (`tests/e2e/performance/`)
+
+- `caching.spec.ts`: HIT/MISS and headers on 5 pages, tracking parameters share one copy while other queries never cache, junk query strings create no entries, 304 with strong/weak/listed validators, a dashboard save changes the ETag at once, private pages never cached, 5 redirects plus the open-redirect check, cached 404, static file headers, sitemap/robots/manifest/icons, `/favicon.ico`.
+- `image-delivery.spec.ts`: one cache entry per variant (junk query, file names, snapping widths), widths snap to the ladder, bad parameters fall back to the original, 304 on original and variants, malformed and unknown ids, delete purges every cached copy, AVIF/WebP/original markup and real formats, share image, and the fragment-collision regression.
+- `islands.spec.ts`: no hydration markers on 8 pages, JavaScript budgets (public 8 KB, dashboard 25 KB gzipped), at most two inline scripts.
+- `tests/tools/js-weight.mjs`: prints the table in 2.1 (`BASE=http://localhost:8790 node tests/tools/js-weight.mjs`).
+
+**Results:** whole suite 361 passed, 0 failed, 6 skipped (the Step 1 `fixme` findings, minus S1-L4 which is now fixed and tested). Mutation check (bugs temporarily put back: the fragment key, strong-only ETags, no redirect, raw-URL cache key): 9 tests failed, covering all of them; sources restored and verified.
+
 ---
 
 ## Step 1: Security & bot protection
@@ -164,7 +226,7 @@ Severity is my judgement for a single-owner portfolio site. "Test" names the Pla
 - **S1-L1: Turnstile `hostname` and `action` are not checked.** Cloudflare's answer names the hostname and action the token was issued for; the code only reads `success`. A token minted on a different site that uses your site key is unlikely, but checking `hostname` closes it. Skipping `action` is documented (Cloudflare's test keys always say `test`); check it only when not using test keys. *Test: `turnstile.spec.ts`.*
 - **S1-L2: `style-src 'unsafe-inline'`.** Lets injected inline styles run (CSS exfiltration, UI redress). Removing it means moving inline `style=` attributes to classes or nonces. Low effort-to-risk payoff; do it when convenient. *Test: `headers-csp.spec.ts`.*
 - **S1-L3: No `Cross-Origin-Opener-Policy`.** Add `same-origin`. Nothing on the site relies on cross-window access. *Test: `headers-csp.spec.ts`.*
-- **S1-L4: `/contact` sends no `Cache-Control`.** The page embeds a per-render form token. Cloudflare does not cache HTML by default, but add `private, no-store` so no intermediary or the back/forward cache holds a stale token. *Test: `headers-csp.spec.ts`.*
+- **S1-L4 (FIXED in Step 2): `/contact` sends no `Cache-Control`.** The page embeds a per-render form token. Cloudflare does not cache HTML by default, but add `private, no-store` so no intermediary or the back/forward cache holds a stale token. *Test: `headers-csp.spec.ts`.*
 - **S1-L5: Legacy unsalted SHA-256 password formats are still accepted** (`lib/crypto.ts`, kept for upgrading old hashes). Run `SELECT substr(password_hash,1,14) FROM users;` on the real D1; if it starts with `pbkdf2-sha256`, delete the two legacy branches so a leaked or edited row can never validate against a weak hash.
 - **S1-L6 (info): The contact form token is replayable** for 2 hours (one token carried 5 accepted posts in a test). The per-IP limit and Turnstile cover this. No action needed unless you want single-use tokens.
 - **Info:** the real D1 `database_id` is committed in `wrangler.jsonc`. It is an identifier, not a secret; fine. HSTS has no `preload` (optional; only add it if every subdomain will be HTTPS forever).
