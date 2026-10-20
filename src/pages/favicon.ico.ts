@@ -8,5 +8,7 @@ export const GET: APIRoute = async ({ redirect }) => {
   const a = await loadAsset(s.favicon_asset ?? undefined);
   const v = a?.id ?? 'default';
   const target = a && a.mime !== 'image/svg+xml' ? `/icons/48.png?v=${v}` : `/icons/favicon.svg?v=${v}`;
-  return redirect(target, 302);
+  const res = redirect(target, 302);
+  res.headers.set('Cache-Control', 'public, max-age=3600'); // browsers ask for this on their own; do not make every one a fresh lookup
+  return res;
 };

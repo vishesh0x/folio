@@ -5,6 +5,7 @@ import { contentVersion, bumpContentVersion } from './lib/content-version';
 import { inlineScriptHashes } from './lib/inline-scripts';
 import { isSameOrigin } from './lib/csrf';
 import { turnstileOn } from './lib/turnstile';
+import { etagMatches } from './lib/http-cache';
 
 const PROTECTED = /^\/(dashboard|api\/admin)(\/|$)/;
 const PUBLIC_PAGE = /^\/(projects(\/[a-z0-9-]+)?|now|resume)?$/; // pages that look the same to every visitor
@@ -22,6 +23,12 @@ export const onRequest = defineMiddleware(async (ctx, next) => {
   const path = ctx.url.pathname;
   const method = ctx.request.method;
 
+  // One address per page: /projects/ is sent to /projects (a permanent redirect), so the cache and search engines see a single URL.
+  // The target is rebuilt from the path segments only, so //evil.example/ can never become a redirect to another site.
+  if ((method === 'GET' || method === 'HEAD') && path.length > 1 && path.endsWith('/') && !PROTECTED.test(path) && !path.startsWith('/auth') && !path.startsWith('/api/')) {
+    return new Response(null, { status: 301, headers: { Location: '/' + path.replace(/^\/+|\/+$/g, '') + ctx.url.search, 'Cache-Control': 'public, max-age=3600' } });
+  }
+
   // Public pages are served from the edge cache when possible (GET only, no query other than tracking tags).
   const cacheable = method === 'GET' && PUBLIC_PAGE.test(path) && [...ctx.url.searchParams.keys()].every((k) => TRACKING.test(k));
   // Browsers must re-check on every visit (so a dashboard save is never hidden behind an old copy), but the check is
@@ -31,12 +38,13 @@ export const onRequest = defineMiddleware(async (ctx, next) => {
   if (cacheable) {
     const version = await contentVersion();
     etag = `"v${version}-${__BUILD_ID__}"`;
-    if (ctx.request.headers.get('if-none-match') === etag) return new Response(null, { status: 304, headers: { ETag: etag, 'Cache-Control': REVALIDATE } });
+    if (etagMatches(ctx.request.headers.get('if-none-match'), etag, false)) return new Response(null, { status: 304, headers: { ETag: etag, 'Cache-Control': REVALIDATE } });
     cacheKey = new Request(`${ctx.url.origin}/__page/${__BUILD_ID__}/${version}${path}`);
     const hit = await caches.default.match(cacheKey);
     if (hit) {
       const h = new Headers(hit.headers);
-      h.set('Cache-Control', REVALIDATE); h.set('ETag', etag); h.set('X-Cache', 'HIT');
+      h.set('Cache-Control', REVALIDATE); h.set('X-Cache', 'HIT');
+      if (hit.status === 200) h.set('ETag', etag); // a remembered "not found" has no validator, so it is never answered with a 304
       return new Response(hit.body, { status: hit.status, headers: h });
     }
   }
@@ -86,11 +94,21 @@ export const onRequest = defineMiddleware(async (ctx, next) => {
       "frame-ancestors 'none'",
     ].join('; '));
   }
-  if (PROTECTED.test(path) || path.startsWith('/auth')) h.set('Cache-Control', 'private, no-store');
+  if (PROTECTED.test(path) || path.startsWith('/auth') || path === '/contact') h.set('Cache-Control', 'private, no-store'); // /contact carries a one-time form token
 
   // Anything saved in the dashboard makes cached pages out of date: move the content version on.
   if (unsafe && PROTECTED.test(path) && res.status < 400) await bumpContentVersion();
 
+  // A page that is not found (e.g. /projects/typo) is remembered for a minute, so repeated requests do not each cost database queries.
+  // It is stored under the current content version, so publishing that project makes the real page appear immediately.
+  if (cacheKey && res.status === 404 && (h.get('content-type') ?? '').startsWith('text/html')) {
+    const body = await res.arrayBuffer();
+    h.delete('set-cookie');
+    const stored = new Headers(h); stored.set('Cache-Control', 'public, max-age=60');
+    await caches.default.put(cacheKey, new Response(body, { status: 404, headers: stored }));
+    h.set('Cache-Control', REVALIDATE); h.set('X-Cache', 'MISS');
+    return new Response(body, { status: 404, headers: h });
+  }
   if (cacheKey && res.status === 200 && (h.get('content-type') ?? '').startsWith('text/html')) {
     const body = await res.arrayBuffer();
     h.delete('set-cookie');

@@ -19,3 +19,21 @@ export async function bumpContentVersion() {
   await env.DB.prepare("INSERT INTO settings (key, value) VALUES ('content_version', ?1) ON CONFLICT(key) DO UPDATE SET value = ?1").bind(v).run();
   memo = { v, t: Date.now() };
 }
+
+/**
+ * Keep a response in this data center's edge cache under the current content version. The version changes on every dashboard save,
+ * so the next visitor gets fresh content at once, and nothing needs purging. `name` must come from a SMALL fixed set (never from
+ * the visitor's URL), otherwise someone could fill the cache with junk.
+ */
+export async function versionedCache(origin: string, name: string, ttl: number, make: () => Promise<Response>): Promise<Response> {
+  const key = new Request(`${origin}/__v/${__BUILD_ID__}/${await contentVersion()}/${name}`);
+  const hit = await caches.default.match(key);
+  if (hit) { const h = new Headers(hit.headers); h.set('X-Cache', 'HIT'); return new Response(hit.body, { status: hit.status, headers: h }); }
+  const res = await make();
+  if (res.status !== 200) return res;
+  const body = await res.arrayBuffer();
+  const stored = new Headers(res.headers); stored.set('Cache-Control', `public, max-age=${ttl}`);
+  await caches.default.put(key, new Response(body, { status: 200, headers: stored }));
+  const out = new Headers(res.headers); out.set('X-Cache', 'MISS');
+  return new Response(body, { status: 200, headers: out });
+}
