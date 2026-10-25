@@ -6,18 +6,45 @@ import { inlineScriptHashes } from './lib/inline-scripts';
 import { isSameOrigin } from './lib/csrf';
 import { turnstileOn } from './lib/turnstile';
 import { etagMatches } from './lib/http-cache';
+import { isDbUnavailable, unavailablePage } from './lib/db-errors';
 
 const PROTECTED = /^\/(dashboard|api\/admin)(\/|$)/;
 const PUBLIC_PAGE = /^\/(projects(\/[a-z0-9-]+)?|now|resume)?$/; // pages that look the same to every visitor
 const TURNSTILE_PAGE = /^\/(contact|resume)\/?$/; // the pages that can show a Turnstile check (contact form, reveal buttons)
 const TRACKING = /^(utm_[a-z]+|fbclid|gclid|ref)$/;
-const EDGE_TTL = 300; // seconds an unchanged page may live in the edge cache (a dashboard save replaces it at once)
+// Seconds a cached public page counts as fresh (a dashboard save replaces it at once, whatever its age). A page is kept for a day, though,
+// so that if the database is down when a page has gone stale, the stale copy is shown rather than an error (see `stale` below).
+const edgeTtl = () => Math.min(3600, Math.max(1, Number(env.PAGE_CACHE_TTL) || 300));
+const KEEP = 86400;
 const json = (body: unknown, status: number, extra: Record<string, string> = {}) =>
   new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json', 'Cache-Control': 'no-store', ...extra } });
 
 const CF_WEB_ANALYTICS = true;
 
+/**
+ * The ONE place a database failure is turned into an answer. A visitor gets a 503 with Retry-After (search engines and CDNs treat that
+ * as "come back shortly", unlike a 500), nothing is cached, and no page is built from placeholder data. Only genuine database errors are
+ * caught here; bugs still surface as 500.
+ */
 export const onRequest = defineMiddleware(async (ctx, next) => {
+  const stale: { hit: Response | null } = { hit: null };
+  try {
+    return await handle(ctx, next, stale);
+  } catch (e) {
+    if (!isDbUnavailable(e)) throw e;
+    console.error(`[db-unavailable] ${ctx.request.method} ${ctx.url.pathname}: ${String((e as Error)?.message ?? e).slice(0, 200)}`);
+    if (stale.hit) { // a cached copy exists (just past its freshness window): better than an error page
+      const h = new Headers(stale.hit.headers); h.set('Cache-Control', 'public, max-age=0, must-revalidate'); h.set('X-Cache', 'STALE'); h.delete('x-stored-at');
+      return new Response(stale.hit.body, { status: stale.hit.status, headers: h });
+    }
+    const common = { 'Retry-After': '30', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'strict-origin-when-cross-origin' };
+    if (ctx.url.pathname.startsWith('/api/')) return json({ error: 'Temporarily unavailable. Please try again in a moment.' }, 503, common);
+    return new Response(unavailablePage(), { status: 503, headers: { ...common, 'Content-Type': 'text/html; charset=utf-8', 'X-Frame-Options': 'DENY',
+      'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'" } });
+  }
+});
+
+async function handle(ctx: Parameters<Parameters<typeof defineMiddleware>[0]>[0], next: Parameters<Parameters<typeof defineMiddleware>[0]>[1], stale: { hit: Response | null }): Promise<Response> {
   const nonce = btoa(crypto.randomUUID());
   ctx.locals.nonce = nonce;
   const path = ctx.url.pathname;
@@ -41,8 +68,10 @@ export const onRequest = defineMiddleware(async (ctx, next) => {
     if (etagMatches(ctx.request.headers.get('if-none-match'), etag, false)) return new Response(null, { status: 304, headers: { ETag: etag, 'Cache-Control': REVALIDATE } });
     cacheKey = new Request(`${ctx.url.origin}/__page/${__BUILD_ID__}/${version}${path}`);
     const hit = await caches.default.match(cacheKey);
-    if (hit) {
-      const h = new Headers(hit.headers);
+    const age = hit ? Date.now() - Number(hit.headers.get('x-stored-at') || 0) : 0;
+    if (hit && hit.status === 200 && age >= edgeTtl() * 1000) stale.hit = hit; // too old to call fresh: rebuild it, but keep this as the fallback
+    else if (hit) {
+      const h = new Headers(hit.headers); h.delete('x-stored-at');
       h.set('Cache-Control', REVALIDATE); h.set('X-Cache', 'HIT');
       if (hit.status === 200) h.set('ETag', etag); // a remembered "not found" has no validator, so it is never answered with a 304
       return new Response(hit.body, { status: hit.status, headers: h });
@@ -101,7 +130,7 @@ export const onRequest = defineMiddleware(async (ctx, next) => {
 
   // A page that is not found (e.g. /projects/typo) is remembered for a minute, so repeated requests do not each cost database queries.
   // It is stored under the current content version, so publishing that project makes the real page appear immediately.
-  if (cacheKey && res.status === 404 && (h.get('content-type') ?? '').startsWith('text/html')) {
+  if (cacheKey && !ctx.locals.degraded && res.status === 404 && (h.get('content-type') ?? '').startsWith('text/html')) {
     const body = await res.arrayBuffer();
     h.delete('set-cookie');
     const stored = new Headers(h); stored.set('Cache-Control', 'public, max-age=60');
@@ -109,13 +138,13 @@ export const onRequest = defineMiddleware(async (ctx, next) => {
     h.set('Cache-Control', REVALIDATE); h.set('X-Cache', 'MISS');
     return new Response(body, { status: 404, headers: h });
   }
-  if (cacheKey && res.status === 200 && (h.get('content-type') ?? '').startsWith('text/html')) {
+  if (cacheKey && !ctx.locals.degraded && res.status === 200 && (h.get('content-type') ?? '').startsWith('text/html')) {
     const body = await res.arrayBuffer();
     h.delete('set-cookie');
-    const stored = new Headers(h); stored.set('Cache-Control', `public, max-age=${EDGE_TTL}`);
+    const stored = new Headers(h); stored.set('Cache-Control', `public, max-age=${KEEP}`); stored.set('X-Stored-At', String(Date.now()));
     await caches.default.put(cacheKey, new Response(body, { status: 200, headers: stored }));
     h.set('Cache-Control', REVALIDATE); h.set('ETag', etag); h.set('X-Cache', 'MISS');
     return new Response(body, { status: 200, headers: h });
   }
   return new Response(res.body, { status: res.status, statusText: res.statusText, headers: h });
-});
+}

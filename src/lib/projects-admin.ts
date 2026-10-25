@@ -18,8 +18,8 @@ function hydrate(r: any): AdminProject {
 }
 
 export async function listAll(filter: 'all' | 'published' | 'draft' = 'all'): Promise<AdminProject[]> {
-  const where = filter === 'all' ? '' : `WHERE status = '${filter}'`; // filter is one of three fixed strings
-  const rows = (await env.DB.prepare(`SELECT * FROM projects ${where} ORDER BY sort_order ASC, created_at DESC, id DESC`).all()).results;
+  // `filter` is bound as a parameter (never spliced into the SQL), so no value of it can change the statement
+  const rows = (await env.DB.prepare(`SELECT * FROM projects WHERE (?1 = 'all' OR status = ?1) ORDER BY sort_order ASC, created_at DESC, id DESC`).bind(filter).all()).results;
   return rows.map(hydrate);
 }
 export async function getById(id: number): Promise<AdminProject | null> {
@@ -82,10 +82,22 @@ export async function uniqueSlug(base: string) {
 const cols = (p: ProjectInput) => [p.slug, p.title, p.summary, p.body_md, JSON.stringify(p.tags), p.cover_asset, p.cover_alt, p.live_url || null, p.source_url || null, p.status, p.featured, p.seo_title || null, p.seo_desc || null, p.seo_image];
 
 export async function createProject(p: ProjectInput): Promise<number> {
-  const r = await env.DB.prepare(
-    `INSERT INTO projects (slug, title, summary, body_md, tags, cover_asset, cover_alt, live_url, source_url, status, featured, seo_title, seo_desc, seo_image, sort_order)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?, 0)`).bind(...cols(p)).run();
-  return Number(r.meta.last_row_id);
+  // "Is this slug free?" and "insert it" are two steps, so two requests at the same moment (a double-click on New project) can both
+  // pick the same slug. The UNIQUE rule in the database correctly refuses the second; it retries with the next free slug.
+  let input = p;
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const r = await env.DB.prepare(
+        `INSERT INTO projects (slug, title, summary, body_md, tags, cover_asset, cover_alt, live_url, source_url, status, featured, seo_title, seo_desc, seo_image, sort_order)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?, 0)`).bind(...cols(input)).run();
+      return Number(r.meta.last_row_id);
+    } catch (e) {
+      if (!String(e).includes('UNIQUE') || attempt >= 8) throw e;
+      const base = p.slug.replace(/-\d+$/, '') || 'project';
+      // after a few clashes add a random part, so a burst of requests cannot keep colliding
+      input = { ...p, slug: attempt < 3 ? await uniqueSlug(base) : `${base}-${crypto.randomUUID().slice(0, 6)}` };
+    }
+  }
 }
 
 /** Saves only if nobody changed the project since the editor loaded it (prevents silent overwrites from a second tab). */

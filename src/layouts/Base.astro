@@ -2,15 +2,19 @@
 import '../styles/global.css';
 import ThemeSwitch from '../components/ThemeSwitch.astro';
 import { NAV } from '../lib/site';
-import { getSettings } from '../lib/settings';
+import { getSettings, SETTINGS_DEFAULTS } from '../lib/settings';
 import { loadAsset } from '../lib/media';
 import { THEME_INIT, THEME_TOGGLE } from '../lib/inline-scripts';
 import paperMono from '../assets/fonts/PaperMono-VF.woff2?url';
 
-interface Props { title?: string; description?: string; noindex?: boolean; bare?: boolean; ogImage?: string | null; ogType?: 'website' | 'article'; }
-const { title, description, noindex = false, bare = false, ogImage, ogType = 'website' } = Astro.props;
+interface Props { title?: string; description?: string; noindex?: boolean; bare?: boolean; ogImage?: string | null; ogType?: 'website' | 'article'; errorPage?: boolean; }
+const { title, description, noindex = false, bare = false, ogImage, ogType = 'website', errorPage = false } = Astro.props;
 
-const s = await getSettings();
+// Normal pages FAIL if the database does (the middleware answers 503), so a page is never built from placeholder settings and cached.
+// Error pages are the exception: they must render even when the database is the problem, so they fall back to defaults and mark the
+// response as degraded, which the middleware never caches.
+let s = SETTINGS_DEFAULTS;
+if (errorPage) { try { s = await getSettings(); } catch { Astro.locals.degraded = true; } } else s = await getSettings();
 let fav = null, og = null;
 try { // a database problem must never stop an error page from rendering
   fav = await loadAsset(s.favicon_asset ?? undefined);

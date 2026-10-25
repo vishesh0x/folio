@@ -7,9 +7,10 @@ import { defineConfig, devices } from '@playwright/test';
  * Two isolated Worker instances, each with its own throwaway local D1/R2 under .wrangler/e2e-*  (wiped on every start):
  *   A  :8787  Turnstile OFF   (default site, seeded with demo content: headers, auth, CSRF/CORS, throttles, responsive layout)
  *   B  :8788  Turnstile ON    (site key + secret + a FAKE Cloudflare verifier on :9911, see tests/e2e/fake-turnstile.mjs)
+ *   D  :8789  database-failure tests (seeded; its database is deliberately broken and restored by tests/e2e/resilience; short page-cache lifetime)
  * Nothing here talks to real Cloudflare services or your real database.
  */
-export const PORT_A = 8787, PORT_B = 8788, VERIFIER = 9911;
+export const PORT_A = 8787, PORT_B = 8788, PORT_D = 8789, VERIFIER = 9911;
 export const SETUP_TOKEN = 'e2e-setup-token-0123456789abcdef';
 
 const worker = (port: number, inspector: number, dir: string, vars: Record<string, string>, seed = false) => ({
@@ -44,6 +45,7 @@ export default defineConfig({
   webServer: [
     { command: 'node tests/e2e/fake-turnstile.mjs', url: `http://127.0.0.1:${VERIFIER}/health`, reuseExistingServer: !process.env.CI },
     worker(PORT_A, 9330, 'e2e-a', { ADMIN_SETUP_TOKEN: SETUP_TOKEN }, true), // seeded with demo content (tests/seed/demo.sql) so layouts are tested with real-looking data
+    worker(PORT_D, 9332, 'e2e-d', { ADMIN_SETUP_TOKEN: SETUP_TOKEN, PAGE_CACHE_TTL: '2' }, true),
     worker(PORT_B, 9331, 'e2e-b', {
       ADMIN_SETUP_TOKEN: SETUP_TOKEN,
       TURNSTILE_SITE_KEY: '1x00000000000000000000AA',
@@ -61,6 +63,16 @@ export default defineConfig({
       // layout on real phone sizes; each spec sets its own viewport / touch emulation
       name: 'responsive', testMatch: /responsive\/.*\.spec\.ts/, dependencies: ['setup'],
       use: { ...devices['Desktop Chrome'], baseURL: `http://localhost:${PORT_A}` },
+    },
+    {
+      // data: SQL safety, schema/indexes/migrations/integrity, concurrency, retention
+      name: 'data', testMatch: /data\/.*\.spec\.ts/, dependencies: ['setup'],
+      use: { ...devices['Desktop Chrome'], baseURL: `http://localhost:${PORT_A}` },
+    },
+    {
+      // the database goes down and comes back (server D has its own database, so nothing else is affected)
+      name: 'resilience', testMatch: /resilience\/.*\.spec\.ts/,
+      use: { ...devices['Desktop Chrome'], baseURL: `http://localhost:${PORT_D}` },
     },
     {
       // page speed and diagrams: eager/lazy images, no layout jumps, inlined CSS, fonts, CSP for the analytics beacon, Mermaid

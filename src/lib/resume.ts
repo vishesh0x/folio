@@ -14,15 +14,15 @@ export const RESUME_DEFAULTS: ResumeOpts = {
   name: '', headline: '', layout: 'two', print_reveal: false, show_email: true, show_phone: false, show_location: true, show_socials: true, show_download: true, contact_mode: 'reveal',
 };
 export async function getResumeOpts(): Promise<ResumeOpts> {
-  try {
-    const r = await env.DB.prepare("SELECT value FROM settings WHERE key = 'resume_opts'").first<{ value: string }>();
-    const o = { ...RESUME_DEFAULTS, ...(r ? JSON.parse(r.value) : {}) };
-    if (!['reveal', 'hidden', 'plain'].includes(o.contact_mode)) o.contact_mode = 'reveal';
-    if (o.layout !== 'one') o.layout = 'two';
-    o.print_reveal = o.print_reveal === true;
-    o.name = typeof o.name === 'string' ? o.name.trim().slice(0, 80) : '';
-    return o;
-  } catch { return RESUME_DEFAULTS; }
+  // A database failure fails the request; it must not fall back to default contact-visibility settings on a page that gets cached.
+  const r = await env.DB.prepare("SELECT value FROM settings WHERE key = 'resume_opts'").first<{ value: string }>();
+  let saved = {}; try { if (r) saved = JSON.parse(r.value); } catch {}
+  const o = { ...RESUME_DEFAULTS, ...saved };
+  if (!['reveal', 'hidden', 'plain'].includes(o.contact_mode)) o.contact_mode = 'reveal';
+  if (o.layout !== 'one') o.layout = 'two';
+  o.print_reveal = o.print_reveal === true;
+  o.name = typeof o.name === 'string' ? o.name.trim().slice(0, 80) : '';
+  return o;
 }
 export async function saveResumeOpts(o: ResumeOpts) {
   await env.DB.prepare("INSERT INTO settings (key, value) VALUES ('resume_opts', ?1) ON CONFLICT(key) DO UPDATE SET value = ?1").bind(JSON.stringify(o)).run();

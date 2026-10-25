@@ -18,10 +18,11 @@ export const SETTINGS_DEFAULTS: SiteSettings = {
 };
 
 export async function getSettings(): Promise<SiteSettings> {
-  try {
-    const row = await env.DB.prepare("SELECT value FROM settings WHERE key = 'site'").first<{ value: string }>();
-    return { ...SETTINGS_DEFAULTS, ...(row ? JSON.parse(row.value) : {}) };
-  } catch { return SETTINGS_DEFAULTS; }
+  // A database FAILURE must fail the request (the middleware answers 503). It must never be turned into placeholder settings: a public
+  // page built from them would be cached as if it were the real page. Only a missing row (fresh install) or unreadable JSON uses defaults.
+  const row = await env.DB.prepare("SELECT value FROM settings WHERE key = 'site'").first<{ value: string }>();
+  let saved = {}; try { if (row) saved = JSON.parse(row.value); } catch {}
+  return { ...SETTINGS_DEFAULTS, ...saved };
 }
 export async function saveSettings(s: SiteSettings) {
   await env.DB.prepare("INSERT INTO settings (key, value) VALUES ('site', ?1) ON CONFLICT(key) DO UPDATE SET value = ?1").bind(JSON.stringify(s)).run();

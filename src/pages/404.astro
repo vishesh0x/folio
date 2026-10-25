@@ -6,7 +6,7 @@ Astro.response.status = 404;
 let recent: { slug: string; title: string }[] = [];
 try { recent = (await listPublished({ limit: 3 })).map((p) => ({ slug: p.slug, title: p.title })); } catch {}
 ---
-<Base title="Page not found" noindex>
+<Base title="Page not found" noindex errorPage>
   <ErrorView code="404" kicker="Off the map" title="This page wandered off." art="compass">
     <p class="lead">The address may have a typo, or the page may have moved or been removed.</p>
     <p class="hero-cta"><a class="btn" href="/">Back to the start</a><a class="btn ghost" href="/projects">Browse projects</a></p>

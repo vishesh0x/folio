@@ -15,11 +15,9 @@ const portrait = await loadAsset(s.portrait_asset ?? undefined);
 let work = await listPublished({ featured: true, limit: 3 });
 if (work.length === 0) work = await listPublished({ limit: 3 });
 
-let now: { title: string; category: string }[] = [];
-try {
-  now = (await env.DB.prepare(`SELECT i.title, c.name AS category FROM now_items i JOIN now_categories c ON c.id = i.category_id
-    WHERE i.status = 'current' ORDER BY i.sort_order, i.id LIMIT 4`).all<{ title: string; category: string }>()).results;
-} catch {}
+// No try/catch: a failed query must fail the page (503), not produce a home page without this block that then gets cached.
+const now = (await env.DB.prepare(`SELECT i.title, c.name AS category FROM now_items i JOIN now_categories c ON c.id = i.category_id
+  WHERE i.status = 'current' ORDER BY i.sort_order, i.id LIMIT 4`).all<{ title: string; category: string }>()).results;
 
 const headlineHtml = emphasis(s.headline || `Hi, I’m *${s.name}*.`);
 const eyebrow = [s.tagline, s.location].filter(Boolean).join(' · ');
