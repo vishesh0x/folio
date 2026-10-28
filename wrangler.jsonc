@@ -1,35 +1,32 @@
 {
-	// The Astro adapter fills in `main` and `assets` at build time.
+	// The Astro adapter fills in `main` and `assets` at build time (dist/server/wrangler.json). Which environment is built is chosen by
+	// CLOUDFLARE_ENV at BUILD time, NOT by `wrangler deploy --env`: after a normal build `--env anything` is silently ignored and deploys this
+	// (production) configuration. There is deliberately no staging environment; if one is ever added, its bindings must be repeated in full
+	// (bindings are not inherited) and must not share the production database or bucket (tests/e2e/data/wrangler-config.spec.ts checks both).
 	"$schema": "node_modules/wrangler/config-schema.json",
 	"name": "folio",
 	"compatibility_date": "2026-09-01",
-	"compatibility_flags": [
-		"nodejs_compat"
-	],
+	"compatibility_flags": ["nodejs_compat"],
+
+	// The site is reached ONLY on its own domain (Worker > Settings > Domains & Routes). The extra addresses Cloudflare would otherwise
+	// create (folio.<account>.workers.dev, and one per uploaded version) would bypass the zone's firewall (WAF) and rate-limit rules, and would
+	// serve a second copy of every page. Setting these here also stops `wrangler deploy` from switching them back on.
+	"workers_dev": false,
+	"preview_urls": false,
+
 	"vars": {
-    	// Optional: Cloudflare Turnstile *site* key to protect the contact form.
-    	"TURNSTILE_SITE_KEY": "0x4AAAAAAFNLlH_NrctHUs4o"
-    },
-	"observability": {
-		"enabled": true
-	}, // keeps logs, so errors behind the "Something broke" page can be found
-	// Binding names must match what the code reads (src/env.d.ts): env.DB and env.ASSETS_BUCKET.
-	"d1_databases": [
-		{
-			"binding": "DB",
-			"database_name": "folio-db",
-			"database_id": "d261f15a-72ba-41fd-9bad-bc8fd2ba0e05",
-			"migrations_dir": "migrations"
-		}
-	],
-	"r2_buckets": [
-		{
-			"binding": "ASSETS_BUCKET",
-			"bucket_name": "folio-assets"
-		}
-	],
-	"images": {
-		"binding": "IMAGES"
-	}
-	// Secret (never commit):  npx wrangler secret put ADMIN_SETUP_TOKEN
+		// PUBLIC key of the Cloudflare Turnstile widget on the contact form and sign-in. Safe to commit: it is printed in every page that shows the widget.
+		"TURNSTILE_SITE_KEY": "0x4AAAAAAFNLlH_NrctHUs4o"
+	},
+	"observability": { "enabled": true }, // keeps logs, so errors behind the "Something broke" page can be found
+
+	// Binding names must match what the code reads (src/env.d.ts): env.DB, env.ASSETS_BUCKET, env.IMAGES.
+	"d1_databases": [{ "binding": "DB", "database_name": "folio-db", "database_id": "d261f15a-72ba-41fd-9bad-bc8fd2ba0e05", "migrations_dir": "migrations" }],
+	"r2_buckets": [{ "binding": "ASSETS_BUCKET", "bucket_name": "folio-assets" }],
+	"images": { "binding": "IMAGES" }
+
+	// SECRETS are never written in this file. Set them with `npx wrangler secret put <NAME>` (and in .dev.vars for local work; see .dev.vars.example):
+	//   ADMIN_SETUP_TOKEN      one-time token for creating the first admin account (also the fallback source of the rate-limit key)
+	//   RATE_LIMIT_SALT        recommended: rate-limit counters are stored under a keyed hash of the visitor's network
+	//   TURNSTILE_SECRET_KEY   only if Turnstile is used (pairs with TURNSTILE_SITE_KEY above)
 }

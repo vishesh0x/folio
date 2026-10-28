@@ -8,22 +8,23 @@ import { defineConfig, devices } from '@playwright/test';
  *   A  :8787  Turnstile OFF   (default site, seeded with demo content: headers, auth, CSRF/CORS, throttles, responsive layout)
  *   B  :8788  Turnstile ON    (site key + secret + a FAKE Cloudflare verifier on :9911, see tests/e2e/fake-turnstile.mjs)
  *   D  :8789  database-failure tests (seeded; its database is deliberately broken and restored by tests/e2e/resilience; short page-cache lifetime)
+ *   E  :8791  the same site run through tests/tools/counting/entry.mjs, which COUNTS every call to a Cloudflare service per request (Workers limits tests)
  * Nothing here talks to real Cloudflare services or your real database.
  */
-export const PORT_A = 8787, PORT_B = 8788, PORT_D = 8789, VERIFIER = 9911;
+export const PORT_A = 8787, PORT_B = 8788, PORT_D = 8789, PORT_E = 8791, VERIFIER = 9911;
 export const SETUP_TOKEN = 'e2e-setup-token-0123456789abcdef';
 export const RATE_SALT = 'e2e-rate-limit-salt-fedcba9876543210'; // rate-limit counters are stored under a keyed hash made with this
 
-const worker = (port: number, inspector: number, dir: string, vars: Record<string, string>, seed = false) => ({
+const worker = (port: number, inspector: number, dir: string, vars: Record<string, string>, seed = false, config = '') => ({
   command: [
     `rm -rf .wrangler/${dir}`,
-    `npx wrangler d1 migrations apply folio-db --local --persist-to .wrangler/${dir}`,
+    `npx wrangler d1 migrations apply folio-db ${config} --local --persist-to .wrangler/${dir}`,
     ...(seed ? [
-      `npx wrangler d1 execute folio-db --local --persist-to .wrangler/${dir} --file tests/seed/demo.sql`,
-      `npx wrangler d1 execute folio-db --local --persist-to .wrangler/${dir} --file tests/seed/demo-media.sql`,   // asset rows, covers, portrait, diagrams
+      `npx wrangler d1 execute folio-db ${config} --local --persist-to .wrangler/${dir} --file tests/seed/demo.sql`,
+      `npx wrangler d1 execute folio-db ${config} --local --persist-to .wrangler/${dir} --file tests/seed/demo-media.sql`,   // asset rows, covers, portrait, diagrams
       `npx wrangler r2 object put folio-assets/assets/demoCover0001/demo-cover.png --file tests/seed/demo-cover.png --content-type image/png --local --persist-to .wrangler/${dir}`,
     ] : []),
-    `npx wrangler dev --port ${port} --inspector-port ${inspector} --persist-to .wrangler/${dir} ` +
+    `npx wrangler dev ${config} --port ${port} --inspector-port ${inspector} --persist-to .wrangler/${dir} ` +
       Object.entries(vars).map(([k, v]) => `--var ${k}:${v}`).join(' '),
   ].join(' && '),
   url: `http://localhost:${port}/robots.txt`,
@@ -47,6 +48,7 @@ export default defineConfig({
     { command: 'node tests/e2e/fake-turnstile.mjs', url: `http://127.0.0.1:${VERIFIER}/health`, reuseExistingServer: !process.env.CI },
     worker(PORT_A, 9330, 'e2e-a', { ADMIN_SETUP_TOKEN: SETUP_TOKEN, RATE_LIMIT_SALT: RATE_SALT }, true), // seeded with demo content (tests/seed/demo.sql) so layouts are tested with real-looking data
     worker(PORT_D, 9332, 'e2e-d', { ADMIN_SETUP_TOKEN: SETUP_TOKEN, PAGE_CACHE_TTL: '2' }, true),
+    worker(PORT_E, 9333, 'e2e-e', { ADMIN_SETUP_TOKEN: SETUP_TOKEN, RATE_LIMIT_SALT: RATE_SALT }, true, '-c tests/tools/counting/wrangler.jsonc'),
     worker(PORT_B, 9331, 'e2e-b', {
       ADMIN_SETUP_TOKEN: SETUP_TOKEN, RATE_LIMIT_SALT: RATE_SALT,
       TURNSTILE_SITE_KEY: '1x00000000000000000000AA',
@@ -84,6 +86,11 @@ export default defineConfig({
       // page speed and diagrams: eager/lazy images, no layout jumps, inlined CSS, fonts, CSP for the analytics beacon, Mermaid
       name: 'performance', testMatch: /performance\/.*\.spec\.ts/, dependencies: ['setup'],
       use: { ...devices['Desktop Chrome'], baseURL: `http://localhost:${PORT_A}` },
+    },
+    {
+      // Workers limits (free plan: 50 calls to Cloudflare services per request, 10 ms CPU): how many calls each route really makes, and that bulk work stays inside them
+      name: 'limits', testMatch: /limits\/.*\.spec\.ts/,
+      use: { ...devices['Desktop Chrome'], baseURL: `http://localhost:${PORT_E}` },
     },
     {
       name: 'turnstile', testMatch: /turnstile\/.*\.spec\.ts/,

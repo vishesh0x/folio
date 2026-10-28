@@ -25,6 +25,7 @@ import go from 'highlight.js/lib/languages/go';
 import yaml from 'highlight.js/lib/languages/yaml';
 import diff from 'highlight.js/lib/languages/diff';
 import { esc, imgHtml, type ImgAsset } from './imghtml';
+import { assetRefs, ASSET_ID as ID } from './asset-refs';
 
 for (const [n, l] of Object.entries({ javascript, typescript, python, bash, json, css, xml, sql, rust, go, yaml, diff })) hljs.registerLanguage(n, l);
 const ALIAS: Record<string, string> = { js: 'javascript', ts: 'typescript', py: 'python', sh: 'bash', shell: 'bash', zsh: 'bash', html: 'xml', svg: 'xml', yml: 'yaml', jsx: 'javascript', tsx: 'typescript' };
@@ -32,7 +33,6 @@ const ALIAS: Record<string, string> = { js: 'javascript', ts: 'typescript', py: 
 export type TocItem = { depth: number; text: string; id: string };
 export type Rendered = { html: string; toc: TocItem[] };
 
-const ID = '[A-Za-z0-9_-]{12}';
 const slugify = (s: string) => s.toLowerCase().normalize('NFKD').replace(/[^\w\s-]/g, '').trim().replace(/[\s_]+/g, '-').replace(/-+/g, '-') || 'section';
 
 /** Apply `fn` only to text that is outside fenced code blocks. */
@@ -47,9 +47,8 @@ function prepare(md: string): string {
 type Ctx = { assets: Map<string, ImgAsset>; byName: Map<string, ImgAsset>; slugs: Map<string, string> };
 
 async function buildContext(md: string): Promise<Ctx> {
-  const ids = new Set<string>(), names = new Set<string>(), targets = new Set<string>();
-  for (const m of md.matchAll(new RegExp(`/media/(${ID})/`, 'g'))) ids.add(m[1]);
-  for (const m of md.matchAll(/!\[\[([^\]|]+)/g)) (new RegExp(`^${ID}$`).test(m[1].trim()) ? ids : names).add(m[1].trim());
+  const { ids, names } = assetRefs(md);      // the same rule the Files page uses to decide what is "in use"
+  const targets = new Set<string>();
   for (const m of md.matchAll(/(?<!!)\[\[([^\]|#]+)/g)) targets.add(m[1].trim());
 
   const assets = new Map<string, ImgAsset>(), byName = new Map<string, ImgAsset>(), slugs = new Map<string, string>();

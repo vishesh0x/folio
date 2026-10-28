@@ -11,7 +11,7 @@ const RESIZABLE = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/avif'
 const FOREVER = 'public, max-age=604800, immutable';
 
 export const snapWidth = (w: number) => WIDTHS.find((x) => x >= w) ?? WIDTHS[WIDTHS.length - 1];
-export const canResize = (a: Asset) => RESIZABLE.has(a.mime);
+export const canResize = (a: Pick<Asset, 'mime'>) => RESIZABLE.has(a.mime);
 
 /** Headers that stop an SVG or file from doing anything if someone opens it directly. */
 function safeHeaders(a: Asset, contentType: string): Headers {
@@ -104,9 +104,11 @@ export async function cachedMedia(request: Request, id: string, v: Variant, make
 }
 
 /** Remove every cached variant of an asset in this data center (other locations expire within 7 days). */
-export async function purgeAssetCache(a: Pick<Asset, 'id'>, origin: string) {
+export async function purgeAssetCache(a: Pick<Asset, 'id' | 'mime'>, origin: string) {
   const urls = [mediaKey(origin, a.id, null), missingKey(origin, a.id)];
-  for (const w of WIDTHS) for (const f of Object.keys(FORMATS) as Fmt[]) urls.push(mediaKey(origin, a.id, { w, f }));
+  // Resized copies exist only for pictures that can be resized. A PDF or SVG has just the original (2 cache calls instead of 38; a request on the
+  // free Workers plan may make only 50 calls in all).
+  if (canResize(a)) for (const w of WIDTHS) for (const f of Object.keys(FORMATS) as Fmt[]) urls.push(mediaKey(origin, a.id, { w, f }));
   await Promise.all(urls.map((u) => caches.default.delete(new Request(u))));
 }
 

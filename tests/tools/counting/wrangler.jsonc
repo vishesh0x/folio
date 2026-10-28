@@ -1,0 +1,12 @@
+{
+	// TEST-ONLY configuration (server E in playwright.config.ts). It runs the BUILT site through entry.mjs, which counts calls to Cloudflare services.
+	// Never deployed: `npm run deploy` uses the root wrangler.jsonc.
+	"name": "folio-counting",
+	"main": "entry.mjs",
+	"compatibility_date": "2026-09-01",
+	"compatibility_flags": ["nodejs_compat"],
+	"assets": { "binding": "ASSETS", "directory": "../../../dist/client" },
+	"d1_databases": [{ "binding": "DB", "database_name": "folio-db", "database_id": "00000000-0000-0000-0000-000000000000", "migrations_dir": "../../../migrations" }],
+	"r2_buckets": [{ "binding": "ASSETS_BUCKET", "bucket_name": "folio-assets" }],
+	"images": { "binding": "IMAGES" }
+}

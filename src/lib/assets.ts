@@ -4,6 +4,7 @@ import { sniffBinary } from './sniff';
 import { sanitizeSvg, svgSize } from './svg';
 import { getSettings } from './settings';
 import { stripMetadata } from './strip';
+import { assetRefs } from './asset-refs';
 
 export type Asset = {
   id: string; r2_key: string; filename: string; mime: string; size: number;
@@ -81,38 +82,53 @@ export const RASTER_MIMES = RASTER;
 /**
  * Where each of the given files is used, as short human phrases ("your portrait", "the cover of Atlas").
  * One set of queries for all of them, so the Files page does not ask the database once per file.
+ *
+ * Cost: each project's text is read ONCE for the files it shows (see asset-refs.ts, the same rule the page renderer uses), then looked up in
+ * a table of the files, so the work grows with the amount of text. (It used to search every project's text once per file, files x projects,
+ * which on the free Workers plan's 10 ms CPU limit would have failed somewhere past a few hundred files.) The database hands over a text only
+ * if it contains something that could be a reference; a project with no pictures in its text costs nothing here.
  */
 export async function usageMap(assets: Asset[]): Promise<Map<string, string[]>> {
   const out = new Map<string, string[]>(assets.map((a) => [a.id, []]));
   const add = (id: string | null | undefined, text: string) => { if (id && out.has(id)) out.get(id)!.push(text); };
   const s = await getSettings();
   add(s.portrait_asset, 'your portrait'); add(s.favicon_asset, 'your favicon'); add(s.og_asset, 'the default share image'); add(s.resume_asset, 'your resume PDF');
-  const projects = (await env.DB.prepare('SELECT title, slug, cover_asset, seo_image, body_md FROM projects').all<{ title: string; slug: string; cover_asset: string | null; seo_image: string | null; body_md: string }>()).results;
+  const projects = (await env.DB.prepare(
+    "SELECT title, slug, cover_asset, seo_image, CASE WHEN instr(body_md, '/media/') > 0 OR instr(body_md, '[[') > 0 THEN body_md ELSE '' END AS body_md FROM projects",
+  ).all<{ title: string; slug: string; cover_asset: string | null; seo_image: string | null; body_md: string }>()).results;
+  const byName = new Map<string, string[]>();                       // lower-case file name -> ids (the same name can be uploaded twice)
+  for (const a of assets) { const k = a.filename.toLowerCase(); byName.set(k, [...(byName.get(k) ?? []), a.id]); }
   for (const p of projects) {
     const t = p.title || p.slug;
     add(p.cover_asset, `the cover of ${t}`); add(p.seo_image, `the share image of ${t}`);
-    for (const a of assets) if (p.body_md.includes(`/media/${a.id}/`) || p.body_md.includes(`[[${a.filename}`)) add(a.id, `the text of ${t}`);
+    if (!p.body_md) continue;
+    const { ids, names } = assetRefs(p.body_md);
+    const shown = new Set<string>(ids);
+    for (const n of names) for (const id of byName.get(n.toLowerCase()) ?? []) shown.add(id);  // every file of that name: the renderer shows one of them, and which can change if another is deleted
+    for (const id of shown) add(id, `the text of ${t}`);
   }
   const pages = (await env.DB.prepare('SELECT page, og_asset FROM seo_pages WHERE og_asset IS NOT NULL').all<{ page: string; og_asset: string }>()).results;
   for (const r of pages) add(r.og_asset, `the share image of the ${r.page} page`);
   return out;
 }
-export async function assetUsage(id: string): Promise<string[]> {
-  const a = await getAsset(id);
+/** `known` is the file's row when the caller already loaded it (saves a database query). */
+export async function assetUsage(id: string, known?: Asset | null): Promise<string[]> {
+  const a = known ?? (await getAsset(id));
   return a ? (await usageMap([a])).get(id) ?? [] : [];
 }
 /** First reason an asset must not be deleted, or null. */
-export async function assetInUse(id: string): Promise<string | null> {
-  const u = await assetUsage(id);
+export async function assetInUse(id: string, known?: Asset | null): Promise<string | null> {
+  const u = await assetUsage(id, known);
   return u.length ? `it is used as ${u[0]}${u.length > 1 ? ` and ${u.length - 1} other place${u.length > 2 ? 's' : ''}` : ''}` : null;
 }
-export async function deleteAsset(id: string, origin: string) {
-  const a = await getAsset(id);
+export async function deleteAsset(id: string, origin: string, known?: Asset | null) {
+  const a = known ?? (await getAsset(id));
   if (!a) return;
   await env.DB.prepare('DELETE FROM assets WHERE id = ?').bind(id).run();
   // Best effort: if storage hiccups here the file is left behind unused (the Files page's storage check finds and removes it), instead of the
   // owner seeing an error for a delete that already happened.
   try { await env.ASSETS_BUCKET.delete(a.r2_key); } catch (e) { console.error('[storage] could not remove', a.r2_key, e); }
-  const { purgeAssetCache } = await import('./media');
-  await purgeAssetCache(a, origin);
+  // Forgetting the cached copies is best effort too: the row and the file are already gone, so a failure here (for instance a request that has used
+  // up its allowance of calls) must not turn a finished delete into an error page. Copies in other locations expire on their own within 7 days.
+  try { const { purgeAssetCache } = await import('./media'); await purgeAssetCache(a, origin); } catch (e) { console.error('[cache] could not forget cached copies of', id, e); }
 }
