@@ -6,7 +6,7 @@ const ascii = (b: Uint8Array, i: number, n: number) => String.fromCharCode(...b.
 
 export function sniffBinary(b: Uint8Array): Sniffed | null {
   if (b.length < 16) return null;
-  if (u32be(b, 0) === 0x89504e47 && u32be(b, 4) === 0x0d0a1a0a) return { mime: 'image/png', ext: 'png', width: u32be(b, 16), height: u32be(b, 20) };
+  if (u32be(b, 0) === 0x89504e47 && u32be(b, 4) === 0x0d0a1a0a && ascii(b, 12, 4) === 'IHDR') return { mime: 'image/png', ext: 'png', width: u32be(b, 16), height: u32be(b, 20) };
   if (b[0] === 0xff && b[1] === 0xd8) {
     let i = 2;
     while (i + 9 < b.length) {
@@ -17,7 +17,7 @@ export function sniffBinary(b: Uint8Array): Sniffed | null {
     }
     return { mime: 'image/jpeg', ext: 'jpg', width: null, height: null };
   }
-  if (ascii(b, 0, 3) === 'GIF') return { mime: 'image/gif', ext: 'gif', width: b[6] | (b[7] << 8), height: b[8] | (b[9] << 8) };
+  if (/^GIF8[79]a$/.test(ascii(b, 0, 6))) return { mime: 'image/gif', ext: 'gif', width: b[6] | (b[7] << 8), height: b[8] | (b[9] << 8) };
   if (ascii(b, 0, 4) === 'RIFF' && ascii(b, 8, 4) === 'WEBP') {
     const k = ascii(b, 12, 4);
     if (k === 'VP8 ') return { mime: 'image/webp', ext: 'webp', width: (b[26] | (b[27] << 8)) & 0x3fff, height: (b[28] | (b[29] << 8)) & 0x3fff };

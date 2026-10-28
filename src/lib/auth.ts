@@ -1,12 +1,17 @@
 import { env } from 'cloudflare:workers';
 import type { AstroCookies } from 'astro';
 import { hashPassword, verifyPassword, needsRehash, dummyVerify, randomToken, sha256Hex, safeEqual } from './crypto';
+import { rateKey, accountKey } from './throttle';
 
 export const MIN_PASSWORD = 12;
 const SESSION_DAYS = 14;
 const COOKIE = import.meta.env.PROD ? '__Host-session' : 'session';
-const MAX_FAILS = 5;
-const WINDOW_SECS = 15 * 60;
+const MAX_FAILS = 5;                 // wrong passwords allowed per visitor (network) ...
+const WINDOW_SECS = 15 * 60;         // ... per 15 minutes
+// A second, separate limit per ACCOUNT, counting wrong passwords from ALL visitors together. The per-visitor limit alone lets many addresses
+// (a botnet, or one IPv6 range) each try a few guesses forever. Twenty an hour is far more than the owner ever mistypes, far too few to guess with.
+export const ACCOUNT_MAX_FAILS = 20;
+export const ACCOUNT_WINDOW_SECS = 3600;
 const now = () => Math.floor(Date.now() / 1000);
 
 export type User = { id: number; email: string };
@@ -23,18 +28,18 @@ export function validatePassword(pw: string, email = ''): string | null {
 }
 
 /* ───── brute-force throttle (D1) ───── */
-export async function isLimited(key: string): Promise<boolean> {
+export async function isLimited(key: string, max = MAX_FAILS, window = WINDOW_SECS): Promise<boolean> {
   const row = await env.DB.prepare('SELECT count, window_start FROM login_attempts WHERE key = ?').bind(key).first<{ count: number; window_start: number }>();
-  return !!row && row.window_start > now() - WINDOW_SECS && row.count >= MAX_FAILS;
+  return !!row && row.window_start > now() - window && row.count >= max;
 }
-export async function recordFailure(key: string) {
+export async function recordFailure(key: string, window = WINDOW_SECS) {
   const t = now();
   await env.DB.prepare(
     `INSERT INTO login_attempts (key, count, window_start) VALUES (?1, 1, ?2)
      ON CONFLICT(key) DO UPDATE SET
        count        = CASE WHEN window_start < ?2 - ?3 THEN 1 ELSE count + 1 END,
        window_start = CASE WHEN window_start < ?2 - ?3 THEN ?2 ELSE window_start END`
-  ).bind(key, t, WINDOW_SECS).run();
+  ).bind(key, t, window).run();
 }
 export async function clearFailures(key: string) {
   await env.DB.prepare('DELETE FROM login_attempts WHERE key = ?').bind(key).run();
@@ -101,5 +106,6 @@ export async function login(email: string, password: string): Promise<number | n
   return user.id;
 }
 
-export const clientKey = (action: string, request: Request) =>
-  `${action}:${request.headers.get('cf-connecting-ip') ?? 'local'}`;
+/** The counter key for this visitor's network (IPv6 grouped by /64, hashed when a secret is configured), see throttle.ts. */
+export const clientKey = (action: string, request: Request) => rateKey(action, request);
+export { accountKey };

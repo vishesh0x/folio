@@ -4,6 +4,9 @@
 //   token "drop-…"     → the connection is destroyed (Cloudflare unreachable)
 //   token "garbage-…"  → an HTML page instead of JSON
 //   token "slow-…"     → answers after 7 s (the Worker gives up after 5 s)
+//   token "wronghost-…"  → success, but earned on another site (hostname evil.example)
+//   token "wrongaction-…" → success, but by a different widget (action "other")
+//   token "act_<name>-…"  → success, earned by the widget with action <name>   (a plain "good-…" names no action, like an unnamed widget)
 //   anything else      → success:false
 // Extra endpoints for assertions:  GET /health   GET /calls   POST /reset
 import http from 'node:http';
@@ -21,8 +24,9 @@ http.createServer((req, res) => {
     if (token.startsWith('drop-')) return req.socket.destroy();
     if (token.startsWith('garbage-')) { res.writeHead(200, { 'content-type': 'text/html' }); return res.end('<html>not json</html>'); }
     if (token.startsWith('slow-')) await new Promise((r) => setTimeout(r, 7000));
-    const ok = secret === 'test-secret' && /^(good|slow)-/.test(token) && !used.has(token);
+    const ok = secret === 'test-secret' && /^(good|slow|wronghost|wrongaction|act_[a-z]+)-/.test(token) && !used.has(token);
     if (ok) used.add(token);
-    json(ok ? { success: true, hostname: 'localhost', action: 'test' } : { success: false, 'error-codes': [used.has(token) ? 'timeout-or-duplicate' : 'invalid-input-response'] });
+    const act = /^act_([a-z]+)-/.exec(token)?.[1] ?? (token.startsWith('wrongaction-') ? 'other' : undefined);
+    json(ok ? { success: true, hostname: token.startsWith('wronghost-') ? 'evil.example' : 'localhost', ...(act ? { action: act } : {}) } : { success: false, 'error-codes': [used.has(token) ? 'timeout-or-duplicate' : 'invalid-input-response'] });
   });
 }).listen(9911, '127.0.0.1', () => console.log('fake turnstile verifier on :9911'));

@@ -3,8 +3,10 @@ import Base from '../../layouts/Base.astro';
 import { getSettings } from '../../lib/settings';
 import {
   MIN_PASSWORD, validateEmail, validatePassword, isLimited, recordFailure, clearFailures,
-  createSession, getUser, login, hasAnyUser, setupEnabled, checkSetupToken, createFirstAdmin, clientKey,
+  createSession, getUser, login, hasAnyUser, setupEnabled, checkSetupToken, createFirstAdmin, clientKey, accountKey, ACCOUNT_MAX_FAILS, ACCOUNT_WINDOW_SECS,
 } from '../../lib/auth';
+import { turnstileOn, turnstileSiteKey, verifyTurnstile } from '../../lib/turnstile';
+import { ipOf } from '../../lib/throttle';
 
 if (await getUser(Astro.cookies)) return Astro.redirect('/dashboard');
 
@@ -12,6 +14,7 @@ const adminExists = await hasAnyUser();
 const canSetup = !adminExists && setupEnabled();
 let error = '';
 let email = '';
+let challenge = false; // show a Turnstile check: set when too many wrong passwords have been tried for this account
 
 if (Astro.request.method === 'POST') {
   const form = await Astro.request.formData();
@@ -20,7 +23,7 @@ if (Astro.request.method === 'POST') {
   const password = String(form.get('password') ?? '');
 
   if (mode === 'setup') {
-    const key = clientKey('setup', Astro.request);
+    const key = await clientKey('setup', Astro.request);
     if (adminExists || !setupEnabled()) {
       Astro.response.status = 403;
       error = 'Registration is closed.';
@@ -42,20 +45,35 @@ if (Astro.request.method === 'POST') {
       else { await clearFailures(key); await createSession(id, Astro.cookies); return Astro.redirect('/dashboard'); }
     }
   } else if (mode === 'login') {
-    const key = clientKey('login', Astro.request);
+    const key = await clientKey('login', Astro.request);
+    const acct = await accountKey(email);
     if (await isLimited(key)) {
       Astro.response.status = 429;
       error = 'Too many attempts. Try again in 15 minutes.';
     } else {
-      const id = await login(email, password);
-      if (id === null) { await recordFailure(key); Astro.response.status = 401; error = 'Email or password is incorrect.'; }
-      else { await clearFailures(key); await createSession(id, Astro.cookies); return Astro.redirect('/dashboard'); }
+      // Many wrong passwords for this ACCOUNT, from any number of visitors: stop guessing unless a human check is passed. (Without
+      // Turnstile configured the only safe choice is to wait; with it, the owner can always get in by solving the check.)
+      let go = true;
+      if (await isLimited(acct, ACCOUNT_MAX_FAILS, ACCOUNT_WINDOW_SECS)) {
+        if (!turnstileOn()) { go = false; Astro.response.status = 429; error = 'Too many wrong passwords for this account. Try again in an hour.'; }
+        else if (!(await verifyTurnstile(String(form.get('cf-turnstile-response') ?? ''), ipOf(Astro.request), { hostname: Astro.url.hostname, action: 'login' }))) {
+          go = false; challenge = true; Astro.response.status = 429; error = 'There have been many wrong passwords for this account. Please complete the check below, then sign in.';
+        }
+      }
+      if (go) {
+        const id = await login(email, password);
+        if (id === null) { await recordFailure(key); await recordFailure(acct, ACCOUNT_WINDOW_SECS); Astro.response.status = 401; error = 'Email or password is incorrect.'; challenge = await isLimited(acct, ACCOUNT_MAX_FAILS, ACCOUNT_WINDOW_SECS) && turnstileOn(); }
+        else { await clearFailures(key); await clearFailures(acct); await createSession(id, Astro.cookies); return Astro.redirect('/dashboard'); }
+      }
     }
   }
 }
 const site = await getSettings();
+const sitekey = challenge ? turnstileSiteKey() : undefined;
+if (sitekey) Astro.locals.challenge = true; // lets the Content-Security-Policy allow Cloudflare's check on this response
 ---
 <Base title={canSetup ? 'Set up' : 'Sign in'} noindex bare>
+  {sitekey && <script slot="head" src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>}
   <main id="main" class="gate">
     <span class="gate-shape gate-a" aria-hidden="true"></span><span class="gate-shape gate-b" aria-hidden="true"></span>
     <a class="gate-back" href="/">← Back to {site.name}</a>
@@ -94,6 +112,7 @@ const site = await getSettings();
           <input type="hidden" name="mode" value="login" />
           <div class="field"><label for="email">Email</label><input id="email" name="email" type="email" autocomplete="username" value={email} required /></div>
           <div class="field"><label for="pw">Password</label><div class="pwbox"><input id="pw" name="password" type="password" autocomplete="current-password" required /><button type="button" class="pwtoggle" data-pw-toggle="pw" aria-pressed="false" hidden>Show</button></div></div>
+          {sitekey && <div class="cf-turnstile" data-sitekey={sitekey} data-action="login"></div>}
           <button class="btn" type="submit">Sign in</button>
         </form>
       )}

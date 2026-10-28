@@ -2,6 +2,7 @@ import { test, expect, request as pwRequest, type APIRequestContext } from '@pla
 import { ADMIN_EMAIL, ADMIN_PASSWORD, freshIp, header, sameOrigin, cspDirective } from '../helpers';
 import { SETUP_TOKEN } from '../../../playwright.config';
 import { d1, breakDb, restoreDb } from '../d1';
+import { readFileSync } from 'node:fs';
 
 // Step 3: "what does the site do when the database is unavailable?" Server D has its own database, which these tests really break (every
 // table renamed away, so every query fails) and then restore. The rules being checked:
@@ -93,6 +94,10 @@ test.describe('while the database is down', () => {
     const write = await admin.post(BASE + '/api/admin/inbox', { form: { action: 'mark-all-read' }, headers: { ...sameOrigin(BASE, freshIp()), connection: 'close' }, maxRedirects: 0 });
     expect(write.status()).toBe(503);
   });
+  test('an upload is refused with 503 and leaves nothing in storage', async () => {
+    const r = await admin.post(BASE + '/api/admin/assets/upload', { multipart: { file: { name: 'x.png', mimeType: 'image/png', buffer: readFileSync('tests/fixtures/plain.png') }, alt: 'during the outage' }, headers: { ...sameOrigin(BASE, freshIp()), connection: 'close' }, maxRedirects: 0 });
+    expect(r.status()).toBe(503); expect(header(r, 'retry-after')).toBe('30');
+  });
   test('error pages still render (they must not depend on the database), flagged so they are never cached', async () => {
     const r = await get('/definitely-not-a-page');
     expect(r.status()).toBe(404); expect(await r.text()).toContain('wandered off'); expect(header(r, 'x-cache')).toBe('');
@@ -113,6 +118,10 @@ test.describe('while the database is down', () => {
       expect(count('SELECT count(*) n FROM messages WHERE is_read = 0'), '"mark all read" must not have half-applied').toBe(unreadBefore);
       const relog = await visitor.post(BASE + '/auth', { form: { mode: 'login', email: d1('e2e-d', 'SELECT email FROM users')[0].email, password: ADMIN_PASSWORD }, headers: { ...sameOrigin(BASE, freshIp()), connection: 'close' }, maxRedirects: 0 });
       expect(relog.status()).toBe(302);
+    });
+    test('storage and the database still agree: the refused upload left no stray file and no entry', async () => {
+      const r = await admin.post(BASE + '/api/admin/assets/storage', { form: { action: 'check', min_age: '0' }, headers: { ...sameOrigin(BASE, freshIp()), connection: 'close' } });
+      const j = await r.json(); expect(j.strays, JSON.stringify(j.strays)).toEqual([]); expect(j.broken).toEqual([]);
     });
     test('nothing from the outage was cached: pages built now are real, the stale copy is replaced', async () => {
       const first = await get('/'); const body = await first.text();

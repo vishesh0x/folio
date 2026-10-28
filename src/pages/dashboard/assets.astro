@@ -90,6 +90,17 @@ const dots = '<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><
       </ul>
     </>
   )}
+
+  <section class="card stack" style="--stack:10px;max-width:34rem;margin-top:2rem" aria-labelledby="storage-h" data-storage hidden>
+    <h2 class="card-h" id="storage-h">Storage check</h2>
+    <p class="card-sub">Compares the files in storage with the list above. A <strong>stray file</strong> is one that is stored but not listed (for example from an upload that was interrupted); it uses space and nothing on your site shows it. Files younger than an hour are never counted.</p>
+    <p><button class="btn ghost sm" type="button" data-storage-check>Check storage</button></p>
+    <div data-storage-result aria-live="polite"></div>
+    <h3 class="card-h" style="font-size:1rem;margin-top:1rem">Pictures uploaded earlier</h3>
+    <p class="card-sub">New uploads automatically lose their location, camera and comment data. This does the same for pictures uploaded before that existed. It changes only the files that have such data, and keeps the picture itself identical.</p>
+    <p><button class="btn ghost sm" type="button" data-storage-scrub>Remove location data from existing pictures</button></p>
+    <div data-scrub-result aria-live="polite"></div>
+  </section>
 </Dash>
 
 <script>
@@ -129,5 +140,48 @@ const dots = '<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><
     };
     chips.forEach((c) => c.addEventListener('click', (e) => { e.preventDefault(); kind = c.dataset.filter!; chips.forEach((x) => x.setAttribute('aria-current', String(x === c))); apply(); }));
     search.addEventListener('input', apply);
+  }
+
+  // Storage check: ask the server, show the answer, and offer to remove stray files only when there are some.
+  const box = document.querySelector<HTMLElement>('[data-storage]');
+  if (box) {
+    box.hidden = false;
+    const out = box.querySelector<HTMLElement>('[data-storage-result]')!;
+    const ask = async (action: string) => {
+      const body = new FormData(); body.set('action', action);
+      const r = await fetch('/api/admin/assets/storage', { method: 'POST', body });
+      if (!r.ok) throw new Error('failed');
+      return r.json();
+    };
+    const size = (n: number) => (n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB');
+    const show = (r: any, note = '') => {
+      out.textContent = '';
+      const p = (t: string) => { const e = document.createElement('p'); e.textContent = t; out.append(e); return e; };
+      p(`${note}${r.objects} files in storage, ${size(r.bytes)} in total.`);
+      p(r.strays.length ? `${r.strays.length} stray file${r.strays.length === 1 ? '' : 's'} (${size(r.strays.reduce((n: number, s: any) => n + s.size, 0))}) can be removed.` : 'No stray files.');
+      if (r.broken.length) p(`${r.broken.length} entr${r.broken.length === 1 ? 'y has' : 'ies have'} no file in storage: ${r.broken.map((b: any) => b.filename).join(', ')}. Delete and re-upload ${r.broken.length === 1 ? 'it' : 'them'}.`);
+      if (r.truncated) p('There are very many files; only the first 20,000 were checked, so nothing can be removed from here.');
+      if (r.strays.length && !r.truncated) {
+        const b = document.createElement('button'); b.type = 'button'; b.className = 'btn bad sm'; b.textContent = `Remove ${r.strays.length} stray file${r.strays.length === 1 ? '' : 's'}`;
+        b.addEventListener('click', async () => { b.disabled = true; try { const d = await ask('clean'); show(await ask('check'), `Removed ${d.removed}. `); } catch { p('Something went wrong. Try again.'); b.disabled = false; } });
+        out.append(b);
+      }
+    };
+    const scrubOut = box.querySelector<HTMLElement>('[data-scrub-result]')!;
+    box.querySelector('[data-storage-scrub]')!.addEventListener('click', async (ev) => {
+      const btn = ev.currentTarget as HTMLButtonElement; btn.disabled = true; scrubOut.textContent = 'Working…';
+      let offset: number | null = 0, checked = 0, cleaned = 0, saved = 0, failed = 0;
+      try {
+        while (offset !== null) {                       // a few pictures per request; repeat until the server says it is done
+          const body = new FormData(); body.set('action', 'scrub'); body.set('offset', String(offset));
+          const r = await fetch('/api/admin/assets/storage', { method: 'POST', body }); if (!r.ok) throw new Error('failed');
+          const d = await r.json(); checked += d.checked; cleaned += d.cleaned; saved += d.bytesSaved; failed += d.failed; offset = d.next;
+          scrubOut.textContent = `Working… ${checked} pictures looked at.`;
+        }
+        scrubOut.textContent = `Done. ${checked} pictures checked, ${cleaned} cleaned (${size(saved)} of extra data removed).${failed ? ` ${failed} could not be processed; try again.` : ''}`;
+      } catch { scrubOut.textContent = 'Something went wrong. Try again; it is safe to repeat.'; }
+      btn.disabled = false;
+    });
+    box.querySelector('[data-storage-check]')!.addEventListener('click', async () => { out.textContent = 'Checking…'; try { show(await ask('check')); } catch { out.textContent = 'Could not check storage. Try again.'; } });
   }
 </script>

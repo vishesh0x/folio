@@ -29,3 +29,19 @@ export function d1All(dir: 'e2e-a' | 'e2e-d', sql: string): any[][] {
 }
 /** EXPLAIN QUERY PLAN as one readable line per step. */
 export const plan = (dir: 'e2e-a' | 'e2e-d', sql: string): string[] => d1(dir, `EXPLAIN QUERY PLAN ${sql}`).map((r: any) => r.detail);
+
+// ── R2 (the file bucket) of the throwaway test servers
+import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+const r2 = (dir: string, args: string[]) => execFileSync('npx', ['wrangler', 'r2', 'object', ...args, '--local', '--persist-to', `.wrangler/${dir}`], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 60_000 });
+/** Put a file straight into the bucket, bypassing the site (to create a "stray" file). */
+export function r2Put(dir: 'e2e-a' | 'e2e-d', key: string, bytes: Buffer) {
+  const t = mkdtempSync(join(tmpdir(), 'r2-')); const f = join(t, 'obj'); writeFileSync(f, bytes);
+  try { r2(dir, ['put', `folio-assets/${key}`, '--file', f, '--content-type', 'application/octet-stream']); } finally { rmSync(t, { recursive: true, force: true }); }
+}
+/** Is this object in the bucket? */
+export function r2Has(dir: 'e2e-a' | 'e2e-d', key: string): boolean {
+  const t = mkdtempSync(join(tmpdir(), 'r2-')); const f = join(t, 'obj');
+  try { r2(dir, ['get', `folio-assets/${key}`, '--file', f]); return true; } catch { return false; } finally { rmSync(t, { recursive: true, force: true }); }
+}

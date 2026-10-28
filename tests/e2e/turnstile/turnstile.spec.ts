@@ -1,6 +1,7 @@
-import type { APIRequestContext } from '@playwright/test';
+import { request as pwRequest, type APIRequestContext } from '@playwright/test';
 import { test, expect } from '../fixtures';
 import { freshIp, sameOrigin, header, cspDirective } from '../helpers';
+import { SETUP_TOKEN } from '../../../playwright.config';
 
 // Audit 1.1: Cloudflare Turnstile. Runs against server B (both keys set) with a FAKE verifier on :9911 that can be told to
 // succeed, fail, hang, drop the connection or answer garbage. "Fail closed" = in every one of those cases, nothing is handed out.
@@ -138,15 +139,69 @@ test.describe('the secret never reaches the browser', () => {
   });
 });
 
-// Known findings (audit-progress.md, Step 1). Remove `.fixme` once fixed.
-test.describe('known findings', () => {
-  test.fixme('FINDING S1-M1: the TEST-ONLY TURNSTILE_VERIFY_URL variable must be ignored in a production build', async () => {
-    // Today it is honoured everywhere: if it were ever set on the real Worker, a verifier of the attacker's choosing
-    // would approve every token. Gate it behind `import.meta.env.DEV` or a build-time flag, then assert here that a
-    // production build still calls challenges.cloudflare.com (e.g. by making that host unreachable and expecting 400, not 200).
+test.describe('S1-L1 (fixed): a token must have been earned on THIS site by THIS widget', () => {
+  test('a token earned on another site is refused, even though Cloudflare says it is genuine', async ({ request, baseURL }) => {
+    expect((await reveal(request, baseURL!, tok('wronghost'))).status()).toBe(REFUSED);
+    expect(await calls(request)).toHaveLength(1);                       // Cloudflare was asked, answered "success", and the Worker still said no
   });
-  test.fixme('FINDING S1-L1: verify that Cloudflare\'s answer names OUR hostname (and the expected action outside test mode)', async ({ request, baseURL }) => {
-    // The fake verifier can answer hostname "evil.example"; the Worker should then refuse.
-    expect(true).toBe(false);
+  test('a token from a different widget is refused (the contact form\'s token cannot open "Show email")', async ({ request, baseURL }) => {
+    expect((await reveal(request, baseURL!, tok('wrongaction'))).status()).toBe(REFUSED);
+    expect((await reveal(request, baseURL!, tok('act_contact'))).status()).toBe(REFUSED);
+  });
+  test('a token from the right widget is accepted', async ({ request, baseURL }) => {
+    expect((await reveal(request, baseURL!, tok('act_reveal'))).status()).toBe(PASSED);
+  });
+  test('the contact form applies the same rule to its own widget', async ({ request, baseURL }) => {
+    const ip = freshIp();
+    const t = /name="t" value="([^"]+)"/.exec(await (await request.get('/contact', { headers: { 'cf-connecting-ip': ip } })).text())![1];
+    await new Promise((r) => setTimeout(r, 3300));
+    const send = (ts: string) => request.post('/contact', { form: { name: 'T', email: 't@example.com', message: 'A real message from the test suite.', website: '', t, 'cf-turnstile-response': ts }, headers: sameOrigin(baseURL!, ip), maxRedirects: 0 });
+    expect((await send(tok('act_reveal'))).status()).toBe(400);
+    expect((await send(tok('wronghost'))).status()).toBe(400);
+    expect((await send(tok('act_contact'))).status()).toBe(303);
+  });
+});
+
+test.describe('S1-M1 (fixed): the test-only verifier override is ignored for real hostnames', () => {
+  test('a request that claims to be for another host does not use the override, so the fake "good" token is refused', async ({ request, baseURL }) => {
+    // Same fake token that passes on localhost (see "valid token → passes"). Addressed to a real-looking host, the Worker uses Cloudflare's
+    // real endpoint instead, which does not know this token (or cannot be reached from here): either way it must be refused, not approved.
+    const host = 'www.visheshraghuvanshi.in';
+    const r = await request.post(`${baseURL}/api/reveal`, { data: { kind: 'email', token: tok('good') }, headers: { ...sameOrigin(`http://${host}`, freshIp()), host } });
+    test.skip(r.status() === 403, 'this environment rejects a spoofed Host before the Worker sees it, which is also fine; the rule itself is unit-tested in units.spec.ts');
+    expect(r.status(), 'the override must not apply').toBe(REFUSED);
+  });
+});
+
+test.describe('S1-M3: with Turnstile on, a locked account is opened again by a human check, so nobody can lock the owner out', () => {
+  const OWNER = 'owner@example.com', PASSWORD = 'correct horse battery staple 42';
+  // every attempt comes from a brand-new visitor (new network address, no cookies), as a distributed guesser would
+  const attempt = async (_request: APIRequestContext, baseURL: string, password: string, extra: Record<string, string> = {}) => {
+    const visitor = await pwRequest.newContext({ baseURL });
+    try {
+      const r = await visitor.post('/auth', { form: { mode: 'login', email: OWNER, password, ...extra }, headers: sameOrigin(baseURL, freshIp()), maxRedirects: 0 });
+      const body = await r.text();   // read before the visitor is disposed
+      return { status: () => r.status(), headers: () => r.headers(), text: async () => body };
+    } finally { await visitor.dispose(); }
+  };
+
+  test('after 20 wrong passwords: refused with a check; a bad check still refused; a good check from the right widget signs in; then normal again', async ({ request, baseURL }) => {
+    const made = await request.post('/auth', { form: { mode: 'setup', token: SETUP_TOKEN, email: OWNER, password: PASSWORD, confirm: PASSWORD }, headers: sameOrigin(baseURL!, freshIp()), maxRedirects: 0 });
+    expect([302, 403]).toContain(made.status());                      // 403 when an earlier run already created it
+    for (let i = 0; i < 20; i++) expect((await attempt(request, baseURL!, `guess ${i}`)).status()).toBe(401);
+    const asked = await attempt(request, baseURL!, PASSWORD);          // the CORRECT password, but 20 wrong ones were just tried
+    expect(asked.status()).toBe(429);
+    const page = await asked.text();
+    expect(page).toContain('class="cf-turnstile"'); expect(page).toContain('data-action="login"'); expect(page).toContain('complete the check');
+    expect(cspDirective(header(asked, 'content-security-policy'), 'script-src')).toContain('https://challenges.cloudflare.com');
+    expect((await attempt(request, baseURL!, PASSWORD, { 'cf-turnstile-response': tok('bad') })).status(), 'a failed check').toBe(429);
+    expect((await attempt(request, baseURL!, PASSWORD, { 'cf-turnstile-response': tok('act_contact') })).status(), 'a check from another widget').toBe(429);
+    const ok = await attempt(request, baseURL!, PASSWORD, { 'cf-turnstile-response': tok('act_login') });
+    expect(ok.status()).toBe(302); expect(header(ok, 'set-cookie')).toContain('session');
+    expect((await attempt(request, baseURL!, PASSWORD)).status(), 'the owner signing in resets the count: no check needed any more').toBe(302);
+  });
+  test('with the check unsolved, a WRONG password stays a plain "incorrect" 401 until the limit, never revealing whether the account exists', async ({ request, baseURL }) => {
+    const r = await request.post('/auth', { form: { mode: 'login', email: `nobody-${Date.now()}@example.com`, password: 'x'.repeat(12) }, headers: sameOrigin(baseURL!, freshIp()), maxRedirects: 0 });
+    expect(r.status()).toBe(401); expect(await r.text()).toContain('Email or password is incorrect.');
   });
 });

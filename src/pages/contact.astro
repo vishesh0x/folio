@@ -6,7 +6,7 @@ import { getSettings } from '../lib/settings';
 import { pageSeo } from '../lib/seo';
 import { validateEmail } from '../lib/auth';
 import { issueToken, checkToken } from '../lib/formtoken';
-import { allow, ipOf } from '../lib/throttle';
+import { allow, ipOf, rateKey } from '../lib/throttle';
 import { turnstileOn, turnstileSiteKey, verifyTurnstile } from '../lib/turnstile';
 
 const s = await getSettings();
@@ -38,9 +38,9 @@ if (Astro.request.method === 'POST') {
     if (v.message.length < 10) errors.message = 'Please write at least a sentence or two.';
     if ((v.message.match(/https?:\/\//gi) ?? []).length > 3) errors.message = 'That has a lot of links. Please trim it down.';
     if (Object.keys(errors).length) { Astro.response.status = 400; formError = 'Please fix the highlighted fields.'; }
-    else if (!(await allow(`contact:${ipOf(Astro.request)}`, 5, 3600))) {
+    else if (!(await allow(await rateKey('contact', Astro.request), 5, 3600))) {
       Astro.response.status = 429; formError = 'You have sent several messages recently. Please try again in an hour.';
-    } else if (turnstileOn() && !(await verifyTurnstile(String(f.get('cf-turnstile-response') ?? ''), ipOf(Astro.request)))) {
+    } else if (turnstileOn() && !(await verifyTurnstile(String(f.get('cf-turnstile-response') ?? ''), ipOf(Astro.request), { hostname: Astro.url.hostname, action: 'contact' }))) {
       Astro.response.status = 400; formError = 'The spam check did not pass. Please try again.';
     } else {
       await env.DB.prepare('INSERT INTO messages (name, email, subject, body) VALUES (?, ?, ?, ?)').bind(v.name, v.email, v.subject || null, v.message).run();

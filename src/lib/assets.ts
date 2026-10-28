@@ -3,6 +3,7 @@ import { randomToken } from './crypto';
 import { sniffBinary } from './sniff';
 import { sanitizeSvg, svgSize } from './svg';
 import { getSettings } from './settings';
+import { stripMetadata } from './strip';
 
 export type Asset = {
   id: string; r2_key: string; filename: string; mime: string; size: number;
@@ -10,6 +11,9 @@ export type Asset = {
 };
 export const MAX_IMAGE = 10 * 1024 * 1024;
 export const MAX_PDF = 15 * 1024 * 1024;
+// Largest picture accepted (Cloudflare's image resizing handles up to 12,000 px a side and about 100 megapixels). A small file can claim
+// a gigantic size in its header and make a resize run out of memory, so the claim is checked before anything is stored.
+export const MAX_SIDE = 12000, MAX_PIXELS = 100_000_000;
 export const isImage = (mime: string) => mime.startsWith('image/');
 
 export const getAsset = (id: string) =>
@@ -27,8 +31,18 @@ export async function saveUpload(file: File, alt: string, decorative: boolean): 
   let bytes = new Uint8Array(await file.arrayBuffer());
   let mime: string, ext: string, width: number | null, height: number | null;
 
-  const head = new TextDecoder().decode(bytes.slice(0, 2000)).toLowerCase();
-  if (head.includes('<svg')) {
+  // What a file IS is decided by its first bytes, in this order: real picture/PDF signatures first, SVG (text) only if none matched.
+  // (Looking for "<svg" first would misread a PNG whose metadata happens to contain that text, and let an SVG-looking prefix hide a binary.)
+  const s = sniffBinary(bytes);
+  if (s) {
+    ({ mime, ext, width, height } = s);
+    if (isImage(mime)) {
+      const known = width !== null && height !== null;
+      if ((mime === 'image/png' || mime === 'image/jpeg' || mime === 'image/gif') && !(known && width! > 0 && height! > 0)) return { ok: false, error: 'That image looks damaged (it has no readable size).' };
+      if (known && (width! > MAX_SIDE || height! > MAX_SIDE || width! * height! > MAX_PIXELS)) return { ok: false, error: `That image is too large in pixels (limit ${MAX_SIDE} px a side and 100 megapixels). Resize it first.` };
+    }
+    bytes = stripMetadata(bytes, mime); // GPS position, camera serial number, comments: the original is public, so they must not be in it
+  } else if (new TextDecoder().decode(bytes.slice(0, 2000)).toLowerCase().includes('<svg')) {
     let text: string;
     try { text = new TextDecoder('utf-8', { fatal: true }).decode(bytes); } catch { return { ok: false, error: 'That SVG is not valid UTF-8 text.' }; }
     const clean = await sanitizeSvg(text);
@@ -36,11 +50,7 @@ export async function saveUpload(file: File, alt: string, decorative: boolean): 
     bytes = new TextEncoder().encode(clean);
     ({ width, height } = svgSize(clean));
     mime = 'image/svg+xml'; ext = 'svg';
-  } else {
-    const s = sniffBinary(bytes);
-    if (!s) return { ok: false, error: 'Unsupported file. Use PNG, JPEG, WebP, AVIF, GIF, ICO, SVG or PDF.' };
-    ({ mime, ext, width, height } = s);
-  }
+  } else return { ok: false, error: 'Unsupported file. Use PNG, JPEG, WebP, AVIF, GIF, ICO, SVG or PDF.' };
   if (mime === 'application/pdf' ? bytes.length > MAX_PDF : bytes.length > MAX_IMAGE) return { ok: false, error: 'That file is too large (limit 10 MB for images, 15 MB for PDFs).' };
   if (isImage(mime) && !alt && !decorative) return { ok: false, error: 'Add alt text describing the image, or tick “decorative” if it carries no meaning.' };
 
@@ -100,7 +110,9 @@ export async function deleteAsset(id: string, origin: string) {
   const a = await getAsset(id);
   if (!a) return;
   await env.DB.prepare('DELETE FROM assets WHERE id = ?').bind(id).run();
-  await env.ASSETS_BUCKET.delete(a.r2_key);
+  // Best effort: if storage hiccups here the file is left behind unused (the Files page's storage check finds and removes it), instead of the
+  // owner seeing an error for a delete that already happened.
+  try { await env.ASSETS_BUCKET.delete(a.r2_key); } catch (e) { console.error('[storage] could not remove', a.r2_key, e); }
   const { purgeAssetCache } = await import('./media');
   await purgeAssetCache(a, origin);
 }

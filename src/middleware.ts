@@ -102,7 +102,7 @@ async function handle(ctx: Parameters<Parameters<typeof defineMiddleware>[0]>[0]
   if (import.meta.env.PROD) {
     h.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
     // The dev server injects its own inline scripts, so the strict policy is production-only.
-    const ts = turnstileOn() && TURNSTILE_PAGE.test(path) ? ' https://challenges.cloudflare.com' : ''; // optional spam check widget
+    const ts = turnstileOn() && (TURNSTILE_PAGE.test(path) || ctx.locals.challenge) ? ' https://challenges.cloudflare.com' : ''; // optional spam check widget
     // Cloudflare Web Analytics: when it is switched on in the Cloudflare dashboard, Cloudflare adds its beacon script to every HTML page
     // and the beacon reports to cloudflareinsights.com. Allowed on public pages only (never sign-in or the dashboard). To stop using it,
     // turn it off in Cloudflare (Analytics & Logs > Web Analytics) and set this to false.

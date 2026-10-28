@@ -19,7 +19,7 @@ test.describe('login brute-force throttle', () => {
   test('a successful login resets the failure counter', async ({ playwright, baseURL }) => {
     const ip = freshIp();
     const fresh = async () => withRetry(await playwright.request.newContext({ baseURL })); // a signed-in context is redirected away from /auth, so use a new one each time
-    const fail = async () => { const c = await fresh(); const r = await login(c, baseURL!, ADMIN_EMAIL, 'nope nope nope nope', ip); await c.dispose(); return r.status(); };
+    const fail = async () => { const c = await fresh(); const r = await login(c, baseURL!, `ghost-reset@example.com`, 'nope nope nope nope', ip); await c.dispose(); return r.status(); };
     for (let i = 0; i < 4; i++) expect(await fail()).toBe(401);
     const ok = await fresh(); expect((await login(ok, baseURL!, ADMIN_EMAIL, ADMIN_PASSWORD, ip)).status()).toBe(302); await ok.dispose();
     for (let i = 0; i < 4; i++) expect(await fail()).toBe(401); // would be 429 if the earlier 4 failures still counted
@@ -39,14 +39,28 @@ test.describe('login brute-force throttle', () => {
     expect(res.status()).toBe(403);
   });
 
-  // Known findings (audit-progress.md, Step 1). Remove `.fixme` once fixed.
-  test.fixme('FINDING S1-M2: addresses in the same IPv6 /64 share one login throttle bucket', async ({ request, baseURL }) => {
-    for (let i = 0; i < 5; i++) await login(request, baseURL!, ADMIN_EMAIL, 'nope nope nope', `2001:db8:9:9::${i + 1}`);
-    expect((await login(request, baseURL!, ADMIN_EMAIL, 'nope nope nope', '2001:db8:9:9::ffff')).status()).toBe(429);
+  test('S1-M2 (fixed): addresses in the same IPv6 /64 share one login bucket; another /64 is unaffected', async ({ request, baseURL }) => {
+    for (let i = 1; i <= 5; i++) expect((await login(request, baseURL!, 'ghost-v6@example.com', 'nope nope nope', `2001:db8:9:9::${i}`)).status()).toBe(401);
+    const sameNetwork = await login(request, baseURL!, 'ghost-v6@example.com', 'nope nope nope', '2001:db8:9:9:abcd:ef01:2345:6789');
+    expect(sameNetwork.status(), 'a new address in the same /64 must not get a fresh allowance').toBe(429);
+    expect((await login(request, baseURL!, 'ghost-v6@example.com', 'nope nope nope', '2001:db8:9:a::1')).status(), 'a different /64 is a different visitor').toBe(401);
   });
-  test.fixme('FINDING S1-M3: failures should also be counted per account, so a botnet cannot try one password per IP forever', async ({ request, baseURL }) => {
-    for (let i = 0; i < 12; i++) await login(request, baseURL!, 'victim@example.com', `guess ${i}`, freshIp());
-    expect((await login(request, baseURL!, 'victim@example.com', 'guess 13', freshIp())).status()).toBe(429);
+  test('S1-M2 (fixed): ::ffff:1.2.3.4 is the same visitor as 1.2.3.4', async ({ request, baseURL }) => {
+    const v4 = `10.${Math.floor(Math.random() * 250) + 1}.${Math.floor(Math.random() * 250) + 1}.77`;
+    for (let i = 0; i < 5; i++) await login(request, baseURL!, 'ghost-map@example.com', 'nope nope nope', v4);
+    expect((await login(request, baseURL!, 'ghost-map@example.com', 'nope nope nope', `::ffff:${v4}`)).status()).toBe(429);
+  });
+  test('S1-M3 (fixed): 20 wrong passwords for one account, from 20 different visitors, stop further guessing for everyone', async ({ request, baseURL }) => {
+    const email = `victim-${Date.now()}@example.com`;                       // an account that does not exist: the limit must apply all the same (no way to tell)
+    for (let i = 0; i < 20; i++) expect((await login(request, baseURL!, email, `guess ${i}`, freshIp())).status(), `attempt ${i + 1}`).toBe(401);
+    const blocked = await login(request, baseURL!, email, 'guess 21', freshIp());
+    expect(blocked.status()).toBe(429); expect(await blocked.text()).toContain('wrong passwords for this account');
+    expect((await login(request, baseURL!, `other-${Date.now()}@example.com`, 'guess', freshIp())).status(), 'other accounts are not affected').toBe(401);
+  });
+  test('S1-M3: the account limit and the per-visitor limit are independent (one visitor is still stopped at 5)', async ({ request, baseURL }) => {
+    const ip = freshIp();
+    for (let i = 0; i < 5; i++) await login(request, baseURL!, `solo-${i}@example.com`, 'nope nope nope', ip);
+    expect((await login(request, baseURL!, 'solo-x@example.com', 'nope nope nope', ip)).status()).toBe(429);
   });
 });
 

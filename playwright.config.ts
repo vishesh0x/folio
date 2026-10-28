@@ -12,6 +12,7 @@ import { defineConfig, devices } from '@playwright/test';
  */
 export const PORT_A = 8787, PORT_B = 8788, PORT_D = 8789, VERIFIER = 9911;
 export const SETUP_TOKEN = 'e2e-setup-token-0123456789abcdef';
+export const RATE_SALT = 'e2e-rate-limit-salt-fedcba9876543210'; // rate-limit counters are stored under a keyed hash made with this
 
 const worker = (port: number, inspector: number, dir: string, vars: Record<string, string>, seed = false) => ({
   command: [
@@ -44,10 +45,10 @@ export default defineConfig({
   },
   webServer: [
     { command: 'node tests/e2e/fake-turnstile.mjs', url: `http://127.0.0.1:${VERIFIER}/health`, reuseExistingServer: !process.env.CI },
-    worker(PORT_A, 9330, 'e2e-a', { ADMIN_SETUP_TOKEN: SETUP_TOKEN }, true), // seeded with demo content (tests/seed/demo.sql) so layouts are tested with real-looking data
+    worker(PORT_A, 9330, 'e2e-a', { ADMIN_SETUP_TOKEN: SETUP_TOKEN, RATE_LIMIT_SALT: RATE_SALT }, true), // seeded with demo content (tests/seed/demo.sql) so layouts are tested with real-looking data
     worker(PORT_D, 9332, 'e2e-d', { ADMIN_SETUP_TOKEN: SETUP_TOKEN, PAGE_CACHE_TTL: '2' }, true),
     worker(PORT_B, 9331, 'e2e-b', {
-      ADMIN_SETUP_TOKEN: SETUP_TOKEN,
+      ADMIN_SETUP_TOKEN: SETUP_TOKEN, RATE_LIMIT_SALT: RATE_SALT,
       TURNSTILE_SITE_KEY: '1x00000000000000000000AA',
       TURNSTILE_SECRET_KEY: 'test-secret',
       TURNSTILE_VERIFY_URL: `http://127.0.0.1:${VERIFIER}/verify`,
@@ -67,6 +68,11 @@ export default defineConfig({
     {
       // data: SQL safety, schema/indexes/migrations/integrity, concurrency, retention
       name: 'data', testMatch: /data\/.*\.spec\.ts/, dependencies: ['setup'],
+      use: { ...devices['Desktop Chrome'], baseURL: `http://localhost:${PORT_A}` },
+    },
+    {
+      // storage (R2): what may be uploaded, what is kept inside a file, what is served, and stray-file clean-up
+      name: 'storage', testMatch: /storage\/.*\.spec\.ts/, dependencies: ['setup'],
       use: { ...devices['Desktop Chrome'], baseURL: `http://localhost:${PORT_A}` },
     },
     {
