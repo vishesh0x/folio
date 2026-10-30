@@ -2,12 +2,12 @@
 import Base from '../../layouts/Base.astro';
 import Reveal from '../../components/Reveal.astro';
 import ResumeSection from '../../components/ResumeSection.astro';
-import { getSettings } from '../../lib/settings';
+import { getPublicSettings } from '../../lib/settings';
 import { getResumeOpts, loadResume, httpUrl, type Entry } from '../../lib/resume';
 import { loadAsset } from '../../lib/media';
 import { pageSeo } from '../../lib/seo';
 
-const [s, o, sections, seo] = await Promise.all([getSettings(), getResumeOpts(), loadResume(), pageSeo('resume')]);
+const [s, o, sections, seo] = await Promise.all([getPublicSettings(), getResumeOpts(), loadResume(), pageSeo('resume')]);
 const pdf = o.show_download && s.resume_asset ? await loadAsset(s.resume_asset) : null;
 const hasPdf = !!pdf && pdf.mime === 'application/pdf';
 const headline = o.headline || s.tagline;

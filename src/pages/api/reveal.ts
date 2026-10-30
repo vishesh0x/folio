@@ -1,5 +1,5 @@
 import type { APIRoute } from 'astro';
-import { getSettings } from '../../lib/settings';
+import { getPublicSettings } from '../../lib/settings';
 import { allow, ipOf, rateKey } from '../../lib/throttle';
 import { isSameOrigin } from '../../lib/csrf';
 import { turnstileOn, verifyTurnstile } from '../../lib/turnstile';
@@ -17,7 +17,7 @@ export const POST: APIRoute = async ({ request, url }) => {
   if (kind !== 'email' && kind !== 'phone') return json({ error: 'Not available' }, 404);
   // With Turnstile on, nothing is handed out without a token Cloudflare confirms (the rate limit above still applies).
   if (turnstileOn() && !(await verifyTurnstile(token, ipOf(request), { hostname: new URL(request.url).hostname, action: 'reveal' }))) return json({ error: 'The spam check did not pass. Please try again.' }, 400);
-  const s = await getSettings();
+  const s = await getPublicSettings();
   // The phone number is only available if the resume is set to show it AND to use click-to-reveal.
   const o = await getResumeOpts();
   const value = kind === 'email' ? s.email : kind === 'phone' && o.show_phone && o.contact_mode === 'reveal' ? s.phone : '';

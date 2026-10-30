@@ -1,9 +1,9 @@
 import type { APIRoute } from 'astro';
-import { getSettings } from '../lib/settings';
+import { getPublicSettings } from '../lib/settings';
 import { versionedCache } from '../lib/content-version';
 
 export const GET: APIRoute = ({ url }) => versionedCache(url.origin, 'robots.txt', 3600, async () => {
-  const s = await getSettings();
+  const s = await getPublicSettings();
   const origin = (s.site_url || url.origin).replace(/\/$/, '');
   const body = [
     'User-agent: *',

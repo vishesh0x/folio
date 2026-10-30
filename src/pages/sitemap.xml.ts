@@ -1,6 +1,6 @@
 import type { APIRoute } from 'astro';
 import { env } from 'cloudflare:workers';
-import { getSettings } from '../lib/settings';
+import { getPublicSettings } from '../lib/settings';
 import { versionedCache } from '../lib/content-version';
 
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -9,7 +9,7 @@ const day = (t: number) => new Date(t * 1000).toISOString().slice(0, 10);
 // Lists the pages worth indexing. Anything you marked "hide from search engines" in Dashboard → SEO is left out,
 // and so are draft projects.
 export const GET: APIRoute = ({ url }) => versionedCache(url.origin, 'sitemap.xml', 3600, async () => {
-  const s = await getSettings();
+  const s = await getPublicSettings();
   const origin = (s.site_url || url.origin).replace(/\/$/, '');
   const hidden = new Set((await env.DB.prepare('SELECT page FROM seo_pages WHERE noindex = 1').all<{ page: string }>()).results.map((r) => r.page));
   const projects = (await env.DB.prepare("SELECT slug, updated_at FROM projects WHERE status = 'published' ORDER BY sort_order, created_at DESC").all<{ slug: string; updated_at: number }>()).results;

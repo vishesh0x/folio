@@ -1,10 +1,10 @@
 import type { APIRoute } from 'astro';
-import { getSettings } from '../lib/settings';
+import { getPublicSettings } from '../lib/settings';
 import { loadAsset } from '../lib/media';
 import { versionedCache } from '../lib/content-version';
 
 export const GET: APIRoute = ({ url }) => versionedCache(url.origin, 'manifest', 3600, async () => {
-  const s = await getSettings();
+  const s = await getPublicSettings();
   const a = await loadAsset(s.favicon_asset ?? undefined);
   const raster = a && a.mime !== 'image/svg+xml' && a.mime !== 'image/x-icon';
   const v = a?.id ?? 'default';

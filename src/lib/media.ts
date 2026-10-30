@@ -104,6 +104,12 @@ export async function cachedMedia(request: Request, id: string, v: Variant, make
   const gone = await cache.match(new Request(missingKey(origin, id)));
   if (gone) return new Response('Not found', { status: 404, headers: { 'Cache-Control': 'no-store', 'X-Cache': 'HIT' } });
   const res = await make();
+  if (res.status === 200 && res.headers.get('X-Degraded')) {
+    // A stand-in (the full-size original, served because the resized copy could not be made right now): short-lived everywhere, never `immutable`, so the
+    // real resized picture replaces it as soon as the problem passes.
+    const h = new Headers(res.headers); h.delete('X-Degraded'); h.set('Cache-Control', 'public, max-age=60');
+    return new Response(res.body, { status: 200, headers: h });
+  }
   if (res.status === 200) {
     const out = new Response(res.body, { status: 200, headers: new Headers(res.headers) });
     out.headers.set('ETag', etag);
@@ -116,19 +122,43 @@ export async function cachedMedia(request: Request, id: string, v: Variant, make
   return res;
 }
 
+/** The variants this site's own pages can ask for: AVIF, WebP and the picture's own format at every width, plus the JPEG used for share images. */
+export function knownVariants(a: Pick<Asset, 'mime'>): { w: number; f: Fmt }[] {
+  if (!canResize(a)) return [];
+  const fb = fallbackFormat(a.mime), out: { w: number; f: Fmt }[] = [];
+  for (const w of WIDTHS) for (const f of new Set<Fmt>(['avif', 'webp', fb])) out.push({ w, f });
+  if (fb !== 'jpeg') for (const w of OG_WIDTHS) out.push({ w, f: 'jpeg' });
+  return out;
+}
+
+/** Where a resized picture is kept in R2 after it is first made (see variantResponse). */
+export const variantKey = (id: string, v: { w: number; f: Fmt }) => `variants/${id}/${v.w}-${v.f}`;
+
+/**
+ * A resized picture, made ONCE and kept in R2.
+ * Why: every call to the Images binding is billed as a transformation (the free plan has 5,000 a month), and the page cache is per DATA CENTER with a
+ * 7-day life, so without this each data center would transform the same picture again every week. With it, a data center that has no cached copy
+ * reads the stored one from R2 (an ordinary read) and only a size nobody has asked for before is transformed, once.
+ */
+export async function variantResponse(a: Asset, v: { w: number; f: Fmt }): Promise<Response | null> {
+  const key = variantKey(a.id, v);
+  const kept = await env.ASSETS_BUCKET.get(key);
+  if (kept) return new Response(kept.body, { headers: safeHeaders(a, FORMATS[v.f]) });
+  const res = await resizedResponse(a, { width: v.w, fit: 'scale-down', fmt: v.f });
+  if (!res) return null;
+  const bytes = await res.arrayBuffer();
+  try { await env.ASSETS_BUCKET.put(key, bytes, { httpMetadata: { contentType: FORMATS[v.f] } }); } catch (e) { console.error('[storage] could not keep resized copy', key, e); }   // still served; just made again next time
+  return new Response(bytes, { headers: res.headers });
+}
+
 /** Remove every cached variant of an asset in this data center (other locations expire within 7 days). */
 export async function purgeAssetCache(a: Pick<Asset, 'id' | 'mime'>, origin: string) {
   const urls = [mediaKey(origin, a.id, null), missingKey(origin, a.id)];
   // Resized copies exist only for pictures that can be resized. A PDF or SVG has just the original (2 cache calls instead of 38; a request on the
   // free Workers plan may make only 50 calls in all).
-  if (canResize(a)) {
-    // Exactly the variants this site's own pages ask for: AVIF, WebP and the picture's own format at every width, plus the JPEG used for share
-    // images at the widths those use. (A variant only someone typing a URL by hand could have asked for is not forgotten here; it expires
-    // within the week. This keeps a delete to about 36 cache calls, inside the 50 a request may make.)
-    const fb = fallbackFormat(a.mime);
-    for (const w of WIDTHS) for (const f of new Set<Fmt>(['avif', 'webp', fb])) urls.push(mediaKey(origin, a.id, { w, f }));
-    if (fb !== 'jpeg') for (const w of OG_WIDTHS) urls.push(mediaKey(origin, a.id, { w, f: 'jpeg' }));
-  }
+  // Exactly the variants this site's own pages ask for (knownVariants). A variant only someone typing a URL by hand could have asked for is not
+  // forgotten here; it expires within the week. This keeps a delete to about 36 cache calls, inside the 50 a request may make.
+  for (const v of knownVariants(a)) urls.push(mediaKey(origin, a.id, v));
   await Promise.all(urls.map((u) => caches.default.delete(new Request(u))));
 }
 

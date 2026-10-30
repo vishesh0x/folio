@@ -2,14 +2,14 @@
 import { env } from 'cloudflare:workers';
 import Base from '../layouts/Base.astro';
 import Reveal from '../components/Reveal.astro';
-import { getSettings } from '../lib/settings';
+import { getPublicSettings } from '../lib/settings';
 import { pageSeo } from '../lib/seo';
 import { validateEmail } from '../lib/auth';
 import { issueToken, checkToken } from '../lib/formtoken';
 import { allow, ipOf, rateKey } from '../lib/throttle';
 import { turnstileOn, turnstileSiteKey, verifyTurnstile } from '../lib/turnstile';
 
-const s = await getSettings();
+const s = await getPublicSettings();
 const seo = await pageSeo('contact');
 const sent = Astro.url.searchParams.get('sent') === '1';
 const turnstileKey = turnstileSiteKey();

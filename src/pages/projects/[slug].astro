@@ -4,13 +4,13 @@ import Img from '../../components/Img.astro';
 import { getPublished, neighbours } from '../../lib/projects';
 import { renderMarkdown, excerpt } from '../../lib/markdown';
 import { loadAsset } from '../../lib/media';
-import { getSettings } from '../../lib/settings';
+import { getPublicSettings } from '../../lib/settings';
 import codeFont from '@fontsource-variable/jetbrains-mono/files/jetbrains-mono-latin-wght-normal.woff2?url';
 
 const p = await getPublished(Astro.params.slug ?? '');
 if (!p) return Astro.rewrite('/404');
 
-const [{ html, toc }, { prev, next }, s] = await Promise.all([renderMarkdown(p.body_md), neighbours(p), getSettings()]);
+const [{ html, toc }, { prev, next }, s] = await Promise.all([renderMarkdown(p.body_md), neighbours(p), getPublicSettings()]);
 const seoImg = await loadAsset(p.seo_image ?? undefined);
 const ogImage = seoImg && seoImg.mime !== 'image/svg+xml' ? `/media/${seoImg.id}/${encodeURIComponent(seoImg.filename)}?w=1280&f=jpeg`
   : p.cover && p.cover.mime !== 'image/svg+xml' ? `/media/${p.cover.id}/${encodeURIComponent(p.cover.filename)}?w=1280&f=jpeg` : undefined;

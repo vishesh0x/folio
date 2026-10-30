@@ -1,6 +1,6 @@
 ---
 import Base from '../../layouts/Base.astro';
-import { getSettings } from '../../lib/settings';
+import { getPublicSettings } from '../../lib/settings';
 import {
   MIN_PASSWORD, validateEmail, validatePassword, isLimited, recordFailure, clearFailures,
   createSession, getUser, login, hasAnyUser, setupEnabled, checkSetupToken, createFirstAdmin, clientKey, accountKey, ACCOUNT_MAX_FAILS, ACCOUNT_WINDOW_SECS,
@@ -68,7 +68,7 @@ if (Astro.request.method === 'POST') {
     }
   }
 }
-const site = await getSettings();
+const site = await getPublicSettings();
 const sitekey = challenge ? turnstileSiteKey() : undefined;
 if (sitekey) Astro.locals.challenge = true; // lets the Content-Security-Policy allow Cloudflare's check on this response
 ---

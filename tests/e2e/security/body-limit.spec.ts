@@ -10,9 +10,14 @@ const MB = 1024 * 1024;
 // A server that refuses a big body WITHOUT reading it may close the connection while the client is still sending; the client then reports a reset
 // instead of the 413 it was sent (the call log shows the 413 arriving first). That race is in the test client, not the site, so try again.
 type Ctx = { post: (url: string, o?: any) => Promise<any> };
+// Returns the response with its body already read INSIDE the retry, so a body lost to the early close counts as a retry too.
 async function big(ctx: Ctx, url: string, o: any) {
-  for (let i = 0; i < 4; i++) { try { return await ctx.post(url, o); } catch (e) { if (!/ECONNRESET|EPIPE|socket hang up/i.test(String(e))) throw e; } }
-  throw new Error('the connection was reset on 4 attempts in a row');
+  let last: unknown;
+  for (let i = 0; i < 5; i++) {
+    try { const r = await ctx.post(url, o); const text = await r.text(); return { status: () => r.status() as number, headers: () => r.headers() as Record<string, string>, text: async () => text, json: async () => JSON.parse(text) }; }
+    catch (e) { last = e; if (!/ECONNRESET|EPIPE|socket hang up|closed|disposed|JSON/i.test(String(e))) throw e; }
+  }
+  throw new Error(`the connection was reset on 5 attempts in a row: ${last}`);
 }
 
 test.describe('the size rule itself', () => {
@@ -34,10 +39,14 @@ test.describe('visitors', () => {
   for (const path of ['/contact', '/auth']) {
     test(`a ${path} POST just over the 4 MiB limit is refused with 413 and a plain message, without being read`, async ({ playwright, baseURL }) => {
       const v = withRetry(await playwright.request.newContext({ baseURL, storageState: { cookies: [], origins: [] } }));
-      const r = await big(v, path, { data: 'x='.padEnd(MAX_FORM_REQUEST + 1024, 'a'), headers: { ...sameOrigin(baseURL!), 'content-type': 'application/x-www-form-urlencoded' }, maxRedirects: 0 });
-      expect(r.status()).toBe(413);
-      expect(r.headers()['cache-control']).toContain('no-store');
-      expect(await r.text()).toBe('That request is too large.');
+      // A complete answer is needed: the server closes without reading the rest of the body, so now and then the client sees the 413 but loses its text.
+      let status = 0, cache = '', text = '';
+      for (let i = 0; i < 5 && !(status === 413 && text); i++) {
+        try { const r = await big(v, path, { data: 'x='.padEnd(MAX_FORM_REQUEST + 1024, 'a'), headers: { ...sameOrigin(baseURL!), 'content-type': 'application/x-www-form-urlencoded' }, maxRedirects: 0 }); status = r.status(); cache = r.headers()['cache-control'] ?? ''; text = await r.text(); } catch { text = ''; }
+      }
+      expect(status).toBe(413);
+      expect(cache).toContain('no-store');
+      expect(text).toBe('That request is too large.');
       await v.dispose();
     });
   }
@@ -55,7 +64,10 @@ test.describe('visitors', () => {
   });
   test('an oversized upload from someone who is not signed in is told 401, not 413', async ({ playwright, baseURL }) => {
     const v = withRetry(await playwright.request.newContext({ baseURL, storageState: { cookies: [], origins: [] } }));
-    const r = await big(v, '/api/admin/assets/upload', { multipart: { file: { name: 'a.pdf', mimeType: 'application/pdf', buffer: pdf(20 * MB) } }, headers: sameOrigin(baseURL!), maxRedirects: 0 });
+    // The answer (401) is sent without reading the 20 MB body, and the local test proxy sometimes turns that early answer into a 500 of its own
+    // ("Error inside ProxyWorker"); a real 401 comes back on a retry. Only for this early-answer case.
+    let r = await big(v, '/api/admin/assets/upload', { multipart: { file: { name: 'a.pdf', mimeType: 'application/pdf', buffer: pdf(20 * MB) } }, headers: sameOrigin(baseURL!), maxRedirects: 0 });
+    for (let i = 0; i < 3 && r.status() === 500; i++) r = await big(v, '/api/admin/assets/upload', { multipart: { file: { name: 'a.pdf', mimeType: 'application/pdf', buffer: pdf(20 * MB) } }, headers: sameOrigin(baseURL!), maxRedirects: 0 });
     expect(r.status()).toBe(401);
     await v.dispose();
   });

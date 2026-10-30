@@ -1,7 +1,7 @@
 ---
 import { env } from 'cloudflare:workers';
 import Base from '../layouts/Base.astro';
-import { getSettings } from '../lib/settings';
+import { getPublicSettings } from '../lib/settings';
 import { pageSeo } from '../lib/seo';
 
 type Row = { id: number; title: string; note: string; link: string | null; status: 'current' | 'done'; started_at: number | null; finished_at: number | null; progress: number | null; updated_at: number; cname: string; icon: string | null };
@@ -16,7 +16,7 @@ for (const r of rows) {
   cats.get(r.cid)![r.status === 'done' ? 'done' : 'current'].push(r);
 }
 const groups = [...cats.values()];
-const s = await getSettings();
+const s = await getPublicSettings();
 const seo = await pageSeo('now');
 
 const fmt = new Intl.DateTimeFormat('en', { month: 'short', year: 'numeric' });

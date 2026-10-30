@@ -163,5 +163,11 @@ export async function deleteAsset(id: string, origin: string, known?: Asset | nu
   try { await env.ASSETS_BUCKET.delete(a.r2_key); } catch (e) { console.error('[storage] could not remove', a.r2_key, e); }
   // Forgetting the cached copies is best effort too: the row and the file are already gone, so a failure here (for instance a request that has used
   // up its allowance of calls) must not turn a finished delete into an error page. Copies in other locations expire on their own within 7 days.
-  try { const { purgeAssetCache } = await import('./media'); await purgeAssetCache(a, origin); } catch (e) { console.error('[cache] could not forget cached copies of', id, e); }
+  try {
+    const { purgeAssetCache, knownVariants, variantKey } = await import('./media');
+    // The resized copies kept in R2 go too (one call for all of them). Any a stranger made by typing an address stay unreachable (the file's row is gone) and are tiny.
+    const keys = knownVariants(a).map((v) => variantKey(a.id, v));
+    if (keys.length) await env.ASSETS_BUCKET.delete(keys);
+    await purgeAssetCache(a, origin);
+  } catch (e) { console.error('[cache] could not forget cached copies of', id, e); }
 }

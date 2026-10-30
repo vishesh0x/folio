@@ -3,13 +3,13 @@ import { env } from 'cloudflare:workers';
 import Base from '../layouts/Base.astro';
 import Img from '../components/Img.astro';
 import ProjectCard from '../components/ProjectCard.astro';
-import { getSettings } from '../lib/settings';
+import { getPublicSettings } from '../lib/settings';
 import { listPublished } from '../lib/projects';
 import { loadAsset } from '../lib/media';
 import { pageSeo } from '../lib/seo';
 import { emphasis } from '../lib/text';
 
-const s = await getSettings();
+const s = await getPublicSettings();
 const seo = await pageSeo('home');
 const portrait = await loadAsset(s.portrait_asset ?? undefined);
 let work = await listPublished({ featured: true, limit: 3 });

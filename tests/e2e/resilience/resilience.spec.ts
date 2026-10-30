@@ -147,10 +147,14 @@ test.describe('a failure of just ONE query must not produce a wrong page that ge
     expect(after.status()).toBe(200); expect(header(after, 'x-cache')).toBe('MISS');
     expect(await after.text()).toMatch(/<meta name="robots" content="noindex/);
   });
-  test('with the main settings unreadable, a normal page fails (503); it is not built with "Your Name" and cached', async () => {
-    // a page nobody has requested yet (a cached older copy would, correctly, be shown instead: see "stale" above)
+  test('with the main settings unreadable, a page is never built from placeholders ("Your Name") and cached: it is refused, or built from the last REAL settings', async () => {
+    // Since Step 7 a server remembers the last real settings (per content version), so a page nobody has requested yet may be built from them
+    // while the settings table is unreadable. That is correct content, so it is allowed; what must never happen is a page made of defaults.
     breakDb('e2e-d', ['settings']);
-    try { expect((await get('/projects/edge-notes')).status()).toBe(503); } finally { restoreDb('e2e-d', ['settings']); }
-    const r = await get('/projects/edge-notes'); expect(r.status()).toBe(200); expect(header(r, 'x-cache')).toBe('MISS'); expect(await r.text()).toContain('Vishesh Raghuvanshi');
+    let during: any;
+    try { during = await get('/projects/edge-notes'); expect([200, 503]).toContain(during.status()); if (during.status() === 200) { const body = await during.text(); expect(body).toContain('Vishesh Raghuvanshi'); expect(body).not.toContain('Your Name'); } }
+    finally { restoreDb('e2e-d', ['settings']); }
+    const r = await get('/projects/edge-notes'); expect(r.status()).toBe(200); expect(['MISS', 'HIT']).toContain(header(r, 'x-cache'));
+    const body = await r.text(); expect(body).toContain('Vishesh Raghuvanshi'); expect(body).not.toContain('Your Name');
   });
 });

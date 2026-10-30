@@ -1,12 +1,12 @@
 import type { APIRoute } from 'astro';
 import { env } from 'cloudflare:workers';
-import { getSettings } from '../../lib/settings';
+import { getPublicSettings } from '../../lib/settings';
 import { getAsset } from '../../lib/assets';
 import { getResumeOpts } from '../../lib/resume';
 
 // The PDF is served from here, so the page never links to its file address, and search engines are told not to index it.
 export const GET: APIRoute = async () => {
-  const [s, o] = await Promise.all([getSettings(), getResumeOpts()]);
+  const [s, o] = await Promise.all([getPublicSettings(), getResumeOpts()]);
   const a = s.resume_asset ? await getAsset(s.resume_asset) : null;
   const obj = a && a.mime === 'application/pdf' ? await env.ASSETS_BUCKET.get(a.r2_key) : null;
   if (!a || !obj) return new Response('Not found', { status: 404, headers: { 'Cache-Control': 'no-store' } });

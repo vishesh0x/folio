@@ -1,4 +1,5 @@
 import { env } from 'cloudflare:workers';
+import { contentVersion } from './content-version';
 
 export type Social = { label: string; url: string };
 export type Highlight = { value: string; label: string };
@@ -23,6 +24,18 @@ export async function getSettings(): Promise<SiteSettings> {
   const row = await env.DB.prepare("SELECT value FROM settings WHERE key = 'site'").first<{ value: string }>();
   let saved = {}; try { if (row) saved = JSON.parse(row.value); } catch {}
   return { ...SETTINGS_DEFAULTS, ...saved };
+}
+// For PUBLIC rendering only (the owner's dashboard and the "is this file in use?" check keep reading fresh, so they never see old data).
+// Remembered per content version: the version changes on every dashboard save (and is itself looked up at most every 5 seconds per server instance),
+// so a save shows on the public site as fast as it did, and a page build no longer re-reads the same row (the layout and the page both asked for it).
+// Always real data: if the database is unreachable, contentVersion() keeps the last version and this keeps the last REAL settings; nothing is invented.
+let memo: { v: string; s: SiteSettings } | null = null;
+export async function getPublicSettings(): Promise<SiteSettings> {
+  const v = await contentVersion();
+  if (memo && memo.v === v) return { ...memo.s };
+  const s = await getSettings();
+  memo = { v, s };
+  return { ...s };
 }
 export async function saveSettings(s: SiteSettings) {
   await env.DB.prepare("INSERT INTO settings (key, value) VALUES ('site', ?1) ON CONFLICT(key) DO UPDATE SET value = ?1").bind(JSON.stringify(s)).run();

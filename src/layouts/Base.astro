@@ -2,7 +2,7 @@
 import '../styles/global.css';
 import ThemeSwitch from '../components/ThemeSwitch.astro';
 import { NAV } from '../lib/site';
-import { getSettings, SETTINGS_DEFAULTS } from '../lib/settings';
+import { getPublicSettings, SETTINGS_DEFAULTS } from '../lib/settings';
 import { loadAsset } from '../lib/media';
 import { THEME_INIT, THEME_TOGGLE } from '../lib/inline-scripts';
 import paperMono from '../assets/fonts/PaperMono-VF.woff2?url';
@@ -14,7 +14,7 @@ const { title, description, noindex = false, bare = false, ogImage, ogAlt, ogTyp
 // Error pages are the exception: they must render even when the database is the problem, so they fall back to defaults and mark the
 // response as degraded, which the middleware never caches.
 let s = SETTINGS_DEFAULTS;
-if (errorPage) { try { s = await getSettings(); } catch { Astro.locals.degraded = true; } } else s = await getSettings();
+if (errorPage) { try { s = await getPublicSettings(); } catch { Astro.locals.degraded = true; } } else s = await getPublicSettings();
 let fav = null, og = null;
 try { // a database problem must never stop an error page from rendering
   fav = await loadAsset(s.favicon_asset ?? undefined);
