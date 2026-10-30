@@ -62,7 +62,7 @@ async function drawOne(fig: HTMLElement) {
   if (source.length > MAX_SOURCE) return problem('it is too large');
   try {
     const mm = await load();
-    mm.initialize({ startOnLoad: false, securityLevel: 'strict', theme: 'base', themeVariables: themeVariables(), fontFamily: getComputedStyle(document.body).fontFamily });
+    mm.initialize({ startOnLoad: false, securityLevel: 'strict', layout: 'dagre', theme: 'base', themeVariables: themeVariables(), fontFamily: getComputedStyle(document.body).fontFamily });
     await mm.parse(source);                         // throws on a mistake, without leaving debris on the page
     const id = `diagram-${++seq}`;
     const { svg } = await mm.render(id, source);
@@ -85,6 +85,10 @@ async function drawOne(fig: HTMLElement) {
       el.removeAttribute('height');
       el.style.cssText = `width:${w}px;max-width:100%;min-width:${Math.round(Math.max(240, Math.min(w, w * 0.5)))}px;height:auto`;
     }
+    // A box that scrolls sideways must be reachable by keyboard (WCAG 2.1.1): it joins the Tab order only while its drawing is wider than the box,
+    // and a visible ring shows where it is. Arrow keys then scroll it.
+    const fit = () => { if (view!.scrollWidth > view!.clientWidth + 1) view!.tabIndex = 0; else view!.removeAttribute('tabindex'); };
+    fit(); new ResizeObserver(fit).observe(view);
     fig.querySelector('.diagram-error')?.remove();
     fig.dataset.state = 'ready';
   } catch (e) {

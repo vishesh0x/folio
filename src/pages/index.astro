@@ -23,8 +23,10 @@ const headlineHtml = emphasis(s.headline || `Hi, I’m *${s.name}*.`);
 const eyebrow = [s.tagline, s.location].filter(Boolean).join(' · ');
 const sameAs = s.socials.map((l) => l.url).filter((u) => /^https?:/.test(u));
 const ld = { '@context': 'https://schema.org', '@type': 'Person', name: s.name, jobTitle: s.tagline || undefined, url: s.site_url || Astro.url.origin, sameAs: sameAs.length ? sameAs : undefined };
+const site = { '@context': 'https://schema.org', '@type': 'WebSite', name: s.name, url: s.site_url || Astro.url.origin };
 ---
 <Base title={seo.title} description={seo.description} noindex={seo.noindex} ogImage={seo.ogImage}>
+  <script slot="head" type="application/ld+json" set:html={JSON.stringify(site).replace(/</g, '\\u003c')} />
   <script slot="head" type="application/ld+json" set:html={JSON.stringify(ld).replace(/</g, '\\u003c')} />
 
   <section class="hero wrap">

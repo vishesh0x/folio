@@ -5,22 +5,38 @@ import { AUTH_FILE, header, sameOrigin } from '../helpers';
 // The important property: ONE cache entry per (image, width, format). Anything else a visitor can put in the URL must not cause new work.
 const anon = { cookies: [], origins: [] };
 const ID = 'demoCover0001';
-const RUNGS = [160, 320, 480, 640, 800, 1024, 1280, 1600, 2000];
+const RUNGS = [160, 320, 480, 640, 720, 800, 900, 1024, 1280, 1600, 2000];   // = WIDTHS in src/lib/media.ts
 // A real 1x1 PNG, used to upload a throwaway image for the delete test
 const PNG_1PX = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
 
 test.describe('media: one cache entry per image variant', () => {
   test.use({ storageState: anon });
 
-  test('headers: a week, immutable, validator, nosniff; MISS then HIT', async ({ request }) => {
+  test('headers: a year in the browser, immutable, validator, nosniff; MISS then HIT both say so', async ({ request }) => {
     const url = `/media/${ID}/a.png?w=640&f=avif`;
-    await request.get(url);
+    const first = await request.get(url);
+    if (header(first, 'x-cache') === 'MISS') expect(header(first, 'cache-control')).toBe('public, max-age=31536000, immutable');
     const r = await request.get(url);
     expect(header(r, 'x-cache')).toBe('HIT');
-    expect(header(r, 'cache-control')).toBe('public, max-age=604800, immutable');
+    expect(header(r, 'cache-control')).toBe('public, max-age=31536000, immutable');   // the shared cache's own copy is stored for a week (next test)
     expect(header(r, 'etag')).toBe(`"${ID}-640-avif"`);
     expect(header(r, 'content-type')).toBe('image/avif');
     expect(header(r, 'x-content-type-options')).toBe('nosniff');
+  });
+
+  test('the shared cache keeps its own copy for a week only, even though browsers keep theirs for a year', async () => {
+    const src = (await import('node:fs')).readFileSync('src/lib/media.ts', 'utf8');
+    expect(src).toContain("const EDGE = 'public, max-age=604800, immutable';");
+    expect(src).toMatch(/stored\.set\('Cache-Control', EDGE\)/);                       // what is put in the shared cache
+    expect(src).toMatch(/h\.set\('Cache-Control', FOREVER\)/);                         // what is sent out on a hit
+  });
+
+  test('a 644-pixel slot (PageSpeed on a phone: 368 CSS px at 1.75x) is served the 720 file, not the 800 one', async ({ request }) => {
+    const at = async (w: number) => (await (await request.get(`/media/${ID}/a.png?w=${w}&f=avif`)).body()).toString('base64');
+    const [a644, a720, a721, a800] = [await at(644), await at(720), await at(721), await at(800)];
+    expect(a644, '644 snaps to 720').toBe(a720);
+    expect(a721, '721 is a different (bigger) file: 800').toBe(a800);
+    expect(a721).not.toBe(a720);
   });
 
   test('junk query strings, other file names and widths that snap to the same size all share the one entry', async ({ request }) => {
@@ -88,7 +104,8 @@ test.describe('deleting an image removes every cached copy straight away', () =>
     expect(up.status()).toBe(200);
     const id: string = (await up.json()).asset.id;
     const visitor = withRetry(await playwright.request.newContext({ baseURL }));
-    const urls = [`/media/${id}/tiny.png`, `/media/${id}/tiny.png?w=160&f=webp`, `/media/${id}/tiny.png?w=320&f=avif`];
+    // every kind of variant this site's own pages can ask for: the original, WebP, AVIF, the picture's own format, and the share-image JPEG
+    const urls = [`/media/${id}/tiny.png`, `/media/${id}/tiny.png?w=160&f=webp`, `/media/${id}/tiny.png?w=320&f=avif`, `/media/${id}/tiny.png?w=720&f=png`, `/media/${id}/tiny.png?w=900&f=avif`, `/media/${id}/tiny.png?w=1280&f=jpeg`];
     for (const u of urls) { await visitor.get(u); expect(header(await visitor.get(u), 'x-cache'), u).toBe('HIT'); }
     const del = await admin.post('/api/admin/assets/delete', { form: { id }, headers: h, maxRedirects: 0 });
     expect(del.status()).toBe(303); expect(header(del, 'location')).toContain('ok=');

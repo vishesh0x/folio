@@ -70,7 +70,7 @@ const links = s.socials;
         </div>
       ) : (
         <form class="card stack" method="post" action="/contact" novalidate style="--stack:1.1rem">
-          {formError && <p class="flash error" role="alert" tabindex="-1" id="form-error">{formError}</p>}
+          {formError && <p class="flash error" role="alert" tabindex="-1" autofocus id="form-error">{formError}</p>}
           <div class="field" data-invalid={!!errors.name}>
             <label for="name">Your name</label>
             <input id="name" name="name" value={v.name} required maxlength="100" autocomplete="name" aria-invalid={errors.name ? 'true' : undefined} aria-describedby={errors.name ? 'name-err' : undefined} />

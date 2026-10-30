@@ -90,9 +90,9 @@ if (sitekey) Astro.locals.challenge = true; // lets the Content-Security-Policy 
           <p class="gate-sub">Welcome back. Sign in to manage your site.</p>
         </>
       )}
-      {error && <p class="notice" role="alert">{error}</p>}
+      {error && <p class="notice" role="alert" tabindex="-1" autofocus>{error}</p>}
       {!adminExists && !setupEnabled() && (
-        <p class="notice" role="alert">Registration is turned off because <code>ADMIN_SETUP_TOKEN</code> is not set (it must be at least 16 characters). Set it with <code>npx wrangler secret put ADMIN_SETUP_TOKEN</code>, then reload.</p>
+        <p class="notice" role="alert" tabindex="-1" autofocus>Registration is turned off because <code>ADMIN_SETUP_TOKEN</code> is not set (it must be at least 16 characters). Set it with <code>npx wrangler secret put ADMIN_SETUP_TOKEN</code>, then reload.</p>
       )}
 
       {canSetup && (

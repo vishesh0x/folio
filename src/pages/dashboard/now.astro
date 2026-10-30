@@ -20,7 +20,7 @@ const total = board.reduce((n, c) => n + c.items.length, 0);
     <a class="btn ghost sm" href="/now" target="_blank" rel="noopener">View public page ↗</a>
   </PageHead>
   {ok && <p class="flash" role="status">{ok}</p>}
-  {error && <p class="flash error" role="alert">{error}</p>}
+  {error && <p class="flash error" role="alert" tabindex="-1" autofocus>{error}</p>}
 
   <div class="two board-top">
     <form class="card stack" method="post" action="/api/admin/now" style="--stack:12px">

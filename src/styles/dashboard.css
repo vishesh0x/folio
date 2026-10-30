@@ -437,6 +437,8 @@ dialog.mpick::backdrop { background: rgb(18 16 22 / .6); backdrop-filter: blur(3
 .dz-t { font-size: 1rem; }
 .files-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; margin: 0 0 16px; }
 .files-bar .search { max-width: 260px; min-height: 36px; padding: 6px 12px; }
+.files-search { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.pager-d [aria-disabled="true"] { opacity: .45; cursor: not-allowed; }
 .files-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(236px, 1fr)); gap: 14px; }
 .file { display: flex; flex-direction: column; border: 1px solid var(--d-line); border-radius: var(--r); background: var(--card); }
 .file[hidden] { display: none; }

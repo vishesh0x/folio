@@ -78,6 +78,11 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'], baseURL: `http://localhost:${PORT_A}` },
     },
     {
+      // search and sharing metadata, accessibility (axe scan in light/dark, desktop/phone), keyboard use
+      name: 'quality', testMatch: /quality\/.*\.spec\.ts/, dependencies: ['setup'],
+      use: { ...devices['Desktop Chrome'], baseURL: `http://localhost:${PORT_A}` },
+    },
+    {
       // the database goes down and comes back (server D has its own database, so nothing else is affected)
       name: 'resilience', testMatch: /resilience\/.*\.spec\.ts/,
       use: { ...devices['Desktop Chrome'], baseURL: `http://localhost:${PORT_D}` },

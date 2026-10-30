@@ -7,8 +7,8 @@ import { loadAsset } from '../lib/media';
 import { THEME_INIT, THEME_TOGGLE } from '../lib/inline-scripts';
 import paperMono from '../assets/fonts/PaperMono-VF.woff2?url';
 
-interface Props { title?: string; description?: string; noindex?: boolean; bare?: boolean; ogImage?: string | null; ogType?: 'website' | 'article'; errorPage?: boolean; }
-const { title, description, noindex = false, bare = false, ogImage, ogType = 'website', errorPage = false } = Astro.props;
+interface Props { title?: string; description?: string; noindex?: boolean; bare?: boolean; ogImage?: string | null; ogAlt?: string; ogType?: 'website' | 'article'; published?: Date; modified?: Date; errorPage?: boolean; }
+const { title, description, noindex = false, bare = false, ogImage, ogAlt, ogType = 'website', published, modified, errorPage = false } = Astro.props;
 
 // Normal pages FAIL if the database does (the middleware answers 503), so a page is never built from placeholder settings and cached.
 // Error pages are the exception: they must render even when the database is the problem, so they fall back to defaults and mark the
@@ -41,7 +41,8 @@ const ogUrl = ogImage ? new URL(ogImage, origin).href
     <meta name="theme-color" content="#f7f7f4" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#141217" media="(prefers-color-scheme: dark)" />
     {noindex && <meta name="robots" content="noindex" />}
-    <link rel="canonical" href={origin + path} />
+    {/* A page that asks not to be indexed (sign-in, 404, error pages) names no canonical address: it has nothing to be the preferred copy of. */}
+    {!noindex && !errorPage && <link rel="canonical" href={origin + path} />}
     {svgIcon
       ? <link rel="icon" type="image/svg+xml" href={`/icons/favicon.svg?v=${v}`} />
       : <>
@@ -56,6 +57,10 @@ const ogUrl = ogImage ? new URL(ogImage, origin).href
     <meta property="og:type" content={ogType} />
     <meta property="og:url" content={origin + path} />
     {ogUrl && <meta property="og:image" content={ogUrl} />}
+    {ogUrl && <meta property="og:image:type" content="image/jpeg" />}
+    {ogUrl && <meta property="og:image:alt" content={ogAlt || fullTitle} />}
+    {ogType === 'article' && published && <meta property="article:published_time" content={published.toISOString()} />}
+    {ogType === 'article' && modified && <meta property="article:modified_time" content={modified.toISOString()} />}
     <meta name="twitter:card" content={ogUrl ? 'summary_large_image' : 'summary'} />
     {!bare && <>
       <link rel="preload" href={paperMono} as="font" type="font/woff2" crossorigin />

@@ -18,6 +18,7 @@ const ALLOWED: Record<string, string> = {
   "opts.featured ? 'AND p.featured = 1' : ''": 'src/lib/projects.ts: boolean chooses between two fixed strings',
   "list.map(() => '?').join(',')": 'a row of ? placeholders; the values are still bound',
   "ids.map(() => '?').join(',')": 'a row of ? placeholders; the values are still bound',
+  'w': 'the WHERE clause of the Files page query (listAssetsPage in src/lib/assets.ts): built only from three fixed fragments (a mime test, and instr(...) > 0 with a ? placeholder); the search text itself is bound',
 };
 
 test.describe('static: no SQL is built from variable text', () => {

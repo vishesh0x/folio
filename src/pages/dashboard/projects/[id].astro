@@ -52,7 +52,7 @@ const words = p.body_md.trim() ? p.body_md.trim().split(/\s+/).length : 0;
   <h1 class="visually-hidden">Edit project: {p.title || 'Untitled'}</h1>
   {created && !formError && <p class="flash" role="status">Draft created. Give it a title and start writing.</p>}
   {saved && !formError && <p class="flash" role="status">{saved === 'published' ? 'Published. It is live on your site.' : saved === 'unpublished' ? 'Moved back to drafts.' : 'Saved.'}</p>}
-  {formError && <p class="flash error" role="alert" id="form-error">{formError}</p>}
+  {formError && <p class="flash error" role="alert" tabindex="-1" autofocus id="form-error">{formError}</p>}
 
   <form method="post" id="editor" class="editor" data-status={p.status} data-new={created ? '1' : undefined} novalidate>
     <input type="hidden" name="v" value={loadedAt} />

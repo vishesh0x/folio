@@ -17,12 +17,17 @@ const ogImage = seoImg && seoImg.mime !== 'image/svg+xml' ? `/media/${seoImg.id}
 const hasCode = /<code[\s>]/.test(html); // the code font is only needed (and only fetched early) on pages that show code
 const description = p.seo_desc || p.summary || excerpt(p.body_md);
 const year = new Date(p.created_at * 1000).getFullYear();
+const siteUrl = (s.site_url || Astro.url.origin).replace(/\/$/, '');
+const crumbs = { '@context': 'https://schema.org', '@type': 'BreadcrumbList', itemListElement: [
+  { '@type': 'ListItem', position: 1, name: 'Home', item: `${siteUrl}/` }, { '@type': 'ListItem', position: 2, name: 'Projects', item: `${siteUrl}/projects` },
+  { '@type': 'ListItem', position: 3, name: p.title, item: `${siteUrl}/projects/${p.slug}` }] };
 const ld = { '@context': 'https://schema.org', '@type': 'CreativeWork', name: p.title, description, author: { '@type': 'Person', name: s.name },
   dateCreated: new Date(p.created_at * 1000).toISOString(), dateModified: new Date(p.updated_at * 1000).toISOString(), keywords: p.tags.join(', ') || undefined,
   codeRepository: p.source_url || undefined };
 ---
-<Base title={p.seo_title || p.title} description={description} ogImage={ogImage} ogType="article">
+<Base title={p.seo_title || p.title} description={description} ogImage={ogImage} ogAlt={p.cover?.alt || p.title} ogType="article" published={new Date(p.created_at * 1000)} modified={new Date(p.updated_at * 1000)}>
   {hasCode && <link slot="head" rel="preload" href={codeFont} as="font" type="font/woff2" crossorigin />}
+  <script slot="head" type="application/ld+json" set:html={JSON.stringify(crumbs).replace(/</g, '\\u003c')} />
   <script slot="head" type="application/ld+json" set:html={JSON.stringify(ld).replace(/</g, '\\u003c')} />
 
   <article class="wrap project">

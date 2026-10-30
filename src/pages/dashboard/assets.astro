@@ -1,15 +1,22 @@
 ---
 import Dash from '../../layouts/Dash.astro';
 import PageHead from '../../components/PageHead.astro';
-import { listAssets, usageMap, assetView } from '../../lib/assets';
+import { listAssetsPage, parseFileQuery, usageMap, assetView, FILES_PER_PAGE } from '../../lib/assets';
 
-const assets = await listAssets();
-const usage = await usageMap(assets);
+const fq = parseFileQuery(Astro.url.searchParams);
+const { items: assets, total, page, pages, counts } = await listAssetsPage(fq);
+const usage = await usageMap(assets);   // only for the files drawn on this page
 const ok = Astro.url.searchParams.get('ok');
 const error = Astro.url.searchParams.get('error');
 const kb = (n: number) => (n > 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB');
 const views = assets.map((a) => ({ a, v: assetView(a), used: usage.get(a.id) ?? [] }));
-const counts = { all: views.length, image: views.filter((x) => x.v.kind === 'image').length, pdf: views.filter((x) => x.v.kind !== 'image').length };
+// Address of this page with some parts changed (the filter, search and page live in the address, so a reload or a shared link shows the same thing)
+const href = (over: { type?: string; page?: number; q?: string }) => {
+  const p = new URLSearchParams(); const type = over.type ?? fq.kind, pg = over.page ?? 1, q = over.q ?? fq.q;
+  if (type !== 'all') p.set('type', type); if (q) p.set('q', q); if (pg > 1) p.set('page', String(pg));
+  const qs = p.toString(); return `/dashboard/assets${qs ? `?${qs}` : ''}`;
+};
+const firstShown = total === 0 ? 0 : (page - 1) * FILES_PER_PAGE + 1, lastShown = Math.min(total, page * FILES_PER_PAGE);
 const dots = '<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>';
 ---
 <Dash title="Files">
@@ -17,7 +24,7 @@ const dots = '<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><
     <button class="btn" type="button" data-upload hidden>Upload files</button>
   </PageHead>
   {ok && <p class="flash" role="status">{ok}</p>}
-  {error && <p class="flash error" role="alert">{error}</p>}
+  {error && <p class="flash error" role="alert" tabindex="-1" autofocus>{error}</p>}
 
   <div class="dropzone" data-drop hidden>
     <span class="dz-ico" aria-hidden="true"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg></span>
@@ -35,22 +42,27 @@ const dots = '<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><
     </form>
   </noscript>
 
-  {views.length === 0 ? (
+  {counts.all === 0 ? (
     <div class="empty"><h2>No files yet</h2><p>Drop your first picture or PDF above. Everything you upload here can be chosen from the project, resume and settings pages.</p></div>
   ) : (
     <>
-      <div class="files-bar" data-filter-bar hidden>
-        <div class="filters" role="group" aria-label="Filter files" style="margin:0">
-          <a href="#all" role="button" data-filter="all" aria-current="true">All <span>{counts.all}</span></a>
-          <a href="#images" role="button" data-filter="image">Images <span>{counts.image}</span></a>
-          <a href="#pdfs" role="button" data-filter="pdf">PDFs <span>{counts.pdf}</span></a>
-        </div>
-        <input type="search" class="search" placeholder="Search files" aria-label="Search files" data-search />
+      <div class="files-bar">
+        <nav class="filters" aria-label="Filter files" style="margin:0">
+          <a href={href({ type: 'all' })} aria-current={fq.kind === 'all' ? 'true' : undefined}>All <span>{counts.all}</span></a>
+          <a href={href({ type: 'image' })} aria-current={fq.kind === 'image' ? 'true' : undefined}>Images <span>{counts.image}</span></a>
+          <a href={href({ type: 'pdf' })} aria-current={fq.kind === 'pdf' ? 'true' : undefined}>PDFs <span>{counts.pdf}</span></a>
+        </nav>
+        <form method="get" action="/dashboard/assets" role="search" class="files-search">
+          {fq.kind !== 'all' && <input type="hidden" name="type" value={fq.kind} />}
+          <input type="search" name="q" class="search" value={fq.q} maxlength="80" placeholder="Search files" aria-label="Search files" />
+          <button class="btn ghost sm" type="submit">Search</button>
+          {fq.q && <a class="btn ghost sm" href={href({ q: '' })}>Clear</a>}
+        </form>
       </div>
-      <p class="hint" role="status" data-none hidden style="margin:12px 0">No files match.</p>
+      <p class="hint" role="status" style="margin:12px 0">{total === 0 ? 'No files match.' : total <= FILES_PER_PAGE ? '' : `Showing ${firstShown}–${lastShown} of ${total}.`}</p>
       <ul class="files-grid">
         {views.map(({ a, v, used }) => (
-          <li class="file" data-kind={v.kind === 'image' ? 'image' : 'pdf'} data-name={`${a.filename} ${a.alt}`.toLowerCase()}>
+          <li class="file">
             <a class="file-thumb" href={v.url} target="_blank" rel="noopener" aria-label={`Open ${a.filename} in a new tab`}>
               {v.kind === 'image'
                 ? <img src={v.thumb} alt="" loading="lazy" width={a.width ?? undefined} height={a.height ?? undefined} />
@@ -88,6 +100,13 @@ const dots = '<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><
           </li>
         ))}
       </ul>
+      {pages > 1 && (
+        <nav class="pager-d" aria-label="Pages of files">
+          {page > 1 ? <a class="btn ghost sm" href={href({ page: page - 1 })} rel="prev">← Newer</a> : <span class="btn ghost sm" aria-disabled="true">← Newer</span>}
+          <span class="muted">Page {page} of {pages}</span>
+          {page < pages ? <a class="btn ghost sm" href={href({ page: page + 1 })} rel="next">Older →</a> : <span class="btn ghost sm" aria-disabled="true">Older →</span>}
+        </nav>
+      )}
     </>
   )}
 
@@ -125,22 +144,6 @@ const dots = '<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><
   for (const ev of ['dragenter', 'dragover']) drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add('is-over'); });
   for (const ev of ['dragleave', 'drop']) drop.addEventListener(ev, () => drop.classList.remove('is-over'));
   drop.addEventListener('drop', (e) => { e.preventDefault(); const f = (e as DragEvent).dataTransfer?.files; if (f?.length) run([...f]); });
-
-  // Filter and search (the grid works without this; it is only a convenience)
-  const bar = document.querySelector<HTMLElement>('[data-filter-bar]');
-  if (bar) {
-    bar.hidden = false;
-    const cards = [...document.querySelectorAll<HTMLElement>('.file')], none = document.querySelector<HTMLElement>('[data-none]')!;
-    const search = bar.querySelector<HTMLInputElement>('[data-search]')!, chips = [...bar.querySelectorAll<HTMLAnchorElement>('[data-filter]')];
-    let kind = 'all';
-    const apply = () => {
-      const q = search.value.trim().toLowerCase(); let n = 0;
-      for (const c of cards) { const show = (kind === 'all' || c.dataset.kind === kind) && (!q || (c.dataset.name ?? '').includes(q)); c.hidden = !show; if (show) n++; }
-      none.hidden = n > 0;
-    };
-    chips.forEach((c) => c.addEventListener('click', (e) => { e.preventDefault(); kind = c.dataset.filter!; chips.forEach((x) => x.setAttribute('aria-current', String(x === c))); apply(); }));
-    search.addEventListener('input', apply);
-  }
 
   // Storage check: ask the server, show the answer, and offer to remove stray files only when there are some.
   const box = document.querySelector<HTMLElement>('[data-storage]');

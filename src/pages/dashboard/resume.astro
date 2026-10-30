@@ -125,7 +125,7 @@ const modes: [ContactMode, string, string][] = [
     <a class="btn ghost sm" href="/resume" target="_blank" rel="noopener">View resume ↗</a>
   </PageHead>
   {ok && <p class="flash" role="status">{ok}</p>}
-  {topError && <p class="flash error" role="alert">{error}</p>}
+  {topError && <p class="flash error" role="alert" tabindex="-1" autofocus>{error}</p>}
 
   <form method="post" id="opts" class="stack" style="--stack:16px" data-savebar aria-label="Resume options">
     <input type="hidden" name="action" value="opts" />
@@ -232,7 +232,7 @@ const modes: [ContactMode, string, string][] = [
             <button class="btn ghost sm" type="submit">Save title</button>
           </form>
         </details>
-        {isForm(`ren-${sec.id}`) && error && <p class="flash error" role="alert">{error}</p>}
+        {isForm(`ren-${sec.id}`) && error && <p class="flash error" role="alert" tabindex="-1" autofocus>{error}</p>}
         {sec.visible && shown === 0 && <p class="note-line">Not shown on your resume yet: add an entry{sec.kind === 'projects' ? ' (and make sure the project is published)' : ''}.</p>}
 
         {sec.entries.length > 0 && (
@@ -260,7 +260,7 @@ const modes: [ContactMode, string, string][] = [
                       <span class="entry-edit" aria-hidden="true">Edit</span>
                       <span class="visually-hidden">Edit “{title}”</span>
                     </summary>
-                    {isForm(ek) && error && <p class="flash error" role="alert">{error}</p>}
+                    {isForm(ek) && error && <p class="flash error" role="alert" tabindex="-1" autofocus>{error}</p>}
                     <form method="post" class="edit-form">
                       <input type="hidden" name="action" value="ent-update" /><input type="hidden" name="id" value={e.id} />
                       {proj && <p class="hint" style="margin:0">Project: <strong>{proj.title}</strong> · <a href={`/dashboard/projects/${proj.id}`}>edit the project itself</a></p>}
@@ -290,7 +290,7 @@ const modes: [ContactMode, string, string][] = [
         {(sec.kind !== 'projects' || free.length > 0) && (
           <details class="add" open={isForm(`add-${sec.id}`)}>
             <summary><span aria-hidden="true">＋</span> {sec.kind === 'projects' ? 'Add a project' : `Add to ${sec.title}`}</summary>
-            {isForm(`add-${sec.id}`) && error && <p class="flash error" role="alert">{error}</p>}
+            {isForm(`add-${sec.id}`) && error && <p class="flash error" role="alert" tabindex="-1" autofocus>{error}</p>}
             <form method="post" class="edit-form">
               <input type="hidden" name="action" value="ent-add" /><input type="hidden" name="section_id" value={sec.id} />
               {sec.kind === 'projects' && (
@@ -314,7 +314,7 @@ const modes: [ContactMode, string, string][] = [
     <summary><span class="card-h">Add a section</span><span class="hint">{sections.length} of {R.MAX_SECTIONS} used</span></summary>
     <form method="post" class="stack" style="--stack:14px;margin-top:14px">
       <input type="hidden" name="action" value="sec-add" />
-      {isForm('sec-add') && error && <p class="flash error" role="alert">{error}</p>}
+      {isForm('sec-add') && error && <p class="flash error" role="alert" tabindex="-1" autofocus>{error}</p>}
       <div class="two">
         <div class="field"><label for="as-kind">Kind</label>
           <select id="as-kind" name="kind">{KINDS.map((k) => <option value={k} selected={isForm('sec-add') && P!.values.kind === k}>{KIND_LABEL[k]}</option>)}</select></div>

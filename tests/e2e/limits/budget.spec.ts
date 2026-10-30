@@ -47,9 +47,18 @@ test.describe('the owner\'s bulk jobs', () => {
     const up = await upload(owner, base, `limits-${Date.now().toString(36)}.png`, 'image/png', png, 'x');
     const { res, counts } = await counted(owner, base, 'POST', '/api/admin/assets/delete', { form: { id: up.json.asset.id } });
     expect(decodeURIComponent(res.headers()['location'] ?? '')).toContain('ok=Deleted');
-    expect(counts.cache, 'every width x format of the picture is forgotten').toBeGreaterThanOrEqual(36);
-    // Measured: 46 of the 50 allowed. If this fails after adding a width to the ladder (src/lib/media.ts), the delete is about to stop fitting.
-    expect(counts.total, counts.calls.join('\n')).toBeLessThanOrEqual(FREE_LIMIT - 3);
+    expect(counts.cache, 'every variant this site can ask for (11 widths x AVIF/WebP/PNG, the share JPEG, the original and the "missing" marker)').toBe(11 * 3 + 1 + 2);
+    // Measured: 44 of the 50 allowed. If this fails after adding a width to the ladder (src/lib/media.ts), the delete is about to stop fitting.
+    expect(counts.total, counts.calls.join('\n')).toBeLessThanOrEqual(FREE_LIMIT - 5);
+  });
+
+  test('deleting a JPEG forgets one format less (its own format is the share-image format)', async () => {
+    const jpg = readFileSync('tests/fixtures/photo-gps.jpg');
+    const up = await upload(owner, base, `limits-${Date.now().toString(36)}.jpg`, 'image/jpeg', jpg, 'x');
+    expect(up.status).toBe(200);
+    const { res, counts } = await counted(owner, base, 'POST', '/api/admin/assets/delete', { form: { id: up.json.asset.id } });
+    expect(decodeURIComponent(res.headers()['location'] ?? '')).toContain('ok=Deleted');
+    expect(counts.cache).toBe(11 * 3 + 2);
   });
 
   test('deleting a PDF forgets only the two cached entries it can have', async () => {
@@ -103,7 +112,7 @@ test.describe('the owner\'s bulk jobs', () => {
 const tmp = () => join(mkdtempSync(join(tmpdir(), 'scale-')), 'seed.sql');
 test.describe('the Files page as the library grows', () => {
   test.afterAll(() => { d1('e2e-e', scaleClear()); });
-  test('it makes the same number of calls with 10 files as with 300', async () => {
+  test('it makes the same number of calls with 10 files as with 300, and draws at most one page of cards', async () => {
     d1('e2e-e', scaleClear());
     const f1 = tmp(); writeFileSync(f1, scaleSql({ assets: 10, projects: 5, bodyKb: 5 })); d1File('e2e-e', f1);
     const small = await counted(owner, base, 'GET', '/dashboard/assets');
@@ -112,9 +121,11 @@ test.describe('the Files page as the library grows', () => {
     const big = await counted(owner, base, 'GET', '/dashboard/assets');
     expect(small.res.status()).toBe(200); expect(big.res.status()).toBe(200);
     expect(big.counts.total, `10 files: ${small.counts.total} calls, 300 files: ${big.counts.total}`).toBe(small.counts.total);
-    const html = (await big.res.text()).length;
-    expect(html).toBeGreaterThan(300_000);                            // it really drew the 300 files
-    // The page's CPU cost is mostly drawing one card per file (about 12 microseconds each, measured), so the weight of a card is what to watch: today about 2.3 KB.
-    expect(html / 300, 'bytes of page per file listed').toBeLessThan(3_500);
+    const bigText = await big.res.text(), smallText = await small.res.text();
+    const cards = (bigText.match(/<li class="file"/g) ?? []).length, fewer = (smallText.match(/<li class="file"/g) ?? []).length;
+    expect(cards, '300 files are listed 48 at a time').toBe(48);
+    // The page's CPU cost is mostly drawing one card per file (about 12 microseconds each, measured), so the weight of ONE card is what to watch (today about 2.3 KB):
+    // the difference between a page of 48 cards and a page of 10, divided by the 38 extra cards.
+    expect((bigText.length - smallText.length) / (cards - fewer), 'bytes per card').toBeLessThan(3_500);
   });
 });

@@ -58,7 +58,7 @@ const rows = Array.from({ length: MAX_SOCIALS }, (_, i) => s.socials[i] ?? { lab
   <MediaData assets={assets} />
   <PageHead title="Settings" lede="Your name, the home page, your pictures, and how the site looks in search results and link previews." />
   {saved && <p class="flash" role="status">Saved. Your changes are live.</p>}
-  {error && <p class="flash error" role="alert">{error} Nothing was saved.</p>}
+  {error && <p class="flash error" role="alert" tabindex="-1" autofocus>{error} Nothing was saved.</p>}
 
   <div class="settings">
     <nav class="jump" aria-label="On this page">

@@ -32,9 +32,9 @@ test.describe('the size rule itself', () => {
 test.describe('visitors', () => {
   test.use({ storageState: { cookies: [], origins: [] } });
   for (const path of ['/contact', '/auth']) {
-    test(`a ${path} POST declaring 5 MB is refused with 413 and a plain message, without being read`, async ({ playwright, baseURL }) => {
+    test(`a ${path} POST just over the 4 MiB limit is refused with 413 and a plain message, without being read`, async ({ playwright, baseURL }) => {
       const v = withRetry(await playwright.request.newContext({ baseURL, storageState: { cookies: [], origins: [] } }));
-      const r = await big(v, path, { data: 'x='.padEnd(5 * MB, 'a'), headers: { ...sameOrigin(baseURL!), 'content-type': 'application/x-www-form-urlencoded' }, maxRedirects: 0 });
+      const r = await big(v, path, { data: 'x='.padEnd(MAX_FORM_REQUEST + 1024, 'a'), headers: { ...sameOrigin(baseURL!), 'content-type': 'application/x-www-form-urlencoded' }, maxRedirects: 0 });
       expect(r.status()).toBe(413);
       expect(r.headers()['cache-control']).toContain('no-store');
       expect(await r.text()).toBe('That request is too large.');

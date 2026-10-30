@@ -1,5 +1,5 @@
 // One implementation of "show an uploaded image", used by <Img> and by the Markdown renderer.
-import { WIDTHS } from './media';
+import { WIDTHS, fallbackFormat } from './media';
 
 export type ImgAsset = { id: string; filename: string; mime: string; width: number | null; height: number | null; alt: string; decorative: number };
 export type ImgOpts = { alt?: string; sizes?: string; eager?: boolean; class?: string; fit?: 'contain' | 'cover'; ratio?: string; natural?: boolean };
@@ -31,7 +31,7 @@ export function imgHtml(a: ImgAsset, o: ImgOpts = {}): string {
   if (!widths.length || widths[widths.length - 1] < maxW) widths.push(WIDTHS.find((w) => w >= maxW) ?? WIDTHS[WIDTHS.length - 1]);
   const url = (w: number, f: string) => `${base}?w=${w}&amp;f=${f}`;
   const set = (f: string) => widths.map((w) => `${url(w, f)} ${w}w`).join(', ');
-  const fb = a.mime === 'image/png' ? 'png' : a.mime === 'image/webp' ? 'webp' : 'jpeg';
+  const fb = fallbackFormat(a.mime);
   const sz = esc(sizes);
   return `<picture><source type="image/avif" srcset="${set('avif')}" sizes="${sz}"><source type="image/webp" srcset="${set('webp')}" sizes="${sz}">` +
     `<img src="${url(widths[Math.min(3, widths.length - 1)], fb)}" srcset="${set(fb)}" sizes="${sz}"${common}></picture>`;

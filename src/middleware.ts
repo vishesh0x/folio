@@ -104,6 +104,8 @@ async function handle(ctx: Parameters<Parameters<typeof defineMiddleware>[0]>[0]
 
   const h = new Headers(res.headers);
   h.set('X-Content-Type-Options', 'nosniff');
+  // The owner's pages, the API, sign-in and error pages are never for search results. (robots.txt also asks crawlers to stay out; this covers a link someone shares.)
+  if (/^\/(dashboard|auth|api|error)(\/|$)/.test(path) || path === '/resume/download') h.set('X-Robots-Tag', 'noindex, nofollow');
   h.set('X-Frame-Options', 'DENY');
   h.set('Referrer-Policy', 'strict-origin-when-cross-origin');
   h.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=()');

@@ -47,7 +47,7 @@ test.describe('the file the browser picks fits the slot ("sizes")', () => {
   });
 
   test('on a wide screen the browser asks for the smallest file that covers the card (not a bigger one)', async ({ page }) => {
-    const LADDER = [160, 320, 480, 640, 800, 1024, 1280, 1600, 2000]; // = WIDTHS in src/lib/media.ts
+    const LADDER = [160, 320, 480, 640, 720, 800, 900, 1024, 1280, 1600, 2000]; // = WIDTHS in src/lib/media.ts
     for (const [path, expectCols] of [['/', 2], ['/projects', 3]] as const) {
       const wanted: number[] = [];
       const p = await page.context().newPage(); await p.setViewportSize({ width: 1350, height: 940 });

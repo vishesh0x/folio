@@ -110,6 +110,16 @@ test.describe('public page', () => {
     expect(seen.some((f) => /^diagrams\./.test(f))).toBe(true);
     expect(seen.length, 'Mermaid itself is split into many on-demand files').toBeGreaterThan(3);
   });
+
+  test('the 1.4 MB ELK layout engine is never downloaded: flowcharts are laid out by the small dagre engine', async ({ page }) => {
+    // Mermaid 12.1 lays flowcharts out with ELK unless told otherwise; ELK is about 420 KB over the wire and unused by anything else on the page.
+    const sizes: Record<string, number> = {};
+    page.on('response', async (r) => { if (/\/_astro\/.*\.js/.test(r.url())) sizes[r.url().split('/').pop()!] = (await r.body().catch(() => Buffer.alloc(0))).length; });
+    await openPage(page, PAGE); await drawAll(page, 3);
+    expect(Object.keys(sizes).filter((f) => /^elk-/.test(f)), 'ELK requested').toEqual([]);
+    expect(Math.max(...Object.values(sizes)) / 1024, 'no single script file is larger than 400 KB').toBeLessThan(400);
+    expect(Object.keys(sizes).some((f) => /^dagre-/.test(f)), 'the dagre layout engine is used').toBe(true);
+  });
 });
 
 test.describe('safety', () => {
