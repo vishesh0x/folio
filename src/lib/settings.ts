@@ -6,15 +6,26 @@ export type Highlight = { value: string; label: string };
 export type SiteSettings = {
   name: string; tagline: string; bio: string; email: string; phone: string; location: string; now_intro: string;
   site_url: string; meta_description: string;
+  /** Owner-written privacy notice (Markdown). Empty means the standard text from src/lib/privacy.ts. */
+  privacy_md: string;
   og_asset: string | null; portrait_asset: string | null; favicon_asset: string | null; resume_asset: string | null;
   headline: string;        // optional big headline on the home page; *word* is shown in the accent colour
   availability: string;    // e.g. "Open to new work"; empty hides the badge
   highlights: Highlight[]; // up to 4 numbers you choose to show on the home page (real ones only)
   socials: Social[];
 };
+export const MAX_SOCIALS = 8;
+/** A web address the site is willing to publish: http(s) only (and mailto: where allowed). Returns '' for empty, null for not acceptable. */
+export const cleanUrl = (u: string, allowMail = false) => {
+  u = u.trim();
+  if (!u) return '';
+  if (allowMail && u.startsWith('mailto:')) return u.slice(0, 300);
+  try { const x = new URL(u); return x.protocol === 'https:' || x.protocol === 'http:' ? x.href : null; } catch { return null; }
+};
 export const SETTINGS_DEFAULTS: SiteSettings = {
   name: 'Your Name', tagline: 'Designer & developer', bio: '', email: '', phone: '', location: '', now_intro: '',
   site_url: '', meta_description: 'Personal website and portfolio.',
+  privacy_md: '',
   og_asset: null, portrait_asset: null, favicon_asset: null, resume_asset: null, headline: '', availability: '', highlights: [], socials: [],
 };
 

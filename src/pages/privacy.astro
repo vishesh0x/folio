@@ -1,0 +1,15 @@
+---
+import Base from '../layouts/Base.astro';
+import { getPublicSettings } from '../lib/settings';
+import { renderMarkdown } from '../lib/markdown';
+import { defaultPrivacyMd } from '../lib/privacy';
+
+const s = await getPublicSettings();
+const { html } = await renderMarkdown(s.privacy_md || defaultPrivacyMd(s.name));
+---
+<Base title="Privacy notice" description={`How this website treats your information: what is stored when you send a message, which services process data, and your choices.`}>
+  <article class="wrap project" style="max-width:46rem">
+    <header class="project-head"><h1>Privacy notice</h1></header>
+    <div class="md" set:html={html} />
+  </article>
+</Base>

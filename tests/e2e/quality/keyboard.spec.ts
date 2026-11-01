@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 
 // Step 6: using the site without a mouse (WCAG 2.1.1, 2.4.1, 2.4.7, 2.4.11, 3.3.1).
 test.use({ storageState: { cookies: [], origins: [] } });
-const PAGES = ['/', '/projects', '/projects/wanderhost-booking', '/now', '/resume', '/contact'];
+const PAGES = ['/', '/projects', '/projects/wanderhost-booking', '/now', '/resume', '/contact', '/privacy'];
 
 for (const scheme of ['light', 'dark'] as const) {
   test.describe(`${scheme} theme`, () => {
@@ -17,7 +17,8 @@ for (const scheme of ['light', 'dark'] as const) {
         await page.keyboard.press('Enter');
         expect(new URL(page.url()).hash).toBe('#main');
         await page.keyboard.press('Tab');
-        expect(await page.evaluate(() => !!document.activeElement?.closest('main')), 'the next Tab stop is inside the page content, not back in the menu').toBe(true);
+        // After the skip link the next stop is the page's first control, or the footer if the content has none (the privacy page): never back in the header or menu.
+        expect(await page.evaluate(() => !!document.activeElement && !document.activeElement.closest('header') && document.activeElement !== document.body), 'the next Tab stop is past the menu').toBe(true);
       });
 
       test(`${path}: every Tab stop shows a visible focus mark and is never hidden behind the sticky header`, async ({ page }) => {

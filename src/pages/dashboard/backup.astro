@@ -1,0 +1,47 @@
+---
+import Dash from '../../layouts/Dash.astro';
+import PageHead from '../../components/PageHead.astro';
+import { summary } from '../../lib/backup';
+const c = await summary();
+---
+<Dash title="Backup & restore">
+  <PageHead title="Backup & restore" lede="Download everything on the site as one zip file, and put it back later (on this site or a new one). Do this before big changes, and now and then." />
+
+  <section class="card" aria-labelledby="bk-ex-h">
+    <div class="card-head"><div><h2 class="card-h" id="bk-ex-h">Download a backup</h2>
+      <p class="card-sub">Your {c.projects} projects, {c.assets} files, resume ({c.resume_sections} sections), Now board ({c.now_items} items), settings and search settings. The zip opens with any zip program: the text is in readable .json files and the files are as you uploaded them.</p></div></div>
+    <label class="choice"><input type="checkbox" id="bk-messages" /> <span>Also include the {c.messages} message{c.messages === 1 ? '' : 's'} from visitors <span class="hint">(personal data: names and email addresses. Keep such a backup private.)</span></span></label>
+    <p style="margin-top:14px"><button class="btn primary" type="button" id="bk-export">Download backup (.zip)</button></p>
+    <p class="hint" id="bk-export-status" role="status" aria-live="polite"></p>
+    <p class="hint">Never included: your sign-in account and password, sessions, and anti-spam counters.</p>
+  </section>
+
+  <section class="card" aria-labelledby="bk-im-h" style="margin-top:18px">
+    <div class="card-head"><div><h2 class="card-h" id="bk-im-h">Restore from a backup</h2>
+      <p class="card-sub">Choose a backup made by this page. Nothing changes until you press Import, and you can check it first without changing anything. Files are only ever added (never deleted or overwritten).</p></div></div>
+    <div class="field"><label for="bk-file">Backup file (.zip)</label><input id="bk-file" type="file" accept=".zip,application/zip" /></div>
+    <p class="hint" id="bk-import-status" role="status" aria-live="polite"></p>
+
+    <div id="bk-import-panel" hidden>
+      <p id="bk-info"></p>
+      <fieldset class="choices"><legend>What to bring back</legend>
+        <label class="choice"><input type="checkbox" id="bk-c-files" /> <span>Files (pictures and PDFs): added if missing</span></label>
+        <label class="choice"><input type="checkbox" id="bk-c-site" /> <span>Site settings and search settings: <strong>replace</strong> the current ones</span></label>
+        <label class="choice"><input type="checkbox" id="bk-c-projects" /> <span>Projects</span></label>
+        <div class="choices-sub" style="margin-left:28px">
+          <label class="choice"><input type="radio" name="bk-m" id="bk-m-replace" checked /> <span><strong>Replace</strong> all current projects with the backup's</span></label>
+          <label class="choice"><input type="radio" name="bk-m" id="bk-m-add" /> <span><strong>Add</strong> only projects whose address is not used yet</span></label>
+        </div>
+        <label class="choice"><input type="checkbox" id="bk-c-resume" /> <span>Resume: <strong>replace</strong> the current one (replacing projects also resets the resume's project entries, so the resume comes with it)</span></label>
+        <label class="choice"><input type="checkbox" id="bk-c-now" /> <span>Now board: <strong>replace</strong> the current one</span></label>
+        <label class="choice"><input type="checkbox" id="bk-c-messages" /> <span>Messages: added (ones already here are not duplicated)</span></label>
+      </fieldset>
+      <p class="hint">Tip: download a backup of the current site first, so you can undo.</p>
+      <div class="field" id="bk-confirm-row" hidden><label for="bk-confirm">Type REPLACE to confirm that the parts marked “replace” overwrite what is on the site now</label><input id="bk-confirm" autocomplete="off" /></div>
+      <p style="margin-top:14px"><button class="btn" type="button" id="bk-check">Check only (changes nothing)</button> <button class="btn primary" type="button" id="bk-go" disabled>Import</button></p>
+      <div id="bk-result" role="status" aria-live="polite"></div>
+    </div>
+  </section>
+</Dash>
+
+<script>import '../../scripts/backup';</script>

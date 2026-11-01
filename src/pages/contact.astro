@@ -93,6 +93,7 @@ const links = s.socials;
           <div class="hp" aria-hidden="true"><label>Leave this empty<input name="website" tabindex="-1" autocomplete="off" /></label></div>
           <input type="hidden" name="t" value={token} />
           {turnstileKey && <div class="cf-turnstile" data-sitekey={turnstileKey} data-action="contact"></div>}
+          <p class="hint" style="margin:0 0 12px">Your name, email and message are stored so I can reply, and are not shared. See the <a href="/privacy">privacy notice</a>.</p>
           <div><button class="btn" type="submit">Send message</button></div>
         </form>
       )}

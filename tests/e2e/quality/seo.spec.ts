@@ -3,7 +3,7 @@ import { AUTH_FILE } from '../helpers';
 
 // Step 6: what search engines and link previews see. Server A, as an anonymous visitor.
 test.use({ storageState: { cookies: [], origins: [] } });
-const PUBLIC = ['/', '/projects', '/projects/wanderhost-booking', '/projects/pocket-ledger', '/now', '/resume', '/contact'];
+const PUBLIC = ['/', '/projects', '/projects/wanderhost-booking', '/projects/pocket-ledger', '/now', '/resume', '/contact', '/privacy'];
 
 type Meta = { title: string; lang: string; viewport: string | null; desc: string | null; canonical: string[]; robots: string | null; og: Record<string, string>; tw: Record<string, string>; h: number[]; ld: string[]; };
 async function meta(page: any, path: string): Promise<{ status: number; headers: Record<string, string>; m: Meta }> {

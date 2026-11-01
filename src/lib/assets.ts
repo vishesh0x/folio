@@ -60,7 +60,8 @@ const safeName = (n: string, ext: string) => {
   return `${base}.${ext}`;
 };
 
-export async function saveUpload(file: File, alt: string, decorative: boolean): Promise<{ ok: true; asset: Asset } | { ok: false; error: string }> {
+/** `restore` is for importing a backup: the file keeps the id (and date) it had, because project texts refer to it by id. Everything else is checked exactly as for a new upload. */
+export async function saveUpload(file: File, alt: string, decorative: boolean, restore?: { id: string; createdAt?: number }): Promise<{ ok: true; asset: Asset } | { ok: false; error: string }> {
   if (file.size > MAX_PDF) return { ok: false, error: 'That file is too large (limit 10 MB for images, 15 MB for PDFs).' };
   let bytes = new Uint8Array(await file.arrayBuffer());
   let mime: string, ext: string, width: number | null, height: number | null;
@@ -88,13 +89,14 @@ export async function saveUpload(file: File, alt: string, decorative: boolean): 
   if (mime === 'application/pdf' ? bytes.length > MAX_PDF : bytes.length > MAX_IMAGE) return { ok: false, error: 'That file is too large (limit 10 MB for images, 15 MB for PDFs).' };
   if (isImage(mime) && !alt && !decorative) return { ok: false, error: 'Add alt text describing the image, or tick “decorative” if it carries no meaning.' };
 
-  const id = randomToken(9);
+  if (restore && !/^[A-Za-z0-9_-]{12}$/.test(restore.id)) return { ok: false, error: 'That file id is not valid.' };
+  const id = restore?.id ?? randomToken(9);
   const filename = safeName(file.name, ext);
   const r2_key = `assets/${id}/${filename}`;
   await env.ASSETS_BUCKET.put(r2_key, bytes, { httpMetadata: { contentType: mime } });
   try {
-    await env.DB.prepare('INSERT INTO assets (id, r2_key, filename, mime, size, width, height, alt, decorative) VALUES (?,?,?,?,?,?,?,?,?)')
-      .bind(id, r2_key, filename, mime, bytes.length, width, height, isImage(mime) ? alt.slice(0, 300) : '', decorative ? 1 : 0).run();
+    await env.DB.prepare('INSERT INTO assets (id, r2_key, filename, mime, size, width, height, alt, decorative, created_at) VALUES (?,?,?,?,?,?,?,?,?, coalesce(?, unixepoch()))')
+      .bind(id, r2_key, filename, mime, bytes.length, width, height, isImage(mime) ? alt.slice(0, 300) : '', decorative ? 1 : 0, restore?.createdAt && Number.isInteger(restore.createdAt) && restore.createdAt > 0 ? restore.createdAt : null).run();
   } catch (e) { await env.ASSETS_BUCKET.delete(r2_key); throw e; }
   return { ok: true, asset: (await getAsset(id))! };
 }

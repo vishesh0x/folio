@@ -26,6 +26,7 @@ export const GET: APIRoute = ({ url }) => versionedCache(url.origin, 'sitemap.xm
   const entries = [
     ...pages.filter((p) => !hidden.has(p.key)).map((p) => ({ loc: p.path, lastmod: p.lastmod })),
     ...projects.map((p) => ({ loc: `/projects/${p.slug}`, lastmod: p.updated_at })),
+    { loc: '/privacy', lastmod: undefined },
   ];
   const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n` +
     entries.map((e) => `  <url><loc>${esc(origin + e.loc)}</loc>${e.lastmod ? `<lastmod>${day(e.lastmod)}</lastmod>` : ''}</url>`).join('\n') + `\n</urlset>\n`;

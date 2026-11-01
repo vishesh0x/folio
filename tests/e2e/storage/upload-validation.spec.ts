@@ -128,7 +128,7 @@ test.describe('what the upload hands back and what the file is called', () => {
 test.describe('only the signed-in owner can upload', () => {
   test.use({ storageState: { cookies: [], origins: [] } });
   test('no session: refused; from another site: refused; nothing is stored', async ({ playwright, baseURL }) => {
-    const request = await playwright.request.newContext({ baseURL, storageState: { cookies: [], origins: [] } });
+    const request = withRetry(await playwright.request.newContext({ baseURL, storageState: { cookies: [], origins: [] } }));   // (retries the local test proxy's occasional 500)
     const r = await request.post('/api/admin/assets/upload', { multipart: { file: { name: 'a.png', mimeType: 'image/png', buffer: fx('plain.png') }, alt: 'x' }, headers: sameOrigin(baseURL!), maxRedirects: 0 });
     expect(r.status()).toBe(401);
     const x = await request.post('/api/admin/assets/upload', { multipart: { file: { name: 'a.png', mimeType: 'image/png', buffer: fx('plain.png') }, alt: 'x' }, headers: { 'sec-fetch-site': 'cross-site', origin: 'https://evil.example' }, maxRedirects: 0 });

@@ -3,7 +3,7 @@ import Dash from '../../layouts/Dash.astro';
 import PageHead from '../../components/PageHead.astro';
 import MediaField from '../../components/MediaField.astro';
 import MediaData from '../../components/MediaData.astro';
-import { getSettings, saveSettings, type Social } from '../../lib/settings';
+import { getSettings, saveSettings, cleanUrl, MAX_SOCIALS, type Social } from '../../lib/settings';
 import { listAssets, isImage } from '../../lib/assets';
 import { validateEmail } from '../../lib/auth';
 
@@ -11,20 +11,13 @@ let s = await getSettings();
 const assets = await listAssets();
 const images = assets.filter((a) => isImage(a.mime));
 const pdfs = assets.filter((a) => a.mime === 'application/pdf');
-const MAX_SOCIALS = 8;
 let error = '', saved = false;
 
-const cleanUrl = (u: string, allowMail = false) => {
-  u = u.trim();
-  if (!u) return '';
-  if (allowMail && u.startsWith('mailto:')) return u.slice(0, 300);
-  try { const x = new URL(u); return x.protocol === 'https:' || x.protocol === 'http:' ? x.href : null; } catch { return null; }
-};
 
 if (Astro.request.method === 'POST') {
   const f = await Astro.request.formData();
   const t = (k: string, max: number) => String(f.get(k) ?? '').trim().slice(0, max);
-  const next = { ...s, headline: t('headline', 160), availability: t('availability', 60), name: t('name', 80) || s.name, tagline: t('tagline', 140), bio: t('bio', 1200), location: t('location', 80), email: t('email', 254), phone: t('phone', 30), now_intro: t('now_intro', 400), meta_description: t('meta_description', 300) };
+  const next = { ...s, headline: t('headline', 160), availability: t('availability', 60), name: t('name', 80) || s.name, tagline: t('tagline', 140), bio: t('bio', 1200), location: t('location', 80), email: t('email', 254), phone: t('phone', 30), now_intro: t('now_intro', 400), meta_description: t('meta_description', 300), privacy_md: String(f.get('privacy_md') ?? '').replace(/\r\n?/g, '\n').slice(0, 12000).trim() };
   const site = cleanUrl(t('site_url', 200));
   const socials: Social[] = [];
   for (let i = 0; i < MAX_SOCIALS; i++) {
@@ -116,6 +109,7 @@ const rows = Array.from({ length: MAX_SOCIALS }, (_, i) => s.socials[i] ?? { lab
         <div class="stack" style="--stack:16px">
           <div class="field"><label for="site_url">Site address</label><input id="site_url" name="site_url" type="url" value={s.site_url} placeholder="https://yourname.com" /><span class="hint">Used for canonical links and share previews. Empty uses the address people visit.</span></div>
           <div class="field"><label for="meta_description">Default description</label><textarea id="meta_description" name="meta_description" rows="2" maxlength="300">{s.meta_description}</textarea></div>
+          <div class="field"><label for="privacy_md">Privacy notice (optional)</label><textarea id="privacy_md" name="privacy_md" rows="10" maxlength="12000" placeholder="Leave empty to use the standard privacy notice.">{s.privacy_md}</textarea><p class="hint">Shown at /privacy. Leave empty for the standard text, which describes what this site really does (a contact form, Cloudflare hosting, Turnstile and Web Analytics, one session cookie for you). Read it once and make sure it is true for your set-up, for example if you switch Cloudflare Web Analytics off. Write your own in Markdown to replace it. This is a plain-language template, not legal advice.</p></div>
           <MediaField side name="og_asset" value={s.og_asset} assets={assets} kind="image" raster label="Default share image" none="No share image" aspect="1.91 / 1" empty="Add a share image" pickTitle="Choose a share image" thumbWidth="260px" help="PNG, JPEG, WebP or AVIF. Facebook, LinkedIn and X do not show SVG or GIF previews. 1200×630 works best." />
         </div>
       </section>

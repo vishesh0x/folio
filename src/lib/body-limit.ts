@@ -8,7 +8,7 @@
 // Not covered: a body sent without a Content-Length (chunked); browsers always send one for forms and uploads.
 export const MAX_UPLOAD_REQUEST = 16 * 1024 * 1024;
 export const MAX_FORM_REQUEST = 4 * 1024 * 1024;
-export const UPLOAD_PATHS = ['/api/admin/assets', '/api/admin/assets/upload'];
+export const UPLOAD_PATHS = ['/api/admin/assets', '/api/admin/assets/upload', '/api/admin/backup-file'];
 
 /** The limit that applies to a POST to this path, in bytes. */
 export const requestLimit = (path: string) => (UPLOAD_PATHS.includes(path) ? MAX_UPLOAD_REQUEST : MAX_FORM_REQUEST);

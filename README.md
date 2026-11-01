@@ -71,3 +71,36 @@ src/scripts      media.ts: the shared upload-or-choose picker used by every file
 src/assets/fonts Paper Mono (variable woff2) and its licence
 migrations       database tables, applied in order
 ```
+
+## Operations: backups, restores and routine checks
+
+Everything here is also covered by tests (see `audit-progress.md`, Steps 8 and 9). Commands run from the project folder; `--remote` ones need `npx wrangler login`.
+
+### Three layers of backup (use more than one)
+
+| Layer | Covers | How far back | How |
+|---|---|---|---|
+| **D1 Time Travel** (automatic, always on) | the whole database | 7 days (free plan), 30 (paid), to the minute | `npx wrangler d1 time-travel info folio-db` shows the current bookmark; `npx wrangler d1 time-travel restore folio-db --timestamp=<unix or RFC3339>` rolls back. **A restore overwrites the database in place** and prints a bookmark: restoring to that bookmark undoes it. Note it down first. It cannot make a copy. |
+| **SQL export** | the whole database (accounts, sessions included) | as old as the file you keep | `npx wrangler d1 export folio-db --remote --output=folio-$(date +%F).sql`. Keep one a month somewhere private. |
+| **The site backup zip** (Dashboard > Backup & restore) | content and every file, readable with any zip program | as old as the file you keep | Download after big edits. Restoring it is also how you move the content to a new site. Never includes your account. Can include visitors' messages if you tick the box: keep such a file private. |
+
+Files in R2 have no automatic history (deleting one is final), so **the site backup zip is your copy of the files**.
+
+### Prove the database backup works (do this once, then every few months)
+
+`node scripts/d1-restore-drill.mjs --remote` exports your real database, loads it into a temporary new one (`folio-drill-<time>`), compares every table row for row, and deletes the temporary one. Your real data is only read. Without `--remote` it does the same on a local test copy.
+
+### Restoring after a disaster
+
+1. Something wrong with recent changes (a bad edit, a mistaken delete): **Time Travel** if it was within 7 days, otherwise the site backup zip (Dashboard > Backup & restore > "Check only", then Import).
+2. The whole database lost: create a new one (`npx wrangler d1 create folio-db`), put its id in `wrangler.jsonc`, `npx wrangler d1 execute folio-db --remote --file=<your export>.sql`, then redeploy.
+3. Files lost: restore the site backup zip (files are added back under their original addresses).
+
+### Routine checks
+
+| What | How | How often |
+|---|---|---|
+| Broken links, including links to other websites | `node tests/tools/crawl-links.mjs https://visheshraghuvanshi.in --external` (run on your own computer; exit code 1 if something inside the site is broken) | monthly, and after big edits |
+| Known weaknesses in what the site is built from | `npm audit` (the advisories that remain are listed in `audit-progress.md`); update with `npm update <name>` only to versions at least 14 days old | monthly |
+| Real usage against the free plan's daily limits | Cloudflare dashboard: Workers & Pages > folio > Metrics; D1 > folio-db > Metrics; R2; Images (see Step 7) | monthly |
+| Whole test suite | `npm run test:e2e` (about 20 minutes) | before each deploy |

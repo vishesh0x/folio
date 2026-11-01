@@ -4,6 +4,8 @@ import PageHead from '../../../components/PageHead.astro';
 import { listMessages } from '../../../lib/inbox';
 import { ago } from '../../../lib/format';
 
+const rawDeleted = Astro.url.searchParams.get('deleted');
+const deleted = rawDeleted && /^(\d{1,6}|none)$/.test(rawDeleted) ? rawDeleted : null;   // only a count or "none" is ever shown (never text from the address)
 const filter = Astro.url.searchParams.get('filter') === 'unread' ? 'unread' : 'all';
 const { rows, total, pages, page } = await listMessages(filter, Number(Astro.url.searchParams.get('page')) || 1);
 const q = (p: number) => `/dashboard/inbox?${filter === 'unread' ? 'filter=unread&' : ''}page=${p}`;
@@ -18,6 +20,7 @@ const snippet = (t: string) => (t.length > 110 ? t.slice(0, 110).trimEnd() + 'â€
       <button class="btn ghost sm" type="submit">Mark all as read</button>
     </form>
   </PageHead>
+  {deleted !== null && <p class="flash" role="status">{deleted === 'none' ? 'Nothing was deleted (tick the box and fill in the field).' : `Deleted ${deleted} message${deleted === '1' ? '' : 's'}.`}</p>}
   <nav class="filters" aria-label="Filter messages">
     <a href="/dashboard/inbox" aria-current={filter === 'all' ? 'true' : undefined}>All</a>
     <a href="/dashboard/inbox?filter=unread" aria-current={filter === 'unread' ? 'true' : undefined}>Unread</a>
@@ -51,4 +54,22 @@ const snippet = (t: string) => (t.length > 110 ? t.slice(0, 110).trimEnd() + 'â€
       {page < pages ? <a class="btn ghost sm" href={q(page + 1)}>Older â†’</a> : <span></span>}
     </nav>
   )}
+
+  <details class="card" style="margin-top:22px">
+    <summary class="card-h" style="cursor:pointer">Visitors' data: download, delete by person, delete old</summary>
+    <p class="card-sub" style="margin-top:8px">Messages contain names and email addresses. Use these when someone asks what you hold about them or asks you to delete it, or to keep the inbox tidy.</p>
+    <p style="margin-top:14px"><a class="btn" href="/api/admin/messages.csv" download>Download all messages (.csv)</a></p>
+    <form method="post" action="/api/admin/inbox" style="margin-top:18px">
+      <input type="hidden" name="action" value="delete-email" />
+      <div class="field"><label for="del-email">Delete every message from this email address</label><input id="del-email" name="email" type="email" maxlength="254" autocomplete="off" required /></div>
+      <label class="choice"><input type="checkbox" name="confirm" value="yes" required /> <span>I understand this cannot be undone</span></label>
+      <p style="margin-top:10px"><button class="btn danger" type="submit">Delete their messages</button></p>
+    </form>
+    <form method="post" action="/api/admin/inbox" style="margin-top:18px">
+      <input type="hidden" name="action" value="delete-older" />
+      <div class="field"><label for="del-days">Delete messages older than (days)</label><input id="del-days" name="days" type="number" min="1" max="3650" value="365" required /></div>
+      <label class="choice"><input type="checkbox" name="confirm" value="yes" required /> <span>I understand this cannot be undone</span></label>
+      <p style="margin-top:10px"><button class="btn danger" type="submit">Delete old messages</button></p>
+    </form>
+  </details>
 </Dash>

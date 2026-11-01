@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { createRequire } from 'node:module';
+import { execFileSync } from 'node:child_process';
 
 // Step 5: the deployment configuration (wrangler.jsonc). These read files only; no server is involved.
 const { parse } = createRequire(import.meta.url)('jsonc-parser') as { parse: (s: string) => any };   // wrangler's own comment-tolerant JSON reader
@@ -58,4 +59,9 @@ test('what the server writes to its logs (Cloudflare keeps them) never includes 
   const lines = files('src').filter((f) => !f.startsWith('src/scripts')).flatMap((f) => readFileSync(f, 'utf8').split('\n').map((l, i) => ({ f, i: i + 1, l }))).filter((x) => /console\.(log|error|warn|info|debug)\(/.test(x.l));
   expect(lines.length, 'there are log statements to check').toBeGreaterThan(0);
   expect(lines.filter((x) => bad.test(x.l)).map((x) => `${x.f}:${x.i}`)).toEqual([]);
+});
+
+test('the deploy script\'s own route check passes (npm run deploy runs it first and refuses to deploy otherwise)', () => {
+  // It once failed for a month on a page added in Step 4 that nobody had put on its list; nothing noticed because tests do not run `npm run deploy`.
+  expect(() => execFileSync('node', ['scripts/check-routes.mjs'], { encoding: 'utf8', stdio: 'pipe' })).not.toThrow();
 });

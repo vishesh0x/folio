@@ -17,6 +17,6 @@ export function unavailablePage(): string {
 main{max-width:34rem;padding:2rem}h1{font-size:1.6rem;margin:0 0 .6rem}p{margin:.6rem 0}a{color:inherit}</style></head>
 <body><main><h1>Back in a moment.</h1>
 <p>The site cannot reach its database right now. This is temporary and nothing you did caused it.</p>
-<p>If you were sending a message, <strong>it was not sent</strong>. Use your browser's Back button to keep what you wrote, then try again in a minute.</p>
+<p>If you were sending a message, <strong>it was not sent</strong>. Use your browser’s Back button to keep what you wrote, then try again in a minute.</p>
 <p><a href="javascript:location.reload()">Try again</a></p></main></body></html>`;
 }

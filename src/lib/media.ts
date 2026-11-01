@@ -86,6 +86,8 @@ export function variantOf(params: URLSearchParams): Variant {
 export const mediaKey = (origin: string, id: string, v: Variant) => `${origin}/media/${id}` + (v ? `?w=${v.w}&f=${v.f}` : '');
 // A separate path, NOT a #fragment: cache keys ignore fragments, so "#missing" would collide with the cached original of the same image.
 const missingKey = (origin: string, id: string) => `${origin}/__missing/${id}`;
+/** Forget "this id does not exist" (kept for a minute so guessed addresses cost nothing). A backup restore brings a file back under an id that may have been asked for a moment ago. */
+export const forgetMissing = (origin: string, id: string) => caches.default.delete(new Request(missingKey(origin, id)));
 
 /**
  * Edge cache wrapper for /media. Answers from cache (with a 304 when the browser already has it), otherwise builds the response once.

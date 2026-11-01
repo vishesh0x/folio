@@ -21,12 +21,13 @@ const ICONS: Record<string, string> = {
   assets: '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="1.8"/><path d="m21 16-5-5-8 9"/>',
   settings: '<path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/>',
   seo: '<circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/>',
+  backup: '<path d="M12 3v12m0 0-4-4m4 4 4-4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/>',
 };
 type Item = [href: string, label: string, icon: string];
 const groups: { label?: string; items: Item[] }[] = [
   { items: [['/dashboard', 'Overview', 'overview'], ['/dashboard/inbox', 'Inbox', 'inbox']] },
   { label: 'Content', items: [['/dashboard/projects', 'Projects', 'projects'], ['/dashboard/now', 'Now board', 'now'], ['/dashboard/resume', 'Resume', 'resume'], ['/dashboard/assets', 'Files', 'assets']] },
-  { label: 'Site', items: [['/dashboard/settings', 'Settings', 'settings'], ['/dashboard/seo', 'Search & sharing', 'seo']] },
+  { label: 'Site', items: [['/dashboard/settings', 'Settings', 'settings'], ['/dashboard/seo', 'Search & sharing', 'seo'], ['/dashboard/backup', 'Backup & restore', 'backup']] },
 ];
 const active = (href: string) => (href === '/dashboard' ? path === href : path === href || path.startsWith(href + '/'));
 ---

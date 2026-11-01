@@ -7,7 +7,7 @@ const EXPECTED = new Set([
   '404.astro', '500.astro', 'contact.astro', 'favicon.ico.ts', 'index.astro', 'manifest.webmanifest.ts', 'now.astro', 'robots.txt.ts', 'sitemap.xml.ts',
   'api/reveal.ts', 'auth/index.astro', 'auth/logout.ts', 'error/403.astro', 'icons/[file].ts', 'media/[id]/[...name].ts',
   'projects/index.astro', 'projects/[slug].astro', 'resume/index.astro', 'resume/download.ts',
-  'api/admin/assets/delete.ts', 'api/admin/assets/index.ts', 'api/admin/assets/update.ts', 'api/admin/assets/upload.ts', 'api/admin/inbox.ts', 'api/admin/now.ts',
+  'api/admin/assets/delete.ts', 'api/admin/assets/storage.ts', 'api/admin/backup.ts', 'api/admin/backup-file.ts', 'dashboard/backup.astro', 'privacy.astro', 'api/admin/messages.csv.ts', 'api/admin/assets/index.ts', 'api/admin/assets/update.ts', 'api/admin/assets/upload.ts', 'api/admin/inbox.ts', 'api/admin/now.ts',
   'api/admin/preview.ts', 'api/admin/projects.ts', 'api/admin/projects/[id]/export.ts',
   'dashboard/assets.astro', 'dashboard/index.astro', 'dashboard/now.astro', 'dashboard/resume.astro', 'dashboard/seo.astro', 'dashboard/settings.astro',
   'dashboard/inbox/[id].astro', 'dashboard/inbox/index.astro', 'dashboard/projects/[id].astro', 'dashboard/projects/index.astro',
