@@ -100,7 +100,7 @@ const links = s.socials;
 
       <aside class="contact-side card">
         <h2>Other ways</h2>
-        {s.email && <p><strong>Email</strong><br /><Reveal kind="email" /></p>}
+        {s.email && s.contact_email && <p><strong>Email</strong><br /><Reveal kind="email" /></p>}
         {s.location && <p><strong>Based in</strong><br />{s.location}</p>}
         {links.length > 0 && (
           <ul class="link-rows">

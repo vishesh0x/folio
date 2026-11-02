@@ -8,6 +8,8 @@ export type SiteSettings = {
   site_url: string; meta_description: string;
   /** Owner-written privacy notice (Markdown). Empty means the standard text from src/lib/privacy.ts. */
   privacy_md: string;
+  /** Offer the public email (click to reveal) on the Contact page. The resume has its own setting. */
+  contact_email: boolean;
   og_asset: string | null; portrait_asset: string | null; favicon_asset: string | null; resume_asset: string | null;
   headline: string;        // optional big headline on the home page; *word* is shown in the accent colour
   availability: string;    // e.g. "Open to new work"; empty hides the badge
@@ -25,7 +27,7 @@ export const cleanUrl = (u: string, allowMail = false) => {
 export const SETTINGS_DEFAULTS: SiteSettings = {
   name: 'Your Name', tagline: 'Designer & developer', bio: '', email: '', phone: '', location: '', now_intro: '',
   site_url: '', meta_description: 'Personal website and portfolio.',
-  privacy_md: '',
+  privacy_md: '', contact_email: true,
   og_asset: null, portrait_asset: null, favicon_asset: null, resume_asset: null, headline: '', availability: '', highlights: [], socials: [],
 };
 

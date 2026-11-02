@@ -1,6 +1,7 @@
 import { test, expect } from '../fixtures';
 import { ADMIN_EMAIL, ADMIN_PASSWORD, freshIp, login, sameOrigin } from '../helpers';
 import { withRetry } from '../fixtures';
+import { d1 } from '../d1';
 
 // Audit 1.2: brute-force and abuse throttling (login 5 failures / 15 min / IP; reveal 10 / hour / IP; contact 5 / hour / IP).
 const anon = { cookies: [], origins: [] };
@@ -100,5 +101,31 @@ test.describe('public endpoint throttles', () => {
     expect((await post('1.AAAA')).status()).toBe(400);                // forged
     expect((await post(t.replace(/.$/, (c) => (c === 'A' ? 'B' : 'A')))).status()).toBe(400); // tampered signature
     expect((await post('')).status()).toBe(400);                      // missing
+  });
+});
+
+test.describe('account lock and known browsers', () => {
+  test('20 wrong passwords lock a stranger out, but a browser the owner signed in from before still gets in', async ({ playwright, baseURL }) => {
+    const fresh = async (storageState?: { cookies: any[]; origins: [] }) => withRetry(await playwright.request.newContext({ baseURL, storageState }));
+    const owner = await fresh();
+    try {
+      expect((await login(owner, baseURL!, ADMIN_EMAIL, ADMIN_PASSWORD, freshIp())).status()).toBe(302);
+      const device = { cookies: (await owner.storageState()).cookies.filter((c) => /device/.test(c.name)), origins: [] as [] };
+      expect(device.cookies, 'a known-browser cookie is issued at sign-in').toHaveLength(1);
+      for (let n = 0; n < 4; n++) {
+        const ip = freshIp();
+        for (let i = 0; i < 5; i++) { const c = await fresh(); expect((await login(c, baseURL!, ADMIN_EMAIL, `wrong ${n} ${i}`, ip)).status()).toBe(401); await c.dispose(); }
+      }
+      const stranger = await fresh();
+      const refused = await login(stranger, baseURL!, ADMIN_EMAIL, ADMIN_PASSWORD, freshIp());
+      expect(refused.status()).toBe(429);
+      expect(await refused.text()).toContain('Too many wrong passwords');
+      await stranger.dispose();
+      const known = await fresh(device);
+      expect((await login(known, baseURL!, ADMIN_EMAIL, ADMIN_PASSWORD, freshIp())).status(), 'the owner\'s own browser is let through (the password is still required)').toBe(302);
+      const wrong = await fresh(device);
+      expect((await login(wrong, baseURL!, ADMIN_EMAIL, 'not the password at all', freshIp())).status(), 'a known browser still needs the right password').toBe(401);
+      await known.dispose(); await wrong.dispose();
+    } finally { await owner.dispose(); d1('e2e-a', 'DELETE FROM login_attempts'); }
   });
 });

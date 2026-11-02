@@ -32,3 +32,6 @@ picture(48, 48).save('tests/fixtures/photo-meta.webp', 'WEBP', lossless=True, ex
 picture(48, 48).save('tests/fixtures/plain.webp', 'WEBP', lossless=True)
 picture(32, 32).save('tests/fixtures/plain.png', 'PNG')
 print('done')
+
+# photo-meta.avif and doc-meta.pdf (made with Pillow and pypdf): EXIF/XMP with a camera name and author, a PDF with title/author/producer.
+# Search strings used by the tests: "SecretCam", "Jane Secret", "Private Title".

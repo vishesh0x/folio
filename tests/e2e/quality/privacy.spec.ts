@@ -52,12 +52,12 @@ test.describe('what the notice claims about the visitor is what the site does', 
   });
 });
 
-test.describe('the owner has exactly one cookie, and it is private', () => {
-  test('signing in sets one cookie: HttpOnly, Secure, SameSite=Lax, host-only (__Host- prefix)', async ({ playwright, baseURL }) => {
+test.describe('the owner has exactly two cookies (session and known browser), and both are private', () => {
+  test('signing in sets two cookies: HttpOnly, Secure, SameSite=Lax, host-only (__Host- prefix)', async ({ playwright, baseURL }) => {
     const v = await playwright.request.newContext({ baseURL, storageState: { cookies: [], origins: [] } });
     const r = await v.post('/auth', { form: { mode: 'login', email: 'e2e-owner@example.com', password: 'correct horse battery staple 42' }, headers: sameOrigin(baseURL!), maxRedirects: 0 });
     const cookies = r.headersArray().filter((h) => h.name.toLowerCase() === 'set-cookie').map((h) => h.value);
-    if (r.status() === 302) { expect(cookies).toHaveLength(1); expect(cookies[0]).toMatch(/^__Host-session=/); for (const a of ['HttpOnly', 'Secure', 'SameSite=Lax', 'Path=/']) expect(cookies[0]).toContain(a); expect(cookies[0]).not.toMatch(/Domain=/i); }
+    if (r.status() === 302) { expect(cookies).toHaveLength(2); expect(cookies.map((c) => c.split('=')[0]).sort()).toEqual(['__Host-device', '__Host-session']); for (const c of cookies) { for (const a of ['HttpOnly', 'Secure', 'SameSite=Lax', 'Path=/']) expect(c).toContain(a); expect(c).not.toMatch(/Domain=/i); } }
     await v.dispose();
   });
 });

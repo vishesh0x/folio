@@ -20,6 +20,8 @@ export const POST: APIRoute = async ({ request, url }) => {
   const s = await getPublicSettings();
   // The phone number is only available if the resume is set to show it AND to use click-to-reveal.
   const o = await getResumeOpts();
-  const value = kind === 'email' ? s.email : kind === 'phone' && o.show_phone && o.contact_mode === 'reveal' ? s.phone : '';
+  // The email is available if the Contact page offers it (Settings) OR the resume shows it in click-to-reveal mode.
+  const emailOk = s.contact_email || (o.show_email && o.contact_mode === 'reveal');
+  const value = kind === 'email' ? (emailOk ? s.email : '') : kind === 'phone' && o.show_phone && o.contact_mode === 'reveal' ? s.phone : '';
   return value ? json({ value }) : json({ error: 'Not available' }, 404);
 };

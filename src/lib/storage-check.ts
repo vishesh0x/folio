@@ -52,7 +52,7 @@ export async function removeStrays(minAgeSecs = 3600): Promise<{ removed: number
  */
 const BATCH = 8;
 export async function scrubMetadata(origin: string, offset = 0): Promise<{ checked: number; cleaned: number; bytesSaved: number; failed: number; next: number | null }> {
-  const rows = (await env.DB.prepare("SELECT id, r2_key, mime FROM assets WHERE mime IN ('image/jpeg', 'image/png', 'image/webp') ORDER BY created_at, id LIMIT ?1 OFFSET ?2")
+  const rows = (await env.DB.prepare("SELECT id, r2_key, mime FROM assets WHERE mime IN ('image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/avif', 'application/pdf') ORDER BY created_at, id LIMIT ?1 OFFSET ?2")
     .bind(BATCH, offset).all<{ id: string; r2_key: string; mime: string }>()).results;
   let cleaned = 0, bytesSaved = 0, failed = 0;
   for (const r of rows) {
@@ -60,11 +60,11 @@ export async function scrubMetadata(origin: string, offset = 0): Promise<{ check
       const obj = await env.ASSETS_BUCKET.get(r.r2_key);
       if (!obj) continue;                                              // a broken entry: reported by the storage check, not our business here
       const before = new Uint8Array(await obj.arrayBuffer()), after = stripMetadata(before, r.mime);
-      if (after.length >= before.length) continue;                     // nothing to remove
+      if (after === before || (after.length === before.length && after.every((v, i) => v === before[i]))) continue;   // nothing to remove
       await env.ASSETS_BUCKET.put(r.r2_key, after, { httpMetadata: obj.httpMetadata, customMetadata: obj.customMetadata });
       await env.DB.prepare('UPDATE assets SET size = ? WHERE id = ?').bind(after.length, r.id).run();
       await caches.default.delete(new Request(mediaKey(origin, r.id, null))); // the cached ORIGINAL would keep serving the old bytes (resized copies never carried it)
-      cleaned++; bytesSaved += before.length - after.length;
+      cleaned++; bytesSaved += Math.max(0, before.length - after.length);
     } catch (e) { failed++; console.error('[storage] could not clean', r.r2_key, e); }
   }
   return { checked: rows.length, cleaned, bytesSaved, failed, next: rows.length === BATCH ? offset + BATCH : null };

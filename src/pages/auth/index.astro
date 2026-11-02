@@ -3,7 +3,7 @@ import Base from '../../layouts/Base.astro';
 import { getPublicSettings } from '../../lib/settings';
 import {
   MIN_PASSWORD, validateEmail, validatePassword, isLimited, recordFailure, clearFailures,
-  createSession, getUser, login, hasAnyUser, setupEnabled, checkSetupToken, createFirstAdmin, clientKey, accountKey, ACCOUNT_MAX_FAILS, ACCOUNT_WINDOW_SECS,
+  createSession, getUser, isKnownDevice, rememberDevice, login, hasAnyUser, setupEnabled, checkSetupToken, createFirstAdmin, clientKey, accountKey, ACCOUNT_MAX_FAILS, ACCOUNT_WINDOW_SECS,
 } from '../../lib/auth';
 import { turnstileOn, turnstileSiteKey, verifyTurnstile } from '../../lib/turnstile';
 import { ipOf } from '../../lib/throttle';
@@ -51,11 +51,12 @@ if (Astro.request.method === 'POST') {
       Astro.response.status = 429;
       error = 'Too many attempts. Try again in 15 minutes.';
     } else {
-      // Many wrong passwords for this ACCOUNT, from any number of visitors: stop guessing unless a human check is passed. (Without
-      // Turnstile configured the only safe choice is to wait; with it, the owner can always get in by solving the check.)
+      // Many wrong passwords for this ACCOUNT, from any number of visitors: stop guessing unless the attempt comes from a browser the owner has
+      // signed in from before, or passes a human check. (A stranger who only knows the email can therefore not keep the owner out, with or
+      // without Turnstile. The password is still required, and the per-network limit above still applies.)
       let go = true;
-      if (await isLimited(acct, ACCOUNT_MAX_FAILS, ACCOUNT_WINDOW_SECS)) {
-        if (!turnstileOn()) { go = false; Astro.response.status = 429; error = 'Too many wrong passwords for this account. Try again in an hour.'; }
+      if (await isLimited(acct, ACCOUNT_MAX_FAILS, ACCOUNT_WINDOW_SECS) && !(await isKnownDevice(Astro.cookies, email))) {
+        if (!turnstileOn()) { go = false; Astro.response.status = 429; error = 'Too many wrong passwords for this account. Try again in an hour, or sign in from a browser you have used before.'; }
         else if (!(await verifyTurnstile(String(form.get('cf-turnstile-response') ?? ''), ipOf(Astro.request), { hostname: Astro.url.hostname, action: 'login' }))) {
           go = false; challenge = true; Astro.response.status = 429; error = 'There have been many wrong passwords for this account. Please complete the check below, then sign in.';
         }
@@ -63,7 +64,7 @@ if (Astro.request.method === 'POST') {
       if (go) {
         const id = await login(email, password);
         if (id === null) { await recordFailure(key); await recordFailure(acct, ACCOUNT_WINDOW_SECS); Astro.response.status = 401; error = 'Email or password is incorrect.'; challenge = await isLimited(acct, ACCOUNT_MAX_FAILS, ACCOUNT_WINDOW_SECS) && turnstileOn(); }
-        else { await clearFailures(key); await clearFailures(acct); await createSession(id, Astro.cookies); return Astro.redirect('/dashboard'); }
+        else { await clearFailures(key); await clearFailures(acct); await createSession(id, Astro.cookies); await rememberDevice(id, Astro.cookies); return Astro.redirect('/dashboard'); }
       }
     }
   }

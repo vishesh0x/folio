@@ -17,7 +17,7 @@ let error = '', saved = false;
 if (Astro.request.method === 'POST') {
   const f = await Astro.request.formData();
   const t = (k: string, max: number) => String(f.get(k) ?? '').trim().slice(0, max);
-  const next = { ...s, headline: t('headline', 160), availability: t('availability', 60), name: t('name', 80) || s.name, tagline: t('tagline', 140), bio: t('bio', 1200), location: t('location', 80), email: t('email', 254), phone: t('phone', 30), now_intro: t('now_intro', 400), meta_description: t('meta_description', 300), privacy_md: String(f.get('privacy_md') ?? '').replace(/\r\n?/g, '\n').slice(0, 12000).trim() };
+  const next = { ...s, contact_email: f.get('contact_email') === 'on', headline: t('headline', 160), availability: t('availability', 60), name: t('name', 80) || s.name, tagline: t('tagline', 140), bio: t('bio', 1200), location: t('location', 80), email: t('email', 254), phone: t('phone', 30), now_intro: t('now_intro', 400), meta_description: t('meta_description', 300), privacy_md: String(f.get('privacy_md') ?? '').replace(/\r\n?/g, '\n').slice(0, 12000).trim() };
   const site = cleanUrl(t('site_url', 200));
   const socials: Social[] = [];
   for (let i = 0; i < MAX_SOCIALS; i++) {
@@ -88,7 +88,7 @@ const rows = Array.from({ length: MAX_SOCIALS }, (_, i) => s.socials[i] ?? { lab
           <div class="field"><label for="tagline">Tagline</label><input id="tagline" name="tagline" value={s.tagline} maxlength="140" /></div>
           <div class="field"><label for="bio">Short bio</label><textarea id="bio" name="bio" rows="4" maxlength="1200">{s.bio}</textarea></div>
           <div class="two">
-            <div class="field"><label for="email">Public email</label><input id="email" name="email" type="email" value={s.email} /><span class="hint">Never written into the page. Visitors click “Show email”, which stops scrapers that only read HTML.</span></div>
+            <div class="field"><label for="email">Public email</label><input id="email" name="email" type="email" value={s.email} /><span class="hint">Never written into the page. Visitors click “Show email”, which stops scrapers that only read HTML.</span><label class="toggle" style="margin-top:8px"><input type="checkbox" name="contact_email" checked={s.contact_email} /> Offer it on the Contact page</label><span class="hint">Turn this off to keep your email off the Contact page. The resume has its own email setting.</span></div>
             <div class="field"><label for="phone">Phone <span class="opt">(optional)</span></label><input id="phone" name="phone" type="tel" value={s.phone} maxlength="30" /><span class="hint">Protected the same way. Used on the resume page.</span></div>
           </div>
           <div class="field"><label for="now_intro">Intro for the Now page</label><textarea id="now_intro" name="now_intro" rows="2" maxlength="400">{s.now_intro}</textarea></div>

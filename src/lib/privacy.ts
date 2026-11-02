@@ -12,7 +12,7 @@ export function defaultPrivacyMd(name: string): string {
 
 ## Cookies and similar storage
 
-Visitors get **no cookies**. A single session cookie is set only for the site owner when signing in to the private dashboard. Your browser's local storage keeps one small item, your light or dark theme choice; it stays on your device and is not sent to the server.
+Visitors get **no cookies**. Two cookies, one for the session and one that recognises the owner's browser, are set only for the site owner when signing in to the private dashboard. Your browser's local storage keeps one small item, your light or dark theme choice; it stays on your device and is not sent to the server.
 
 ## Services that process data for this site
 

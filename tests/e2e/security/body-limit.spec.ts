@@ -1,7 +1,7 @@
 import { test, expect, withRetry } from '../fixtures';
 import { AUTH_FILE, sameOrigin } from '../helpers';
 import { pdf } from '../uploads';
-import { requestTooLarge, requestLimit, MAX_UPLOAD_REQUEST, MAX_FORM_REQUEST } from '../../../src/lib/body-limit';
+import { requestTooLarge, lengthMissing, requestLimit, MAX_UPLOAD_REQUEST, MAX_FORM_REQUEST } from '../../../src/lib/body-limit';
 
 // Step 5: the site refuses an oversized request from its declared size, before reading any of it. (A Worker has 128 MB of memory; reading a form
 // holds all of it at once, and Cloudflare lets bodies of up to 100 MB through.) The file-size rules inside the upload code stay as the second layer.
@@ -31,6 +31,14 @@ test.describe('the size rule itself', () => {
     expect(requestTooLarge('/contact', null)).toBeNull();
     expect(requestTooLarge('/contact', 'abc')).toBeNull();
     expect(requestTooLarge('/contact', '-5')).toBeNull();
+  });
+
+  test('a body without a usable length is refused (411); a request with no body is not', () => {
+    expect(lengthMissing(null, true)).toBe(true);
+    expect(lengthMissing('abc', true)).toBe(true);
+    expect(lengthMissing('-5', true)).toBe(true);
+    expect(lengthMissing('120', true)).toBe(false);
+    expect(lengthMissing(null, false)).toBe(false);   // e.g. the sign-out button posts no body
   });
 });
 

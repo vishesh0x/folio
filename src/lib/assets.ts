@@ -3,7 +3,7 @@ import { randomToken } from './crypto';
 import { sniffBinary } from './sniff';
 import { sanitizeSvg, svgSize } from './svg';
 import { getSettings } from './settings';
-import { stripMetadata } from './strip';
+import { stripMetadata, cleanAvif } from './strip';
 import { assetRefs } from './asset-refs';
 
 export type Asset = {
@@ -76,6 +76,7 @@ export async function saveUpload(file: File, alt: string, decorative: boolean, r
       if ((mime === 'image/png' || mime === 'image/jpeg' || mime === 'image/gif') && !(known && width! > 0 && height! > 0)) return { ok: false, error: 'That image looks damaged (it has no readable size).' };
       if (known && (width! > MAX_SIDE || height! > MAX_SIDE || width! * height! > MAX_PIXELS)) return { ok: false, error: `That image is too large in pixels (limit ${MAX_SIDE} px a side and 100 megapixels). Resize it first.` };
     }
+    if (mime === 'image/avif' && (cleanAvif(bytes) === null)) return { ok: false, error: 'That AVIF could not be checked for camera or location data. Export it again without metadata, or use JPEG, PNG or WebP.' };
     bytes = stripMetadata(bytes, mime); // GPS position, camera serial number, comments: the original is public, so they must not be in it
   } else if (new TextDecoder().decode(bytes.slice(0, 2000)).toLowerCase().includes('<svg')) {
     let text: string;

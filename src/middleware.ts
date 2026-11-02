@@ -4,7 +4,7 @@ import { getUser } from './lib/auth';
 import { contentVersion, bumpContentVersion } from './lib/content-version';
 import { inlineScriptHashes } from './lib/inline-scripts';
 import { isSameOrigin } from './lib/csrf';
-import { requestTooLarge, tooLargeMessage } from './lib/body-limit';
+import { requestTooLarge, tooLargeMessage, lengthMissing } from './lib/body-limit';
 import { turnstileOn } from './lib/turnstile';
 import { etagMatches } from './lib/http-cache';
 import { isDbUnavailable, unavailablePage } from './lib/db-errors';
@@ -91,6 +91,9 @@ async function handle(ctx: Parameters<Parameters<typeof defineMiddleware>[0]>[0]
   const unsafe = !['GET', 'HEAD', 'OPTIONS'].includes(method);
   if (unsafe && !path.startsWith('/error/') && !isSameOrigin(ctx.request, ctx.url)) { // /error/* is exempt so the rewrite below cannot loop
     res = path.startsWith('/api/') ? json({ error: 'Forbidden' }, 403) : await ctx.rewrite('/error/403');
+  } else if (unsafe && !path.startsWith('/error/') && lengthMissing(ctx.request.headers.get('content-length'), ctx.request.body !== null)) {
+    // A body with no declared size (chunked) would be read in full before any limit could apply: refuse it (see src/lib/body-limit.ts).
+    res = new Response('A Content-Length header is required.', { status: 411, headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' } });
   } else if (unsafe && !path.startsWith('/error/') && requestTooLarge(path, ctx.request.headers.get('content-length'))) { // /error/* is exempt: a refused request is rewritten there and must keep its own status
     // Refused before the body is read (see src/lib/body-limit.ts). The Files page's own upload form gets its usual red message; the editors'
     // upload boxes get JSON; anything else a plain 413.

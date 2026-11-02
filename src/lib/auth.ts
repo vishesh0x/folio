@@ -6,6 +6,8 @@ import { rateKey, accountKey } from './throttle';
 export const MIN_PASSWORD = 12;
 const SESSION_DAYS = 14;
 const COOKIE = import.meta.env.PROD ? '__Host-session' : 'session';
+const DEVICE_COOKIE = import.meta.env.PROD ? '__Host-device' : 'device';
+const DEVICE_DAYS = 180, MAX_DEVICES = 10;
 const MAX_FAILS = 5;                 // wrong passwords allowed per visitor (network) ...
 const WINDOW_SECS = 15 * 60;         // ... per 15 minutes
 // A second, separate limit per ACCOUNT, counting wrong passwords from ALL visitors together. The per-visitor limit alone lets many addresses
@@ -43,6 +45,32 @@ export async function recordFailure(key: string, window = WINDOW_SECS) {
 }
 export async function clearFailures(key: string) {
   await env.DB.prepare('DELETE FROM login_attempts WHERE key = ?').bind(key).run();
+}
+
+/* ───── known devices ───── */
+// When many wrong passwords have been sent for the account (by anyone), sign-in is locked for everybody, which would let a stranger who knows the
+// owner's email keep the owner out. A browser the owner has signed in from before carries a random token (stored here only as a hash); it lets
+// that browser keep trying. It is not a credential: the password is still required, and the per-network limit still applies.
+export async function isKnownDevice(cookies: AstroCookies, email: string): Promise<boolean> {
+  const token = cookies.get(DEVICE_COOKIE)?.value;
+  if (!token || token.length > 100) return false;
+  const row = await env.DB.prepare('SELECT 1 AS ok FROM trusted_devices t JOIN users u ON u.id = t.user_id WHERE t.token_hash = ? AND u.email = ? AND t.expires_at > ?')
+    .bind(await sha256Hex(token), email, now()).first();
+  return !!row;
+}
+export async function rememberDevice(userId: number, cookies: AstroCookies) {
+  const existing = cookies.get(DEVICE_COOKIE)?.value;
+  if (existing && existing.length <= 100) {
+    const row = await env.DB.prepare('SELECT 1 AS ok FROM trusted_devices WHERE token_hash = ? AND user_id = ? AND expires_at > ?').bind(await sha256Hex(existing), userId, now()).first();
+    if (row) return;   // already known: keep its token
+  }
+  const token = randomToken(), hash = await sha256Hex(token), expires = now() + DEVICE_DAYS * 86400;
+  await env.DB.batch([
+    env.DB.prepare('DELETE FROM trusted_devices WHERE expires_at < ?').bind(now()),
+    env.DB.prepare('INSERT INTO trusted_devices (token_hash, user_id, expires_at) VALUES (?, ?, ?)').bind(hash, userId, expires),
+    env.DB.prepare('DELETE FROM trusted_devices WHERE user_id = ?1 AND token_hash NOT IN (SELECT token_hash FROM trusted_devices WHERE user_id = ?1 ORDER BY expires_at DESC LIMIT ?2)').bind(userId, MAX_DEVICES),
+  ]);
+  cookies.set(DEVICE_COOKIE, token, { httpOnly: true, secure: import.meta.env.PROD, sameSite: 'lax', path: '/', maxAge: DEVICE_DAYS * 86400 });
 }
 
 /* ───── sessions ───── */
