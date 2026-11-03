@@ -1,8 +1,9 @@
 import { test, expect, type Page } from '@playwright/test';
 import { WIDTHS, openPage } from '../helpers';
 
-// Lighthouse findings: the largest image must start loading at once (not lazy), images must be the right size for their slot,
-// and nothing may jump when an image arrives late (Cumulative Layout Shift).
+// Lighthouse findings: the largest image must start loading at once (not lazy), images must be the
+// right size for their slot, and nothing may jump when an image arrives late (Cumulative Layout
+// Shift).
 const anon = { cookies: [], origins: [] };
 test.use({ storageState: anon });
 
@@ -47,7 +48,7 @@ test.describe('the file the browser picks fits the slot ("sizes")', () => {
   });
 
   test('on a wide screen the browser asks for the smallest file that covers the card (not a bigger one)', async ({ page }) => {
-    const LADDER = [160, 320, 480, 640, 720, 800, 900, 1024, 1280, 1600, 2000]; // = WIDTHS in src/lib/media.ts
+    const LADDER = [160, 320, 480, 640, 720, 800, 900, 1024, 1280, 1600, 2000];  // = WIDTHS in src/lib/media.ts
     for (const [path, expectCols] of [['/', 2], ['/projects', 3]] as const) {
       const wanted: number[] = [];
       const p = await page.context().newPage(); await p.setViewportSize({ width: 1350, height: 940 });
@@ -62,7 +63,10 @@ test.describe('the file the browser picks fits the slot ("sizes")', () => {
   });
 });
 
-/** Layout shift caused by images arriving late: every /media/ response is delayed, like a slow phone connection. */
+/**
+ * Layout shift caused by images arriving late: every /media/ response is delayed, like a slow phone
+ * connection.
+ */
 async function shiftWithLateImages(page: Page, path: string, delay = 1500) {
   await page.route('**/media/**', async (r) => { await new Promise((x) => setTimeout(x, delay)); await r.continue(); });
   await page.addInitScript(() => {
@@ -79,7 +83,7 @@ test.describe('no layout shift when an image arrives late', () => {
     for (const path of ['/projects/wanderhost-booking', '/projects/pocket-ledger', '/', '/projects', '/now', '/resume', '/contact']) {
       test(`${path} on a ${name}`, async ({ page }) => {
         await page.setViewportSize(vp);
-        expect(await shiftWithLateImages(page, path)).toBeLessThan(0.01); // "good" is under 0.1; we have 0.000
+        expect(await shiftWithLateImages(page, path)).toBeLessThan(0.01);  // "good" is under 0.1; the site measures 0.000
       });
     }
   }

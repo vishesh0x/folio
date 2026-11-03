@@ -1,3 +1,7 @@
+/**
+ * Owner-only form actions for the Now board.
+ */
+
 import type { APIRoute } from 'astro';
 import * as N from '../../../lib/now-admin';
 import { getSettings, saveSettings } from '../../../lib/settings';

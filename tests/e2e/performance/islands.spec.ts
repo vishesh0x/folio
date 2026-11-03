@@ -2,8 +2,9 @@ import { test, expect } from '../fixtures';
 import { AUTH_FILE } from '../helpers';
 import { gzipSync } from 'node:zlib';
 
-// Step 2: Astro islands. This site has NO UI-framework islands by design (no client:load / client:visible / client:idle); everything is
-// server-rendered HTML plus a few small hand-written scripts. These tests keep it that way and cap how much JavaScript each page may ship.
+// Astro islands. This site has NO UI-framework islands by design (no client:load / client:visible /
+// client:idle); everything is server-rendered HTML plus a few small hand-written scripts. These tests
+// keep it that way and cap how much JavaScript each page may ship.
 const anon = { cookies: [], origins: [] };
 const PUBLIC = ['/', '/projects', '/projects/pocket-ledger', '/now', '/resume', '/contact', '/auth', '/no-such-page'];
 const DASH = ['/dashboard', '/dashboard/projects', '/dashboard/projects/1', '/dashboard/now', '/dashboard/resume', '/dashboard/inbox', '/dashboard/settings', '/dashboard/assets', '/dashboard/seo'];

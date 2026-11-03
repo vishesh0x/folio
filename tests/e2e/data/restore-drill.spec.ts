@@ -6,8 +6,9 @@ import { join } from 'node:path';
 // @ts-ignore (a plain script, also run by hand: node scripts/d1-restore-drill.mjs)
 import { drill } from '../../../scripts/d1-restore-drill.mjs';
 
-// Step 9: a backup you have never restored is only a hope. The drill exports a database, loads the export into a NEW empty database and compares every
-// table row for row. Here it is run on a copy of the test database; on your real one: node scripts/d1-restore-drill.mjs --remote
+// A backup the owner has never restored is only a hope. The drill exports a database, loads the export
+// into a NEW empty database and compares every table row for row. Here it is run on a copy of the test
+// database; on the real one: node scripts/d1-restore-drill.mjs --remote.
 test.describe.configure({ mode: 'serial' });
 const DB = 'folio-db';
 let dir = '';

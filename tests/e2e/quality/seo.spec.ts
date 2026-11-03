@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { AUTH_FILE } from '../helpers';
 
-// Step 6: what search engines and link previews see. Server A, as an anonymous visitor.
+// What search engines and link previews see. Server A, as an anonymous visitor.
 test.use({ storageState: { cookies: [], origins: [] } });
 const PUBLIC = ['/', '/projects', '/projects/wanderhost-booking', '/projects/pocket-ledger', '/now', '/resume', '/contact', '/privacy'];
 
@@ -32,17 +32,17 @@ test.describe('every public page', () => {
       expect(m.title.length, 'a title').toBeGreaterThan(3); expect(m.title.length, 'short enough to show in a result').toBeLessThanOrEqual(70);
       expect(titles.get(m.title), `title "${m.title}" is already used by ${titles.get(m.title)}`).toBeUndefined(); titles.set(m.title, path);
       expect((m.desc ?? '').length, 'a description').toBeGreaterThan(10); expect(m.desc!.length).toBeLessThanOrEqual(320);
-      // one canonical address: an absolute https URL for exactly this page
+      // One canonical address: an absolute https URL for exactly this page.
       expect(m.canonical, 'exactly one canonical link').toHaveLength(1);
       const canon = new URL(m.canonical[0]);
       expect(canon.protocol).toBe('https:'); expect(canon.pathname).toBe(path); expect(canon.search + canon.hash).toBe('');
-      // sharing tags agree with the page
+      // Sharing tags agree with the page.
       expect(m.og['og:url']).toBe(m.canonical[0]); expect(m.og['og:title']).toBe(m.title);
       expect(m.og['og:description']).toBe(m.desc); expect(m.og['og:site_name']).toBeTruthy(); expect(['website', 'article']).toContain(m.og['og:type']);
       const img = m.og['og:image'];
       expect(m.tw['twitter:card'], 'a big preview card only when there is an image').toBe(img ? 'summary_large_image' : 'summary');
       if (img) { expect(new URL(img).protocol).toBe('https:'); expect(m.og['og:image:alt'], 'the image has a description').toBeTruthy(); expect(m.og['og:image:type']).toBe('image/jpeg'); }
-      // headings: one h1, and the outline never jumps down a level (h2 straight to h4)
+      // Headings: one h1, and the outline never jumps down a level (h2 straight to h4).
       expect(m.h.filter((n) => n === 1), 'exactly one h1').toHaveLength(1); expect(m.h[0]).toBe(1);
       m.h.forEach((n, i) => { if (i) expect(n, `heading ${i} follows h${m.h[i - 1]}`).toBeLessThanOrEqual(m.h[i - 1] + 1); });
     });

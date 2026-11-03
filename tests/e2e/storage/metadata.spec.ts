@@ -4,8 +4,9 @@ import { AUTH_FILE, header } from '../helpers';
 import { upload, removeAsset } from '../uploads';
 import { exifOrientation, stripMetadata, hasAvifMetadata, cleanAvif, cleanPdf } from '../../../src/lib/strip';
 
-// Step 4: a phone photo carries the exact place it was taken, the camera's serial number and more, and the site serves the ORIGINAL file to
-// anyone who has its address (it is visible in the page source). That personal data must not be in the stored file.
+// A phone photo carries the exact place it was taken, the camera's serial number and more, and the
+// site serves the ORIGINAL file to anyone who has its address (it is visible in the page source). That
+// personal data must not be in the stored file.
 test.use({ storageState: AUTH_FILE });
 const SECRETS = ['SecretCamera', 'SERIAL-1234', 'SecretEditing', 'SECRET-COMMENT', 'SECRET-XMP', 'SECRET-PERSON', 'SECRET-ITXT', '2024:06:01', 'xmpmeta'];
 const CASES: [string, string, string][] = [['photo-gps.jpg', 'image/jpeg', 'jpg'], ['photo-gps-noorient.jpg', 'image/jpeg', 'jpg'], ['photo-meta.png', 'image/png', 'png'], ['photo-meta.webp', 'image/webp', 'webp']];
@@ -14,18 +15,18 @@ for (const [file, mime, ext] of CASES) {
   test(`${file}: the stored and served original has no location, camera or comments`, async ({ playwright, baseURL }) => {
     const a = withRetry(await playwright.request.newContext({ baseURL, storageState: AUTH_FILE })), visitor = withRetry(await playwright.request.newContext({ baseURL, storageState: { cookies: [], origins: [] } }));
     const original = readFileSync(`tests/fixtures/${file}`);
-    const marks = file.includes('noorient') ? ['Exif'] : SECRETS;          // the GPS-only photo has numbers, not text: the EXIF block itself is the marker
+    const marks = file.includes('noorient') ? ['Exif'] : SECRETS;  // The GPS-only photo has numbers, not text: the EXIF block itself is the marker
     expect(marks.filter((s) => original.toString('latin1').includes(s)).length, 'the fixture should contain personal data').toBeGreaterThan(0);
     const up = await upload(a, baseURL!, file, mime, original, 'A photo');
     expect(up.status, JSON.stringify(up.json)).toBe(200);
     const asset = up.json.asset;
-    const served = await visitor.get(asset.url);                        // exactly what anyone who knows the address receives
+    const served = await visitor.get(asset.url);  // Exactly what anyone who knows the address receives
     expect(served.status()).toBe(200); expect(header(served, 'content-type')).toBe(mime);
     const body = await served.body();
     expect(marks.filter((s) => body.toString('latin1').includes(s)), 'personal data still present in the served file').toEqual([]);
     expect(body.length, 'the recorded size is the size of what is stored').toBe(asset.size);
     expect(body.length).toBeLessThan(original.length);
-    // still a working picture: the resizer can read it, and its recorded dimensions are right
+    // Still a working picture: the resizer can read it, and its recorded dimensions are right.
     const small = await visitor.get(`${asset.url}?w=160&f=webp`);
     expect(small.status()).toBe(200); expect(header(small, 'content-type')).toBe('image/webp');
     expect([asset.width, asset.height]).toEqual(file.includes('gps') ? [64, 48] : file.endsWith('.png') ? [40, 40] : [48, 48]);
@@ -51,7 +52,8 @@ test('a file with no personal data is stored exactly as uploaded', async ({ play
   await removeAsset(a, baseURL!, up.json.asset.id); await a.dispose(); await visitor.dispose();
 });
 
-// GIF comments and XMP are removed; the animation block, timing and picture survive. An AVIF with EXIF/XMP is detected (the upload is then refused).
+// GIF comments and XMP are removed; the animation block, timing and picture survive. An AVIF with
+// EXIF/XMP is detected (the upload is then refused).
 test('GIF: comments and XMP are removed, animation and picture data are kept', () => {
   const ascii = (s: string) => [...Buffer.from(s, 'latin1')];
   const head = [...ascii('GIF89a'), 1, 0, 1, 0, 0x80, 0, 0, 0, 0, 0, 255, 255, 255];
@@ -67,7 +69,7 @@ test('GIF: comments and XMP are removed, animation and picture data are kept', (
   expect(out.toString('latin1')).toContain('NETSCAPE2.0');
   expect([...out.subarray(-1)]).toEqual([0x3b]);
   const broken = new Uint8Array([...head, 0x99]);
-  expect(stripMetadata(broken, 'image/gif')).toBe(broken);      // not understood: returned unchanged, never damaged
+  expect(stripMetadata(broken, 'image/gif')).toBe(broken);  // Not understood: returned unchanged, never damaged
 });
 
 test('AVIF: EXIF and XMP items are detected inside the meta box; a plain one and an unreadable one are told apart', () => {
@@ -79,7 +81,7 @@ test('AVIF: EXIF and XMP items are detected inside the meta box; a plain one and
   expect(hasAvifMetadata(plain)).toBe(false);
   expect(hasAvifMetadata(withExif)).toBe(true);
   expect(hasAvifMetadata(withXmp)).toBe(true);
-  expect(hasAvifMetadata(new Uint8Array(Buffer.concat([ftyp, Buffer.from([0, 0, 1, 0, 0x6d, 0x65, 0x74, 0x61])])))).toBe(true);   // a box that claims more bytes than exist
+  expect(hasAvifMetadata(new Uint8Array(Buffer.concat([ftyp, Buffer.from([0, 0, 1, 0, 0x6d, 0x65, 0x74, 0x61])])))).toBe(true);  // A box that claims more bytes than exist
 });
 
 test('AVIF: EXIF and XMP are zeroed in place (same size, same layout); a clean file is returned untouched', () => {
@@ -93,9 +95,9 @@ test('AVIF: EXIF and XMP are zeroed in place (same size, same layout); a clean f
   expect(Buffer.from(out).includes('Jane Secret')).toBe(false);
   expect(Buffer.from(out).includes('Exif')).toBe(false);
   expect(hasAvifMetadata(out)).toBe(false);
-  expect(cleanAvif(out)).toBe(out);                                    // second run: nothing to do
+  expect(cleanAvif(out)).toBe(out);  // Second run: nothing to do
   expect(stripMetadata(original, 'image/avif')).toEqual(out);
-  const damaged = original.slice(0, original.length - 300);            // boxes no longer add up: refused, never half-cleaned
+  const damaged = original.slice(0, original.length - 300);  // Boxes no longer add up: refused, never half-cleaned
   expect(cleanAvif(damaged)).toBeNull();
 });
 
@@ -109,5 +111,5 @@ test('PDF: document properties are blanked in place; the file keeps its size and
   expect(Buffer.from(out.subarray(0, 5)).toString()).toBe('%PDF-');
   expect(cleanPdf(out)).toBeTruthy();
   const encrypted = new TextEncoder().encode('%PDF-1.4\n1 0 obj\n<< /Author (x) >>\nendobj\ntrailer << /Info 1 0 R /Encrypt 2 0 R >>');
-  expect(cleanPdf(encrypted)).toBe(encrypted);                         // encrypted: left alone
+  expect(cleanPdf(encrypted)).toBe(encrypted);  // Encrypted: left alone
 });

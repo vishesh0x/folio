@@ -1,4 +1,7 @@
 ---
+/**
+ * Single project page: rendered Markdown, table of contents, links and previous/next navigation.
+ */
 import Base from '../../layouts/Base.astro';
 import Img from '../../components/Img.astro';
 import { getPublished, neighbours } from '../../lib/projects';
@@ -14,7 +17,7 @@ const [{ html, toc }, { prev, next }, s] = await Promise.all([renderMarkdown(p.b
 const seoImg = await loadAsset(p.seo_image ?? undefined);
 const ogImage = seoImg && seoImg.mime !== 'image/svg+xml' ? `/media/${seoImg.id}/${encodeURIComponent(seoImg.filename)}?w=1280&f=jpeg`
   : p.cover && p.cover.mime !== 'image/svg+xml' ? `/media/${p.cover.id}/${encodeURIComponent(p.cover.filename)}?w=1280&f=jpeg` : undefined;
-const hasCode = /<code[\s>]/.test(html); // the code font is only needed (and only fetched early) on pages that show code
+const hasCode = /<code[\s>]/.test(html);  // The code font is only needed (and only fetched early) on pages that show code
 const description = p.seo_desc || p.summary || excerpt(p.body_md);
 const year = new Date(p.created_at * 1000).getFullYear();
 const siteUrl = (s.site_url || Astro.url.origin).replace(/\/$/, '');
@@ -66,6 +69,7 @@ const ld = { '@context': 'https://schema.org', '@type': 'CreativeWork', name: p.
 </Base>
 
 <script>
-  // Diagrams (```mermaid): Mermaid is downloaded only if this page has one, and only when it is about to scroll into view.
+  // Diagrams (```mermaid): Mermaid is downloaded only if this page has one, and only when it is about to
+  // scroll into view.
   if (document.querySelector('figure[data-diagram]')) import('../../scripts/diagrams').then((m) => m.renderDiagrams());
 </script>

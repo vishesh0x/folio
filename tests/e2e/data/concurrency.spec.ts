@@ -4,8 +4,9 @@ import { withRetry } from '../fixtures';
 import { editorFields } from '../forms';
 import { d1 } from '../d1';
 
-// Step 3: what happens when two things happen at once. D1 runs one write at a time per database, but "check, then write" in two steps can
-// still race, and two browser tabs can overwrite each other. Each case here is something that really happens (a double-click, two tabs).
+// What happens when two things happen at once. D1 runs one write at a time per database, but "check,
+// then write" in two steps can still race, and two browser tabs can overwrite each other. Each case
+// here is something that really happens (a double-click, two tabs).
 const admin = async (playwright: any, baseURL: string) => withRetry(await playwright.request.newContext({ baseURL, storageState: AUTH_FILE }));
 const count = (sql: string) => d1('e2e-a', sql)[0].n as number;
 
@@ -42,7 +43,7 @@ test.describe('two tabs editing the same project', () => {
     const a = await admin(playwright, baseURL!);
     const created = await a.post('/api/admin/projects', { form: { action: 'create' }, headers: sameOrigin(baseURL!), maxRedirects: 0 });
     const id = /\/dashboard\/projects\/(\d+)/.exec(header(created, 'location'))![1];
-    await new Promise((r) => setTimeout(r, 1200));                        // edits are timestamped to the second
+    await new Promise((r) => setTimeout(r, 1200));  // Edits are timestamped to the second
     const [tabA, tabB] = [editorFields(await (await a.get(`/dashboard/projects/${id}`)).text()), editorFields(await (await a.get(`/dashboard/projects/${id}`)).text())];
     expect(tabA.v).toBe(tabB.v);
     const save = (f: Record<string, string>, title: string) => a.post(`/dashboard/projects/${id}`, { form: { ...f, title, intent: 'save' }, headers: sameOrigin(baseURL!), maxRedirects: 0 });
@@ -50,7 +51,7 @@ test.describe('two tabs editing the same project', () => {
     const lost = await save(tabB, 'Written in tab B');
     expect(lost.status()).toBe(409); expect(await lost.text()).toContain('changed in another tab');
     expect(d1('e2e-a', `SELECT title FROM projects WHERE id = ${id}`)[0].title, 'tab A must not be overwritten').toBe('Written in tab A');
-    const fresh = editorFields(await (await a.get(`/dashboard/projects/${id}`)).text());      // reload, as the message says
+    const fresh = editorFields(await (await a.get(`/dashboard/projects/${id}`)).text());  // Reload, as the message says
     expect((await save(fresh, 'Written in tab B, after reloading')).status()).toBe(303);
     await a.dispose();
   });

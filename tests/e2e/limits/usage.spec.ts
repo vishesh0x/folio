@@ -1,17 +1,21 @@
 import { test, expect, withRetry } from '../fixtures';
 import { counted, signIn } from './counting';
 
-// Step 7: the Workers FREE plan's DAILY allowances for D1 are 5,000,000 rows read and 100,000 rows written; when either is used up, EVERY query
-// (so every page) fails until midnight UTC. These budgets are set a little above what each route costs today (measured with the counting server),
-// so a change that makes a public page start writing, or read ten times more, fails here before it can matter.
-//   what they allow:  reading: 5,000,000 / 50 rows = 100,000 uncached public page builds a day; writing: 100,000 rows = about 16,000 failed sign-ins a day.
+// The Workers FREE plan's DAILY allowances for D1 are 5,000,000 rows read and 100,000 rows written;
+// when either is used up, EVERY query
+// (so every page) fails until midnight UTC. These budgets are set a little above what each route costs
+// today (measured with the counting server),
+// so a change that makes a public page start writing, or read ten times more, fails here before it can
+// matter.
+//   what they allow:  reading: 5,000,000 / 50 rows = 100,000 uncached public page builds a day;
+//   writing: 100,000 rows = about 16,000 failed sign-ins a day.
 test.describe.configure({ mode: 'serial' });
 let anon: any, owner: any, base: string;
 test.beforeAll(async ({ playwright, baseURL }) => {
   base = baseURL!;
   anon = withRetry(await playwright.request.newContext({ baseURL, storageState: { cookies: [], origins: [] } }));
   owner = withRetry(await playwright.request.newContext({ baseURL, storageState: { cookies: [], origins: [] } })); await signIn(owner, baseURL!);
-  for (const p of ['/', '/contact', '/projects']) await counted(anon, base, 'GET', `${p}?warm=1`);   // the first /contact view creates the form's signing key (one write, once ever)
+  for (const p of ['/', '/contact', '/projects']) await counted(anon, base, 'GET', `${p}?warm=1`);  // The first /contact view creates the form's signing key (one write, once ever)
 });
 test.afterAll(async () => { await anon?.dispose(); await owner?.dispose(); });
 const q = () => Math.random().toString(36).slice(2);

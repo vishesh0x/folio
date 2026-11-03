@@ -3,7 +3,8 @@ import { ADMIN_EMAIL, ADMIN_PASSWORD, freshIp, login, sameOrigin } from '../help
 import { withRetry } from '../fixtures';
 import { d1 } from '../d1';
 
-// Audit 1.2: brute-force and abuse throttling (login 5 failures / 15 min / IP; reveal 10 / hour / IP; contact 5 / hour / IP).
+// Brute-force and abuse throttling (login 5 failures / 15 min / IP; reveal 10 / hour / IP; contact 5 /
+// hour / IP).
 const anon = { cookies: [], origins: [] };
 test.use({ storageState: anon });
 
@@ -19,11 +20,11 @@ test.describe('login brute-force throttle', () => {
 
   test('a successful login resets the failure counter', async ({ playwright, baseURL }) => {
     const ip = freshIp();
-    const fresh = async () => withRetry(await playwright.request.newContext({ baseURL })); // a signed-in context is redirected away from /auth, so use a new one each time
+    const fresh = async () => withRetry(await playwright.request.newContext({ baseURL }));  // A signed-in context is redirected away from /auth, so use a new one each time
     const fail = async () => { const c = await fresh(); const r = await login(c, baseURL!, `ghost-reset@example.com`, 'nope nope nope nope', ip); await c.dispose(); return r.status(); };
     for (let i = 0; i < 4; i++) expect(await fail()).toBe(401);
     const ok = await fresh(); expect((await login(ok, baseURL!, ADMIN_EMAIL, ADMIN_PASSWORD, ip)).status()).toBe(302); await ok.dispose();
-    for (let i = 0; i < 4; i++) expect(await fail()).toBe(401); // would be 429 if the earlier 4 failures still counted
+    for (let i = 0; i < 4; i++) expect(await fail()).toBe(401);  // Would be 429 if the earlier 4 failures still counted
   });
 
   test('no account enumeration: unknown email and wrong password look the same', async ({ request, baseURL }) => {
@@ -52,7 +53,7 @@ test.describe('login brute-force throttle', () => {
     expect((await login(request, baseURL!, 'ghost-map@example.com', 'nope nope nope', `::ffff:${v4}`)).status()).toBe(429);
   });
   test('S1-M3 (fixed): 20 wrong passwords for one account, from 20 different visitors, stop further guessing for everyone', async ({ request, baseURL }) => {
-    const email = `victim-${Date.now()}@example.com`;                       // an account that does not exist: the limit must apply all the same (no way to tell)
+    const email = `victim-${Date.now()}@example.com`;  // An account that does not exist: the limit must apply all the same (no way to tell)
     for (let i = 0; i < 20; i++) expect((await login(request, baseURL!, email, `guess ${i}`, freshIp())).status(), `attempt ${i + 1}`).toBe(401);
     const blocked = await login(request, baseURL!, email, 'guess 21', freshIp());
     expect(blocked.status()).toBe(429); expect(await blocked.text()).toContain('wrong passwords for this account');
@@ -70,7 +71,7 @@ test.describe('public endpoint throttles', () => {
     const ip = freshIp(), h = sameOrigin(baseURL!, ip);
     const codes: number[] = [];
     for (let i = 0; i < 11; i++) codes.push((await request.post('/api/reveal', { data: { kind: 'unknown' }, headers: h })).status());
-    expect(codes.slice(0, 10)).toEqual(Array(10).fill(404)); // unknown kind: refused, but counted
+    expect(codes.slice(0, 10)).toEqual(Array(10).fill(404));  // Unknown kind: refused, but counted
     expect(codes[10]).toBe(429);
   });
 
@@ -78,7 +79,7 @@ test.describe('public endpoint throttles', () => {
     const ip = freshIp(), h = sameOrigin(baseURL!, ip);
     const html = await (await request.get('/contact', { headers: { 'cf-connecting-ip': ip } })).text();
     const t = /name="t" value="([^"]+)"/.exec(html)![1];
-    await new Promise((r) => setTimeout(r, 3300)); // forms posted faster than 3 s are refused
+    await new Promise((r) => setTimeout(r, 3300));  // Forms posted faster than 3 s are refused
     const codes: number[] = [];
     for (let i = 0; i < 6; i++) {
       codes.push((await request.post('/contact', { form: { name: 'Tester', email: 'tester@example.com', message: `Hello from the test suite, message ${i}`, website: '', t }, headers: h, maxRedirects: 0 })).status());
@@ -97,10 +98,10 @@ test.describe('public endpoint throttles', () => {
     const html = await (await request.get('/contact', { headers: { 'cf-connecting-ip': ip } })).text();
     const t = /name="t" value="([^"]+)"/.exec(html)![1];
     const post = (tok: string) => request.post('/contact', { form: { name: 'T', email: 't@example.com', message: 'a long enough message', website: '', t: tok }, headers: h, maxRedirects: 0 });
-    expect((await post(t)).status()).toBe(400);                       // instant post
-    expect((await post('1.AAAA')).status()).toBe(400);                // forged
-    expect((await post(t.replace(/.$/, (c) => (c === 'A' ? 'B' : 'A')))).status()).toBe(400); // tampered signature
-    expect((await post('')).status()).toBe(400);                      // missing
+    expect((await post(t)).status()).toBe(400);  // Instant post
+    expect((await post('1.AAAA')).status()).toBe(400);  // Forged
+    expect((await post(t.replace(/.$/, (c) => (c === 'A' ? 'B' : 'A')))).status()).toBe(400);  // Tampered signature
+    expect((await post('')).status()).toBe(400);  // Missing
   });
 });
 

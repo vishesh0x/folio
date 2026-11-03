@@ -1,3 +1,7 @@
+/**
+ * Web app manifest, cached per content version.
+ */
+
 import type { APIRoute } from 'astro';
 import { getPublicSettings } from '../lib/settings';
 import { loadAsset } from '../lib/media';

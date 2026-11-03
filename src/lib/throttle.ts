@@ -1,7 +1,10 @@
 import { env } from 'cloudflare:workers';
 import { networkOf } from './ip';
 
-/** Counts a hit for `key` and says whether it is still within `max` hits per `windowSecs`. One atomic statement. */
+/**
+ * Counts a hit for `key` and says whether it is still within `max` hits per `windowSecs`. One atomic
+ * statement.
+ */
 export async function allow(key: string, max: number, windowSecs: number): Promise<boolean> {
   const now = Math.floor(Date.now() / 1000);
   const row = await env.DB.prepare(
@@ -11,18 +14,26 @@ export async function allow(key: string, max: number, windowSecs: number): Promi
        window_start = CASE WHEN window_start < ?2 - ?3 THEN ?2 ELSE window_start END
      RETURNING count`
   ).bind(key, now, windowSecs).first<{ count: number }>();
-  // Retention: rows hold visitor IP addresses and the longest window is 1 hour, so anything older than 2 hours is useless. Pruned on about
-  // 1 in 20 calls, which keeps the table tiny without a scheduled job (idx_attempts_window makes it cheap).
+  // Retention: rows hold visitor IP addresses and the longest window is 1 hour, so anything older than 2
+  // hours is useless. Pruned on about 1 in 20 calls, which keeps the table tiny without a scheduled job
+  // (idx_attempts_window makes it cheap).
   if (Math.random() < 0.05) await env.DB.prepare('DELETE FROM login_attempts WHERE window_start < ?').bind(now - 7200).run();
   return (row?.count ?? 1) <= max;
 }
+/**
+ * The visitor's address as set by Cloudflare, or a shared 'local' value when it is missing (local
+ * testing).
+ */
 export const ipOf = (request: Request) => request.headers.get('cf-connecting-ip') ?? 'local';
 
 /**
  * What a rate-limit counter is stored under. Two privacy/fairness rules:
- *  - a visitor is their NETWORK (an IPv6 /64, see ip.ts), not one address of billions they could rotate through;
- *  - the stored key is a keyed hash (HMAC) when a secret is configured (RATE_LIMIT_SALT, or failing that ADMIN_SETUP_TOKEN), so the
- *    database holds no visitor IP addresses; without any secret (local development) the plain network is kept so it is easy to read.
+ *  - a visitor is their NETWORK (an IPv6 /64, see ip.ts), not one address of billions they could
+ *    rotate through;
+ *  - the stored key is a keyed hash (HMAC) when a secret is configured (RATE_LIMIT_SALT, or failing
+ *    that ADMIN_SETUP_TOKEN), so the
+ *    database holds no visitor IP addresses; without any secret (local development) the plain network
+ *    is kept so it is easy to read.
  * Unrelated visitors still get different keys, and the same visitor always gets the same one.
  */
 async function keyed(value: string, fallbackToHash = false): Promise<string> {

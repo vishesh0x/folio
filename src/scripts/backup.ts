@@ -1,12 +1,12 @@
-// Backup & restore, in the browser. A backup is an ordinary .zip file: JSON for the text content, and the original files, so it can be opened with any
-// zip program. The page builds and reads that zip itself and talks to the server only in small pieces (src/lib/backup.ts), which keeps every request
+// Backup & restore, in the browser. A backup is an ordinary .zip file: JSON for the text content, and
+// the original files, so it can be opened with any zip program. The page builds and reads that zip
+// itself and talks to the server only in small pieces (src/lib/backup.ts), which keeps every request
 // far inside the Worker's limits however big the site is.
-
-/* ───── zip: writer (stored, uncompressed: pictures are compressed already) and reader (stored or deflated) ───── */
+// ── Zip: writer (stored, uncompressed: pictures are compressed already) and reader (stored or deflated) ──
 const TABLE = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
 const crc32 = (b: Uint8Array) => { let c = 0xffffffff; for (let i = 0; i < b.length; i++) c = TABLE[(c ^ b[i]) & 0xff] ^ (c >>> 8); return (c ^ 0xffffffff) >>> 0; };
 const enc = new TextEncoder(), dec = new TextDecoder();
-const MAX_TOTAL = 900 * 1024 * 1024;     // a browser holds the whole zip in memory; refuse to build or open anything bigger
+const MAX_TOTAL = 900 * 1024 * 1024;  // A browser holds the whole zip in memory; refuse to build or open anything bigger
 
 export function makeZip(entries: { name: string; data: Uint8Array }[]): Blob {
   const d = new Date(), time = (d.getHours() << 11) | (d.getMinutes() << 5) | (d.getSeconds() >> 1), date = ((d.getFullYear() - 1980) << 9) | ((d.getMonth() + 1) << 5) | d.getDate();
@@ -56,7 +56,7 @@ export async function readZip(buf: ArrayBuffer): Promise<Map<string, Uint8Array>
 
 const sha256 = async (b: Uint8Array) => [...new Uint8Array(await crypto.subtle.digest('SHA-256', b))].map((x) => x.toString(16).padStart(2, '0')).join('');
 
-/* ───── talking to the server ───── */
+// ── Talking to the server ──
 async function api(method: 'GET' | 'POST', url: string, body?: unknown) {
   const r = await fetch(url, { method, headers: body ? { 'Content-Type': 'application/json' } : undefined, body: body ? JSON.stringify(body) : undefined });
   const j = await r.json().catch(() => ({ ok: false, error: `The server answered ${r.status}.` }));
@@ -71,7 +71,7 @@ async function pages(part: string): Promise<any[]> {
 const say = (el: HTMLElement | null, text: string) => { if (el) el.textContent = text; };
 const json = (v: unknown) => enc.encode(JSON.stringify(v, null, 1));
 
-/* ───── export ───── */
+// ── Export ──
 async function exportAll(withMessages: boolean, status: HTMLElement) {
   const files: { name: string; data: Uint8Array }[] = [];
   say(status, 'Reading your content…');
@@ -100,7 +100,7 @@ async function exportAll(withMessages: boolean, status: HTMLElement) {
   return { files: files.length, bytes: blob.size, counts: manifest.counts };
 }
 
-/* ───── import ───── */
+// ── Import ──
 type Parsed = { manifest: any; site?: any; projects?: any[]; resume?: any[]; now?: any[]; assets?: any[]; messages?: any[]; zip: Map<string, Uint8Array> };
 async function parseBackup(buf: ArrayBuffer): Promise<Parsed> {
   const zip = await readZip(buf), m = zip.get('manifest.json');
@@ -139,7 +139,7 @@ async function runImport(p: Parsed, c: Choice, dry: boolean, status: HTMLElement
   return t;
 }
 
-/* ───── the page ───── */
+// ── The page ──
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T | null;
 function init() {
   const exportBtn = $<HTMLButtonElement>('bk-export'), exportStatus = $('bk-export-status')!;

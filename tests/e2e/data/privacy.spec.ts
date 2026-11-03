@@ -5,8 +5,9 @@ import { networkOf } from '../../../src/lib/ip';
 import { RATE_SALT } from '../../../playwright.config';
 import { d1 } from '../d1';
 
-// S1-M5: the rate limiter must not keep visitor IP addresses or email addresses in the database. The test server has a RATE_LIMIT_SALT, and
-// this test computes the expected keys itself (same recipe) to prove both that the stored value is the keyed hash and that it groups right.
+// S1-M5: the rate limiter must not keep visitor IP addresses or email addresses in the database. The
+// test server has a RATE_LIMIT_SALT, and this test computes the expected keys itself (same recipe) to
+// prove both that the stored value is the keyed hash and that it groups right.
 const keyOf = (value: string) => createHmac('sha256', 'rate-limit-v1:' + RATE_SALT).update(value).digest('hex').slice(0, 32);
 const rows = (like: string) => d1('e2e-a', `SELECT key, count FROM login_attempts WHERE key LIKE '${like}'`) as { key: string; count: number }[];
 
@@ -27,7 +28,7 @@ test('counters are stored under a keyed hash of the visitor\'s NETWORK, not thei
 test('failed sign-ins are counted per account without storing the email address', async ({ request, baseURL }) => {
   const email = `Private.Person+${Date.now()}@Example.com`;
   await login(request, baseURL!, email, 'wrong password here', freshIp());
-  await login(request, baseURL!, email.toLowerCase(), 'wrong password again', freshIp());      // same account, different spelling of the case
+  await login(request, baseURL!, email.toLowerCase(), 'wrong password again', freshIp());  // Same account, different spelling of the case
   const key = `acct:${keyOf(email.trim().toLowerCase())}`;
   expect(rows(key)).toEqual([{ key, count: 2 }]);
   expect(JSON.stringify(d1('e2e-a', 'SELECT key FROM login_attempts')).toLowerCase()).not.toContain('private.person');

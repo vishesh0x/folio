@@ -1,4 +1,7 @@
 ---
+/**
+ * Dashboard: project editor with a live Markdown preview.
+ */
 import Dash from '../../../layouts/Dash.astro';
 import MediaField from '../../../components/MediaField.astro';
 import MediaData from '../../../components/MediaData.astro';
@@ -25,7 +28,7 @@ if (Astro.request.method === 'POST') {
   loadedAt = Number(f.get('v')) || project.updated_at;
   const parsed = parseForm(f, new Set(images.map((a) => a.id)), new Set(ogImages.map((a) => a.id)), intent, project);
   errors = parsed.errors;
-  p = { ...project, ...parsed.input }; // keep what the person typed if anything goes wrong
+  p = { ...project, ...parsed.input };  // Keep what the person typed if anything goes wrong
   if (!errors.slug && await slugTaken(p.slug, id)) errors.slug = 'Another project already uses that address.';
   if (Object.keys(errors).length) { Astro.response.status = 400; formError = 'Please fix the highlighted fields. Nothing was saved.'; }
   else {
@@ -42,7 +45,7 @@ const saved = q.get('saved'), created = q.get('created');
 const isPub = p.status === 'published';
 const site = await getSettings();
 const origin = (site.site_url || Astro.url.origin).replace(/\/$/, '');
-const [originScheme, originHost] = origin.split('://');   // lets the address wrap after "https://" on very narrow phones instead of cutting the domain
+const [originScheme, originHost] = origin.split('://');  // Lets the address wrap after "https://" on very narrow phones instead of cutting the domain
 const hasSeo = !!(p.seo_title || p.seo_desc || p.seo_image);
 const words = p.body_md.trim() ? p.body_md.trim().split(/\s+/).length : 0;
 ---
@@ -219,10 +222,10 @@ const words = p.body_md.trim() ? p.body_md.trim().split(/\s+/).length : 0;
   const slugEl = form.querySelector<HTMLTextAreaElement>('#slug')!;
   const q = <T extends Element>(s: string) => form.querySelector<T>(s)!;
 
-  // Show the controls that need JavaScript
+  // Show the controls that need JavaScript.
   form.querySelectorAll<HTMLElement>('[data-tabs],[data-tools],[data-import-label],[data-slug-make]').forEach((el) => (el.hidden = false));
 
-  // ── editing helpers (execCommand keeps the browser's undo history working)
+  // ── editing helpers (execCommand keeps the browser's undo history working).
   const insert = (text: string) => {
     body.focus();
     if (typeof document.execCommand !== 'function' || !document.execCommand('insertText', false, text)) body.setRangeText(text, body.selectionStart, body.selectionEnd, 'end');
@@ -246,7 +249,8 @@ const words = p.body_md.trim() ? p.body_md.trim().split(/\s+/).length : 0;
     h2: () => linePrefix('## '), quote: () => linePrefix('> '), ul: () => linePrefix('- '), task: () => linePrefix('- [ ] '),
     callout: () => insert('> [!tip] Title\n> Write the callout here.\n'),
     wiki: () => { const s = selected(); const start = body.selectionStart; insert(`[[${s}]]`); if (!s) body.setSelectionRange(start + 2, start + 2); },
-    // Choose or upload an image without leaving the editor. The caret is remembered, because the dialog takes the focus.
+    // Choose or upload an image without leaving the editor. The caret is remembered, because the dialog
+    // takes the focus.
     image: () => {
       const from = body.selectionStart, to = body.selectionEnd;
       openPicker({
@@ -291,7 +295,8 @@ const words = p.body_md.trim() ? p.body_md.trim().split(/\s+/).length : 0;
     t.addEventListener('keydown', (e) => { if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') { const o = tabs.find((x) => x !== t)!; o.focus(); show(o.dataset.tab as 'write' | 'preview'); } });
   });
 
-  // ── address (slug): a readable, wrapping view with an Edit button; the field itself is a self-sizing box so nothing is cut off
+  // ── address (slug): a readable, wrapping view with an Edit button; the field itself is a self-sizing
+  // box so nothing is cut off.
   const slugify = (s: string) => s.toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 80).replace(/-+$/, '');
   const box = q<HTMLElement>('[data-slug]'), view = q<HTMLElement>('[data-slug-view]'), edit = q<HTMLElement>('[data-slug-edit-box]'), slugText = q<HTMLElement>('[data-slug-text]');
   const editing = (on: boolean) => { view.hidden = on; edit.hidden = !on; if (on) { slugEl.focus(); slugEl.select(); } };
@@ -300,14 +305,14 @@ const words = p.body_md.trim() ? p.body_md.trim().split(/\s+/).length : 0;
   slugEl.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); editing(false); } });
   slugEl.addEventListener('input', () => { slugEl.value = slugEl.value.replace(/[\r\n]+/g, ''); slugTouched = true; });
   slugEl.addEventListener('blur', (e) => {
-    if (edit.contains(e.relatedTarget as Node)) return; // moving to "Make it from the title": keep the box open
+    if (edit.contains(e.relatedTarget as Node)) return;  // Moving to "Make it from the title": keep the box open
     slugEl.value = slugify(slugEl.value) || slugEl.value.trim(); slugText.textContent = slugEl.value;
-    refresh(); // the search preview shows the tidied address
+    refresh();  // The search preview shows the tidied address
     if (slugEl.value) editing(false);
   });
   q<HTMLButtonElement>('[data-slug-make]').addEventListener('click', () => { slugEl.value = slugify(titleEl.value) || 'untitled'; slugTouched = true; slugText.textContent = slugEl.value; form.dispatchEvent(new Event('input')); slugEl.focus(); });
 
-  // ── counters, word count, search preview
+  // ── counters, word count, search preview.
   const summary = q<HTMLTextAreaElement>('#summary'), seoT = q<HTMLInputElement>('#seo_title'), seoD = q<HTMLTextAreaElement>('#seo_desc');
   const pvT = q<HTMLElement>('[data-pv-title]'), pvD = q<HTMLElement>('[data-pv-desc]'), pvU = q<HTMLElement>('[data-pv-url]');
   const base = pvU.textContent!.slice(0, pvU.textContent!.lastIndexOf('/projects/') + '/projects/'.length);
@@ -332,7 +337,7 @@ const words = p.body_md.trim() ? p.body_md.trim().split(/\s+/).length : 0;
   window.addEventListener('beforeunload', (e) => { if (dirty && !submitting) { e.preventDefault(); e.returnValue = ''; } });
   if (form.dataset.new) titleEl.select();
 
-  // ── import an Obsidian note
+  // ── import an Obsidian note.
   q<HTMLInputElement>('#import').addEventListener('change', async (e) => {
     const file = (e.target as HTMLInputElement).files?.[0]; if (!file) return;
     if (file.size > 400_000) { alert('That file is too large to import.'); return; }

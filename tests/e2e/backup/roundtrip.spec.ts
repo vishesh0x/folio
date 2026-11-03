@@ -8,12 +8,14 @@ import { sameOrigin } from '../helpers';
 import { d1 } from '../d1';
 import { upload } from '../uploads';
 
-// The whole promise, through the real page: download a backup, damage the site, restore, and the site is as it was.
+// The whole promise, through the real page: download a backup, damage the site, restore, and the site
+// is as it was.
 test.describe.configure({ mode: 'serial' });
 const png = readFileSync('tests/fixtures/plain.png');
 let owner: any, anon: any, base: string, zipPath = '';
 const get = async (part: string) => (await owner.get(`/api/admin/backup?part=${part}`)).json();
-// The importer renumbers sort_order 0, 1, 2... (the seed has ties); what must be kept is the ORDER, which the export gives sorted.
+// The importer renumbers sort_order 0, 1, 2... (the seed has ties); what must be kept is the ORDER,
+// which the export gives sorted.
 const order = (x: unknown) => JSON.parse(JSON.stringify(x, (k, v) => (k === 'sort_order' ? undefined : v)));
 const sha = (b: Buffer) => createHash('sha256').update(b).digest('hex');
 const snapshot = async () => {
@@ -69,10 +71,10 @@ test('download: one zip with the readable content and every file; no account, pa
   const buf = readFileSync(zipPath);
   expect(buf.subarray(0, 4).toString('hex')).toBe('504b0304');
   for (const name of ['manifest.json', 'site.json', 'projects.json', 'resume.json', 'now.json', 'assets.json', 'README.txt', `files/${extraId}/`]) expect(buf.includes(Buffer.from(name)), name).toBe(true);
-  expect(buf.includes(Buffer.from('"includes_messages": false')), 'the manifest says there are no messages').toBe(true);   // (the README mentions the file name, so the name is not a test)
+  expect(buf.includes(Buffer.from('"includes_messages": false')), 'the manifest says there are no messages').toBe(true);  // (the README mentions the file name, so the name is not a test)
   expect(buf.includes(Buffer.from('rita@roundtrip.test'))).toBe(false);
   for (const secret of ['pbkdf2', 'password_hash', 'form_secret', '__Host-session']) expect(buf.includes(Buffer.from(secret)), secret).toBe(false);
-  // with the box ticked the messages come too
+  // With the box ticked the messages come too.
   await page.check('#bk-messages');
   const [dl2] = await Promise.all([page.waitForEvent('download'), page.click('#bk-export')]);
   const p2 = join(tmpdir(), `rt2-${Date.now()}.zip`); await dl2.saveAs(p2);
@@ -81,7 +83,7 @@ test('download: one zip with the readable content and every file; no account, pa
 });
 
 test('damage the site, check the backup without changing anything, then restore: everything is back exactly', async ({ browser }) => {
-  // damage: a project, the tagline, the Now board, the resume, an unused file
+  // Damage: a project, the tagline, the Now board, the resume, an unused file.
   d1('e2e-f', "DELETE FROM projects WHERE slug = 'pocket-ledger'");
   d1('e2e-f', "UPDATE settings SET value = json_set(value, '$.tagline', 'DAMAGED TAGLINE') WHERE key = 'site'");
   d1('e2e-f', 'DELETE FROM now_categories; DELETE FROM resume_sections');
@@ -98,7 +100,7 @@ test('damage the site, check the backup without changing anything, then restore:
   await expect(page.locator('#bk-result')).toContainText('Nothing was changed');
   expect((await snapshot()).projects.length, 'check only changed nothing').toBe(damaged.projects.length);
   expect(JSON.parse((d1('e2e-f', "SELECT value FROM settings WHERE key='site'") as any[])[0].value).tagline).toBe('DAMAGED TAGLINE');
-  // the Import button needs the typed confirmation because parts are replaced
+  // The Import button needs the typed confirmation because parts are replaced.
   await expect(page.locator('#bk-go')).toBeDisabled();
   await page.fill('#bk-confirm', 'replace'); await expect(page.locator('#bk-go'), 'case matters').toBeDisabled();
   await page.fill('#bk-confirm', 'REPLACE'); await expect(page.locator('#bk-go')).toBeEnabled();
@@ -108,11 +110,13 @@ test('damage the site, check the backup without changing anything, then restore:
   await ctx.close();
 
   const after = await snapshot();
-  // The importer enforces the form's limits. The demo data has one tag longer than the form allows (48 characters, for an overflow test); it comes back as the form would have kept it.
+  // The importer enforces the form's limits. The demo data has one tag longer than the form allows (48
+  // characters, for an overflow test); it comes back as the form would have kept it.
   const limited = before.projects.map((p: any) => ({ ...p, tags: p.tags.map((t: string) => t.slice(0, 30)) }));
   expect(after.projects, 'projects: every field, including dates, bodies and addresses').toEqual(limited);
   expect(after.site.settings).toEqual(before.site.settings); expect(after.site.seo_pages).toEqual(before.site.seo_pages);
-  // The resume's own cleaner fills fields a seeded entry did not have with empty values, so check that everything that was there is preserved; the next test proves a second restore changes nothing more.
+  // The resume's own cleaner fills fields a seeded entry did not have with empty values, so check that
+  // everything that was there is preserved; the next test proves a second restore changes nothing more.
   expect(order(after.resume)).toMatchObject(order(before.resume)); expect(order(after.now)).toMatchObject(order(before.now)); restored = after;
   expect(after.assets.map((a: any) => a.id).sort()).toEqual(before.assets.map((a: any) => a.id).sort());
   expect(after.assets.find((a: any) => a.id === extraId), 'the deleted file is back under the same id').toBeTruthy();
@@ -148,7 +152,7 @@ test('"add" mode brings back only what is missing and does not touch the rest', 
 test('a file that is not a backup, or was changed after it was made, is refused with a plain message and changes nothing', async ({ browser }) => {
   const { writeFileSync } = await import('node:fs');
   const text = join(tmpdir(), `notzip-${Date.now()}.zip`); writeFileSync(text, 'just some text');
-  const tampered = join(tmpdir(), `tamper-${Date.now()}.zip`); const buf = Buffer.from(readFileSync(zipPath)); const at = buf.indexOf(Buffer.from('"title"')); buf.write('"titlX"', at);   // alter content inside a stored JSON file
+  const tampered = join(tmpdir(), `tamper-${Date.now()}.zip`); const buf = Buffer.from(readFileSync(zipPath)); const at = buf.indexOf(Buffer.from('"title"')); buf.write('"titlX"', at);  // Alter content inside a stored JSON file
   writeFileSync(tampered, buf);
   const { ctx, page } = await openPage(browser);
   const projectsBefore = (await get('projects')).items.length;

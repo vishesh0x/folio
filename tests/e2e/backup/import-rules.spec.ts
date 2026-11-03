@@ -5,8 +5,9 @@ import { sameOrigin } from '../helpers';
 import { d1 } from '../d1';
 import { upload } from '../uploads';
 
-// An import is the dashboard's own trust level (owner only), but a backup file can be old, edited by hand or tampered with. Everything in it is checked
-// with the same rules as the forms: bad items are skipped or cleaned and reported, never saved as they are, and a "check only" run writes nothing.
+// An import is the dashboard's own trust level (owner only), but a backup file can be old, edited by
+// hand or tampered with. Everything in it is checked with the same rules as the forms: bad items are
+// skipped or cleaned and reported, never saved as they are, and a "check only" run writes nothing.
 test.describe.configure({ mode: 'serial' });
 let owner: any, anon: any, base: string;
 test.beforeAll(async ({ playwright, baseURL }) => {
@@ -32,7 +33,8 @@ test.describe('who may use it', () => {
     expect((await owner.get('/api/admin/backup?part=users')).status()).toBe(400);
     expect((await post({ part: 'users' })).status).toBe(400);
     const bad = await owner.post('/api/admin/backup', { data: '{not json', headers: { ...sameOrigin(base), 'content-type': 'application/json' } }); expect(bad.status()).toBe(400);
-    // (the server answers 413 without reading the rest, which now and then makes the test client see a reset instead: try again)
+    // (the server answers 413 without reading the rest, which now and then makes the test client see a
+    // reset instead: try again).
     let status = 0;
     for (let i = 0; i < 5 && status !== 413; i++) { try { status = (await owner.post('/api/admin/backup', { data: JSON.stringify({ part: 'projects', items: [{ title: 'x'.repeat(4 * 1024 * 1024 + 2048) }] }), headers: { ...sameOrigin(base), 'content-type': 'application/json' } })).status(); } catch (e) { if (!/ECONNRESET|EPIPE|socket hang up/i.test(String(e))) throw e; } }
     expect(status).toBe(413);
@@ -44,7 +46,7 @@ test.describe('what an export never contains', () => {
     let all = '';
     for (const part of ['summary', 'site', 'projects', 'resume', 'now', 'assets', 'messages']) all += await (await owner.get(`/api/admin/backup?part=${part}`)).text();
     for (const secret of ['pbkdf2', 'password_hash', 'form_secret', 'content_version', 'login_attempts', 'sessions', 'r2_key']) expect(all, secret).not.toContain(secret);
-    expect(all).not.toContain('limits@example.com');            // the owner's sign-in email is the account, not content
+    expect(all).not.toContain('limits@example.com');  // The owner's sign-in email is the account, not content
   });
 });
 
@@ -103,7 +105,7 @@ test.describe('site settings', () => {
 test.describe('resume, Now board and messages', () => {
   test('unknown kinds and entries for missing projects are skipped; entry data is cleaned by the resume\'s own rules', async () => {
     const bad = await post({ part: 'resume-section', first: true, section: { kind: 'hacking', title: 'x', entries: [] } });
-    expect(bad.json.skipped).toBe(1); expect(count('SELECT count(*) AS n FROM resume_sections')).toBeGreaterThan(0);   // nothing was cleared by a rejected first section
+    expect(bad.json.skipped).toBe(1); expect(count('SELECT count(*) AS n FROM resume_sections')).toBeGreaterThan(0);  // Nothing was cleared by a rejected first section
     const r = await post({ part: 'resume-section', first: true, section: { kind: 'experience', title: 'Work', visible: 1, entries: [{ data: { role: 'Dev<script>', company: 'ACME', description: 'x'.repeat(5000), url: 'javascript:alert(1)' }, visible: 1 }, { data: 'junk' }] } });
     expect(r.json.added).toBe(2); expect(r.json.skipped).toBe(1);
     const e = JSON.parse((d1('e2e-f', 'SELECT data FROM resume_entries ORDER BY id LIMIT 1') as any[])[0].data);
@@ -138,7 +140,7 @@ test.describe('files', () => {
     expect((d1('e2e-f', "SELECT alt FROM assets WHERE id='impfile00001'") as any[])[0].alt).toBe('Alt');
   });
   test('a file asked for a moment before it is restored shows up at once (the "no such file" answer is forgotten)', async () => {
-    expect((await anon.get('/media/impfile00005/plain.png')).status()).toBe(404);          // remembered as missing for a minute
+    expect((await anon.get('/media/impfile00005/plain.png')).status()).toBe(404);  // Remembered as missing for a minute
     expect(await (await send({ id: 'impfile00005', alt: 'Back again' }, { name: 'plain.png', mimeType: 'image/png', buffer: png })).json()).toEqual({ ok: true, added: true });
     expect((await anon.get('/media/impfile00005/plain.png')).status()).toBe(200);
   });

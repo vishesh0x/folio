@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 
-// Step 9: what you install is what you run. These read package.json and package-lock.json (no network).
+// What is installed is what runs. These read package.json and package-lock.json (no network).
 const lock = JSON.parse(readFileSync('package-lock.json', 'utf8')), pkg = JSON.parse(readFileSync('package.json', 'utf8'));
 const entries = Object.entries<any>(lock.packages).filter(([k]) => k !== '');
 

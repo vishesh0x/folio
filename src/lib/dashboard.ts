@@ -1,8 +1,13 @@
+/**
+ * Aggregated figures for the dashboard overview page.
+ */
+
 import { env } from 'cloudflare:workers';
 import { turnstileOn, turnstileHalfSet } from './turnstile';
 import { getSettings, SETTINGS_DEFAULTS } from './settings';
 import type { Message } from './inbox';
 
+/** Collects the counts and recent items for the overview page in a single database round trip. */
 export async function overview() {
   const db = env.DB;
   const [msgs, projects, assets, now, resume, seo, recentMsgs, recentProjects] = await db.batch([

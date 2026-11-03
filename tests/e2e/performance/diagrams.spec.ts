@@ -1,11 +1,15 @@
 import { test, expect, type Page } from '@playwright/test';
 import { AUTH_FILE, sameOrigin, openPage } from '../helpers';
 
-// Mermaid diagrams written in Markdown (```mermaid), as in Obsidian. The demo project "wanderhost-booking" has three; "edge-notes" has a broken one.
+// Mermaid diagrams written in Markdown (```mermaid), as in Obsidian. The demo project
+// "wanderhost-booking" has three; "edge-notes" has a broken one.
 const anon = { cookies: [], origins: [] };
 const PAGE = '/projects/wanderhost-booking';
 
-/** Collects anything that would be a problem: console errors/warnings (CSP violations show up here), uncaught errors, dialogs. */
+/**
+ * Collects anything that would be a problem: console errors/warnings (CSP violations show up here),
+ * uncaught errors, dialogs.
+ */
 function watch(page: Page) {
   const problems: string[] = [];
   page.on('console', (m) => { if (['error', 'warning'].includes(m.type())) problems.push(`${m.type()}: ${m.text()}`); });
@@ -13,7 +17,9 @@ function watch(page: Page) {
   page.on('dialog', (d) => { problems.push(`dialog: ${d.message()}`); void d.dismiss(); });
   return problems;
 }
-/** Scroll each diagram into view (they are drawn when near the screen) and wait until all are drawn. */
+/**
+ * Scroll each diagram into view (they are drawn when near the screen) and wait until all are drawn.
+ */
 async function drawAll(page: Page, n: number) {
   const figs = page.locator('figure.diagram');
   for (let i = 0; i < await figs.count(); i++) await figs.nth(i).scrollIntoViewIfNeeded();
@@ -112,7 +118,8 @@ test.describe('public page', () => {
   });
 
   test('the 1.4 MB ELK layout engine is never downloaded: flowcharts are laid out by the small dagre engine', async ({ page }) => {
-    // Mermaid 12.1 lays flowcharts out with ELK unless told otherwise; ELK is about 420 KB over the wire and unused by anything else on the page.
+    // Mermaid 12.1 lays flowcharts out with ELK unless told otherwise; ELK is about 420 KB over the wire
+    // and unused by anything else on the page.
     const sizes: Record<string, number> = {};
     page.on('response', async (r) => { if (/\/_astro\/.*\.js/.test(r.url())) sizes[r.url().split('/').pop()!] = (await r.body().catch(() => Buffer.alloc(0))).length; });
     await openPage(page, PAGE); await drawAll(page, 3);

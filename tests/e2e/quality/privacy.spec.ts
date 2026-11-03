@@ -2,8 +2,8 @@ import { test, expect, withRetry } from '../fixtures';
 import { AUTH_FILE, sameOrigin } from '../helpers';
 import { d1 } from '../d1';
 
-// Step 8: what the privacy notice says must be TRUE. Each claim in src/lib/privacy.ts is checked against what the site really does, so the notice
-// cannot quietly become wrong. Server A.
+// What the privacy notice says must be TRUE. Each claim in src/lib/privacy.ts is checked against what
+// the site really does, so the notice cannot quietly become wrong. Server A.
 const PUBLIC = ['/', '/projects', '/projects/wanderhost-booking', '/now', '/resume', '/contact', '/privacy', '/no-such-page', '/sitemap.xml', '/robots.txt', '/auth'];
 
 test.describe('the notice exists and is reachable', () => {

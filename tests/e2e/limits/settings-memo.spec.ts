@@ -1,8 +1,9 @@
 import { test, expect, withRetry } from '../fixtures';
 import { counted, signIn } from './counting';
 
-// Step 7: a public page build used to read the settings row twice (the layout and the page both asked). Public pages now remember the settings per
-// content version; the owner's dashboard still reads fresh, and a dashboard save shows on the public site at once.
+// A public page build used to read the settings row twice (the layout and the page both asked). Public
+// pages now remember the settings per content version; the owner's dashboard still reads fresh, and a
+// dashboard save shows on the public site at once.
 test.describe.configure({ mode: 'serial' });
 let owner: any, base: string;
 test.beforeAll(async ({ playwright, baseURL }) => {

@@ -4,7 +4,7 @@
 //  - width/height from the real file, so the page never jumps while loading
 //  - lazy loading + async decoding by default (eager only for the main image above the fold)
 //  - AVIF/WebP/fallback sources at several widths, served through Cloudflare Images
-//  - NO cropping: images keep their own ratio unless you pass fit="cover" AND a ratio
+//  - NO cropping: images keep their own ratio unless fit="cover" AND a ratio are passed
 import { imgHtml, type ImgAsset, type ImgOpts } from '../lib/imghtml';
 interface Props extends ImgOpts { asset: ImgAsset }
 const { asset, ...opts } = Astro.props;

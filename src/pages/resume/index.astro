@@ -1,4 +1,7 @@
 ---
+/**
+ * Public resume page with a print layout and click-to-reveal contact details.
+ */
 import Base from '../../layouts/Base.astro';
 import Reveal from '../../components/Reveal.astro';
 import ResumeSection from '../../components/ResumeSection.astro';
@@ -11,13 +14,13 @@ const [s, o, sections, seo] = await Promise.all([getPublicSettings(), getResumeO
 const pdf = o.show_download && s.resume_asset ? await loadAsset(s.resume_asset) : null;
 const hasPdf = !!pdf && pdf.mime === 'application/pdf';
 const headline = o.headline || s.tagline;
-const name = o.name || s.name; // the resume can carry a different name from the site (for example a full legal name); empty uses the site's
+const name = o.name || s.name;  // The resume can carry a different name from the site (for example a full legal name); empty uses the site's
 const site = s.site_url ? s.site_url.replace(/^https?:\/\//, '') : '';
 const socials = o.show_socials ? s.socials.filter((l) => /^https?:/.test(l.url)) : [];
 const email = o.show_email && s.email, phone = o.show_phone && s.phone;
 const kb = (n: number) => (n > 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB');
 const twoCol = o.layout === 'two';
-const SIDE = new Set(['skills', 'certifications']); // these two live in the narrow right-hand column in the two-column layout
+const SIDE = new Set(['skills', 'certifications']);  // These two live in the narrow right-hand column in the two-column layout
 const mainSections = twoCol ? sections.filter((x) => !SIDE.has(x.kind)) : sections;
 const sideSections = twoCol ? sections.filter((x) => SIDE.has(x.kind)) : [];
 const hasContact = !!(site || email || phone || socials.length);
@@ -80,11 +83,13 @@ const hasContact = !!(site || email || phone || socials.length);
 </Base>
 
 <script>
-  // "Print this page". If you chose to include contact details in the printout, reveal them first and wait for them to load.
+  // "Print this page". If the owner chose to include contact details in the printout, reveal them first
+  // and wait for them to load.
   const btn = document.querySelector<HTMLButtonElement>('[data-print]');
   btn?.addEventListener('click', async () => {
     if (btn.dataset.printReveal) {
-      // With Turnstile on, each reveal runs a check first (usually invisible, a second or two); without it, the wait is short.
+      // With Turnstile on, each reveal runs a check first (usually invisible, a second or two); without it,
+      // the wait is short.
       const checks = !!document.querySelector('[data-reveal-wrap][data-sitekey]');
       btn.disabled = true; btn.setAttribute('aria-busy', 'true');
       document.querySelectorAll<HTMLButtonElement>('[data-reveal]').forEach((b) => b.click());

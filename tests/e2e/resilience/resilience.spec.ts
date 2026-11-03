@@ -4,10 +4,12 @@ import { SETUP_TOKEN } from '../../../playwright.config';
 import { d1, breakDb, restoreDb } from '../d1';
 import { readFileSync } from 'node:fs';
 
-// Step 3: "what does the site do when the database is unavailable?" Server D has its own database, which these tests really break (every
+// "what does the site do when the database is unavailable?" Server D has its own database, which these
+// tests really break (every
 // table renamed away, so every query fails) and then restore. The rules being checked:
 //   public pages that were already cached keep working (fail OPEN: a visitor loses nothing);
-//   everything that needs the database answers 503 + Retry-After and never pretends to succeed (fail CLOSED: nothing is written, nobody is let in);
+//   everything that needs the database answers 503 + Retry-After and never pretends to succeed (fail
+//   CLOSED: nothing is written, nobody is let in);
 //   no placeholder page is ever cached, and everything comes back by itself.
 test.describe.configure({ mode: 'serial' });
 test.setTimeout(120_000);
@@ -20,7 +22,7 @@ const count = (sql: string) => d1('e2e-d', sql)[0].n as number;
 test.afterAll(async () => { try { restoreDb('e2e-d'); } catch {} await admin?.dispose(); await visitor?.dispose(); });
 
 test('only one first administrator can be created, even when several setups arrive together', async () => {
-  const racer = await pwRequest.newContext({ baseURL: BASE, storageState: anon });   // whoever creates the account is signed in as it, so keep that apart from the anonymous visitor
+  const racer = await pwRequest.newContext({ baseURL: BASE, storageState: anon });  // Whoever creates the account is signed in as it, so keep that apart from the anonymous visitor
   const setup = (i: number) => racer.post('/auth', { form: { mode: 'setup', token: SETUP_TOKEN, email: `race${i}@example.com`, password: ADMIN_PASSWORD, confirm: ADMIN_PASSWORD }, headers: { ...sameOrigin(BASE, freshIp()), connection: 'close' }, maxRedirects: 0 });
   const rs = await Promise.all([0, 1, 2, 3, 4, 5].map(setup));
   const codes = rs.map((r) => r.status()).sort();
@@ -44,9 +46,9 @@ test.describe('while the database is down', () => {
     expect((await get('/media/demoCover0001/x.png?w=640&f=webp')).status()).toBe(200);
     msgsBefore = count('SELECT count(*) n FROM messages');
     d1('e2e-d', "INSERT INTO messages (name, email, body, is_read) VALUES ('t', 't@example.com', 'unread one', 0)"); unreadBefore = count('SELECT count(*) n FROM messages WHERE is_read = 0'); msgsBefore++;
-    await new Promise((r) => setTimeout(r, 3000));     // the test server counts a page as fresh for 2 s, so by now the warmed pages are "stale"
+    await new Promise((r) => setTimeout(r, 3000));  // The test server counts a page as fresh for 2 s, so by now the warmed pages are "stale"
     breakDb('e2e-d');
-    await new Promise((r) => setTimeout(r, 6000));     // let the 5 s content-version memo expire, so nothing can lean on remembered database answers
+    await new Promise((r) => setTimeout(r, 6000));  // let the 5 s content-version memo expire, so nothing can lean on remembered database answers
   });
   test.afterAll(() => { restoreDb('e2e-d'); });
 
@@ -72,7 +74,7 @@ test.describe('while the database is down', () => {
       expect(cspDirective(header(r, 'content-security-policy'), 'default-src')).toEqual(["'none'"]);
       const body = await r.text();
       expect(body).toContain('Back in a moment'); expect(body).toContain('<meta name="robots" content="noindex">');
-      expect(body).not.toMatch(/Your Name|Error:|D1_|SQLITE|no such table|at .*\.(ts|js):\d+/);   // nothing internal is shown
+      expect(body).not.toMatch(/Your Name|Error:|D1_|SQLITE|no such table|at .*\.(ts|js):\d+/);  // Nothing internal is shown
     }
   });
   test('someone with no session is still sent to sign-in without needing the database at all', async () => {
@@ -134,7 +136,8 @@ test.describe('while the database is down', () => {
 });
 
 test.describe('a failure of just ONE query must not produce a wrong page that gets cached', () => {
-  // The old code swallowed such errors and used defaults, so a "hide from search" page could be built without its noindex and kept for 5 minutes.
+  // The old code swallowed such errors and used defaults, so a "hide from search" page could be built
+  // without its noindex and kept for 5 minutes.
   test('with the search-hiding settings unreadable, the page fails (503) instead of being built without noindex', async () => {
     restoreDb('e2e-d');
     d1('e2e-d', "INSERT OR REPLACE INTO seo_pages (page, noindex) VALUES ('resume', 1)");
@@ -148,8 +151,9 @@ test.describe('a failure of just ONE query must not produce a wrong page that ge
     expect(await after.text()).toMatch(/<meta name="robots" content="noindex/);
   });
   test('with the main settings unreadable, a page is never built from placeholders ("Your Name") and cached: it is refused, or built from the last REAL settings', async () => {
-    // Since Step 7 a server remembers the last real settings (per content version), so a page nobody has requested yet may be built from them
-    // while the settings table is unreadable. That is correct content, so it is allowed; what must never happen is a page made of defaults.
+    // A server remembers the last real settings (per content version), so a page nobody has requested yet
+    // may be built from them while the settings table is unreadable. That is correct content, so it is
+    // allowed; what must never happen is a page made of defaults.
     breakDb('e2e-d', ['settings']);
     let during: any;
     try { during = await get('/projects/edge-notes'); expect([200, 503]).toContain(during.status()); if (during.status() === 200) { const body = await during.text(); expect(body).toContain('Vishesh Raghuvanshi'); expect(body).not.toContain('Your Name'); } }

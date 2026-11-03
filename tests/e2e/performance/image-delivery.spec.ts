@@ -1,12 +1,13 @@
 import { test, expect, withRetry } from '../fixtures';
 import { AUTH_FILE, header, sameOrigin } from '../helpers';
 
-// Step 2: Cloudflare Images pipeline. Every image goes through /media with a snapped width and an explicit format (AVIF, WebP, original).
-// The important property: ONE cache entry per (image, width, format). Anything else a visitor can put in the URL must not cause new work.
+// Cloudflare Images pipeline. Every image goes through /media with a snapped width and an explicit
+// format (AVIF, WebP, original). The important property: ONE cache entry per (image, width, format).
+// Anything else a visitor can put in the URL must not cause new work.
 const anon = { cookies: [], origins: [] };
 const ID = 'demoCover0001';
-const RUNGS = [160, 320, 480, 640, 720, 800, 900, 1024, 1280, 1600, 2000];   // = WIDTHS in src/lib/media.ts
-// A real 1x1 PNG, used to upload a throwaway image for the delete test
+const RUNGS = [160, 320, 480, 640, 720, 800, 900, 1024, 1280, 1600, 2000];  // = WIDTHS in src/lib/media.ts
+// A real 1x1 PNG, used to upload a throwaway image for the delete test.
 const PNG_1PX = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
 
 test.describe('media: one cache entry per image variant', () => {
@@ -18,7 +19,7 @@ test.describe('media: one cache entry per image variant', () => {
     if (header(first, 'x-cache') === 'MISS') expect(header(first, 'cache-control')).toBe('public, max-age=31536000, immutable');
     const r = await request.get(url);
     expect(header(r, 'x-cache')).toBe('HIT');
-    expect(header(r, 'cache-control')).toBe('public, max-age=31536000, immutable');   // the shared cache's own copy is stored for a week (next test)
+    expect(header(r, 'cache-control')).toBe('public, max-age=31536000, immutable');  // The shared cache's own copy is stored for a week (next test)
     expect(header(r, 'etag')).toBe(`"${ID}-640-avif"`);
     expect(header(r, 'content-type')).toBe('image/avif');
     expect(header(r, 'x-content-type-options')).toBe('nosniff');
@@ -27,8 +28,8 @@ test.describe('media: one cache entry per image variant', () => {
   test('the shared cache keeps its own copy for a week only, even though browsers keep theirs for a year', async () => {
     const src = (await import('node:fs')).readFileSync('src/lib/media.ts', 'utf8');
     expect(src).toContain("const EDGE = 'public, max-age=604800, immutable';");
-    expect(src).toMatch(/stored\.set\('Cache-Control', EDGE\)/);                       // what is put in the shared cache
-    expect(src).toMatch(/h\.set\('Cache-Control', FOREVER\)/);                         // what is sent out on a hit
+    expect(src).toMatch(/stored\.set\('Cache-Control', EDGE\)/);  // What is put in the shared cache
+    expect(src).toMatch(/h\.set\('Cache-Control', FOREVER\)/);  // What is sent out on a hit
   });
 
   test('a 644-pixel slot (PageSpeed on a phone: 368 CSS px at 1.75x) is served the 720 file, not the 800 one', async ({ request }) => {
@@ -86,7 +87,7 @@ test.describe('media: one cache entry per image variant', () => {
     }
     const id = `nope${Date.now()}`;
     expect((await request.get(`/media/${id}/a.png`)).status()).toBe(404);
-    const again = await request.get(`/media/${id}/a.png?w=800&f=avif`);   // any variant of an unknown id
+    const again = await request.get(`/media/${id}/a.png?w=800&f=avif`);  // Any variant of an unknown id
     expect(again.status()).toBe(404); expect(header(again, 'x-cache')).toBe('HIT');
   });
 
@@ -104,7 +105,8 @@ test.describe('deleting an image removes every cached copy straight away', () =>
     expect(up.status()).toBe(200);
     const id: string = (await up.json()).asset.id;
     const visitor = withRetry(await playwright.request.newContext({ baseURL }));
-    // every kind of variant this site's own pages can ask for: the original, WebP, AVIF, the picture's own format, and the share-image JPEG
+    // Every kind of variant this site's own pages can ask for: the original, WebP, AVIF, the picture's own
+    // format, and the share-image JPEG
     const urls = [`/media/${id}/tiny.png`, `/media/${id}/tiny.png?w=160&f=webp`, `/media/${id}/tiny.png?w=320&f=avif`, `/media/${id}/tiny.png?w=720&f=png`, `/media/${id}/tiny.png?w=900&f=avif`, `/media/${id}/tiny.png?w=1280&f=jpeg`];
     for (const u of urls) { await visitor.get(u); expect(header(await visitor.get(u), 'x-cache'), u).toBe('HIT'); }
     const del = await admin.post('/api/admin/assets/delete', { form: { id }, headers: h, maxRedirects: 0 });
@@ -147,7 +149,7 @@ test.describe('format negotiation and responsive markup', () => {
   });
 
   test('share image: a JPEG no wider than 1280px on the same site, for every page', async ({ request }) => {
-    for (const path of ['/projects/wanderhost-booking', '/projects/pocket-ledger']) {   // (the demo site has no site-wide share image, so the home page has none)
+    for (const path of ['/projects/wanderhost-booking', '/projects/pocket-ledger']) {  // (the demo site has no site-wide share image, so the home page has none)
       const html = await (await request.get(path)).text();
       const og = /<meta property="og:image" content="([^"]+)"/.exec(html)![1].replace(/&amp;/g, '&');
       expect(og, path).toMatch(/^https:\/\/visheshraghuvanshi\.in\/media\/[\w-]+\/[^?]+\?w=(1280|1024|800)&f=jpeg$/);
@@ -160,7 +162,7 @@ test.describe('format negotiation and responsive markup', () => {
 test.describe('regression: the "unknown id" marker must never hide a real image', () => {
   test.use({ storageState: anon });
   test('with the original already cached, a variant that was never built is still built (not a 404)', async ({ request }) => {
-    expect((await request.get(`/media/${ID}/first.png`)).status()).toBe(200);            // original is now cached
+    expect((await request.get(`/media/${ID}/first.png`)).status()).toBe(200);  // Original is now cached
     for (const q of ['?w=160&f=png', '?w=1600&f=webp', '?w=2000&f=avif']) expect((await request.get(`/media/${ID}/first.png${q}`)).status(), q).toBe(200);
   });
 });

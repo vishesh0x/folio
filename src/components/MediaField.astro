@@ -1,18 +1,19 @@
 ---
-// A file field with the upload built in: shows what is chosen, lets you drop or pick a new file right here, or choose one you
-// already uploaded, or remove it. Saves the asset id in a hidden input named `name`. Needs <MediaData> once on the page.
-// Without JavaScript it falls back to a plain <select> of your uploaded files.
+// A file field with the upload built in: shows what is chosen, lets the owner drop or pick a new file
+// right here, or choose one already uploaded, or remove it. Saves the asset id in a hidden input named
+// `name`. Needs <MediaData> once on the page. Without JavaScript it falls back to a plain <select> of
+// the uploaded files.
 import { assetView, isImage, RASTER_MIMES, type Asset } from '../lib/assets';
 interface Props {
   name: string; value: string | null; assets: Asset[];
   kind?: 'image' | 'pdf' | 'any'; label: string; none?: string; raster?: boolean;
-  aspect?: string;            // shape of the preview, matching how it is shown on the site: "16 / 10", "4 / 5", "1.91 / 1", "1 / 1"
-  empty?: string;             // text in the empty box
+  aspect?: string;  // Shape of the preview, matching how it is shown on the site: "16 / 10", "4 / 5", "1.91 / 1", "1 / 1"
+  empty?: string;  // Text in the empty box
   pickTitle?: string; compact?: boolean; labelHidden?: boolean;
-  side?: boolean;             // preview and details side by side (wide containers); default is stacked (narrow sidebars)
-  exclude?: string[];         // mime types this field refuses (a GIF favicon, for example)
-  help?: string | string[];   // small print shown under the buttons
-  thumbWidth?: string;        // width of the preview when shown side by side, for example "120px"
+  side?: boolean;  // Preview and details side by side (wide containers); default is stacked (narrow sidebars)
+  exclude?: string[];  // Mime types this field refuses (a GIF favicon, for example)
+  help?: string | string[];  // Small print shown under the buttons
+  thumbWidth?: string;  // Width of the preview when shown side by side, for example "120px"
 }
 const { name, value, assets, kind = 'image', label, none, raster = false, aspect = '16 / 10', empty, pickTitle, compact = false, labelHidden = false, side = false, exclude = [], help, thumbWidth } = Astro.props;
 const helps = help ? (Array.isArray(help) ? help : [help]) : [];
@@ -65,12 +66,12 @@ const uid = `mf-${name.replace(/[^a-z0-9]+/gi, '-')}`;
     const input = document.createElement('input'); input.type = 'hidden'; input.name = name; input.value = root.dataset.value ?? '';
     root.prepend(input);
     const body = root.querySelector<HTMLElement>('.mfield-body')!;
-    const helps = [...root.querySelectorAll<HTMLElement>('.mfield-help')]; // small print survives re-painting
+    const helps = [...root.querySelectorAll<HTMLElement>('.mfield-help')];  // Small print survives re-painting
 
     const paint = () => {
       const it = findItem(input.value);
       const thumb = el('button', 'mfield-thumb' + (it ? '' : ' is-empty')) as HTMLButtonElement;
-      thumb.type = 'button'; thumb.dataset.mfOpen = ''; if (it) thumb.setAttribute('aria-label', `Change: ${label}`); // an empty box is named by the text it shows
+      thumb.type = 'button'; thumb.dataset.mfOpen = ''; if (it) thumb.setAttribute('aria-label', `Change: ${label}`);  // An empty box is named by the text it shows
       if (it && it.kind === 'image') { const i = el('img') as HTMLImageElement; i.src = it.thumb; i.alt = ''; if (it.width) i.width = it.width; if (it.height) i.height = it.height; thumb.append(i); }
       else if (it) { const d = el('span', 'mfield-doc'); d.innerHTML = icons.file; d.append('PDF'); thumb.append(d); }
       else { const d = el('span', 'mfield-empty'); d.innerHTML = icons.upload; d.append(el('strong', '', root.dataset.empty ?? `Add ${noun}`), el('small', '', 'Drop a file or click')); thumb.append(d); }
@@ -86,7 +87,7 @@ const uid = `mf-${name.replace(/[^a-z0-9]+/gi, '-')}`;
     const set = (it: Item | null) => {
       input.value = it?.id ?? '';
       paint();
-      input.dispatchEvent(new Event('input', { bubbles: true })); // lets the page notice there is something to save
+      input.dispatchEvent(new Event('input', { bubbles: true }));  // Lets the page notice there is something to save
       input.dispatchEvent(new Event('change', { bubbles: true }));
     };
     const open = (file?: File) => openPicker({ kind, title: root.dataset.title ?? 'Choose a file', current: input.value || null, none, raster, exclude, file, onPick: set });
@@ -96,7 +97,7 @@ const uid = `mf-${name.replace(/[^a-z0-9]+/gi, '-')}`;
       if (t.closest('[data-mf-clear]')) { set(null); (root.querySelector('[data-mf-open]') as HTMLElement | null)?.focus(); }
       else if (t.closest('[data-mf-open]')) open();
     });
-    // drop a file straight onto the field
+    // Drop a file straight onto the field.
     for (const ev of ['dragenter', 'dragover']) root.addEventListener(ev, (e) => { e.preventDefault(); root.classList.add('is-over'); });
     root.addEventListener('dragleave', (e) => { if (!root.contains((e as DragEvent).relatedTarget as Node)) root.classList.remove('is-over'); });
     root.addEventListener('drop', (e) => {

@@ -1,9 +1,10 @@
 // Browser code shared by every place in the dashboard that picks or uploads a file:
 // the project cover and share image, portrait, favicon, resume PDF, and the Markdown "Image" button.
 //
-//   • library()      the files you have already uploaded (read once from <script id="media-data">)
+//   • library()      the files already uploaded (read once from <script id="media-data">)
 //   • uploadFile()   sends one file to /api/admin/assets/upload and reports progress
-//   • openPicker()   one modal that lets you choose an existing file OR upload a new one on the spot
+//   • openPicker()   one modal that lets the owner choose an existing file OR upload a new one on the
+//                    spot
 import type { AssetView } from '../lib/assets';
 
 export type Item = AssetView;
@@ -11,19 +12,19 @@ export type Kind = 'image' | 'pdf' | 'any';
 export type PickOpts = {
   kind: Kind;
   title: string;
-  current?: string | null;       // id that is selected right now
-  none?: string;                 // label for a "no file" tile (for example "No cover"); omit to hide the tile
-  raster?: boolean;              // only PNG, JPEG, WebP, AVIF (link previews cannot show SVG or GIF)
-  exclude?: string[];            // file types that make no sense for this field, for example ['image/gif']
-  file?: File;                   // a file the person already dropped; goes straight to the "describe it" step
-  uploadOnly?: boolean;          // hide the list of existing files (used on the Files page, which is the list)
+  current?: string | null;  // id that is selected right now
+  none?: string;  // Label for a "no file" tile (for example "No cover"); omit to hide the tile
+  raster?: boolean;  // Only PNG, JPEG, WebP, AVIF (link previews cannot show SVG or GIF)
+  exclude?: string[];  // File types that make no sense for this field, for example ['image/gif']
+  file?: File;  // A file the person already dropped; goes straight to the "describe it" step
+  uploadOnly?: boolean;  // Hide the list of existing files (used on the Files page, which is the list)
   onPick: (item: Item | null) => void;
 };
 
 const MAX_IMAGE = 10 * 1024 * 1024, MAX_PDF = 15 * 1024 * 1024;
 const RASTER = ['image/png', 'image/jpeg', 'image/webp', 'image/avif'];
 
-/* ───────── library ───────── */
+// ── Library ──
 let items: Item[] | null = null;
 export function library(): Item[] {
   if (!items) {
@@ -40,8 +41,11 @@ export const accepts = (kind: Kind, raster = false) =>
 const hintFor = (kind: Kind, raster: boolean) =>
   kind === 'pdf' ? 'A PDF, up to 15 MB.' : raster ? 'PNG, JPEG, WebP or AVIF, up to 10 MB.' : kind === 'image' ? 'PNG, JPEG, WebP, AVIF, GIF or SVG, up to 10 MB.' : 'Images up to 10 MB, PDFs up to 15 MB.';
 
-/** Returns a reason this file cannot be used here, or null. Only a quick check: the server checks the real bytes again. */
-const NEVER = ['image/x-icon', 'image/vnd.microsoft.icon']; // .ico files are never used by a picker
+/**
+ * Returns a reason this file cannot be used here, or null. Only a quick check: the server checks the
+ * real bytes again.
+ */
+const NEVER = ['image/x-icon', 'image/vnd.microsoft.icon'];  // .ico files are never used by a picker
 export function problemWith(file: File, kind: Kind, raster = false, exclude: string[] = []): string | null {
   const isPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
   const isImg = file.type.startsWith('image/') || /\.(png|jpe?g|webp|avif|gif|svg|ico)$/i.test(file.name);
@@ -54,7 +58,7 @@ export function problemWith(file: File, kind: Kind, raster = false, exclude: str
   return null;
 }
 
-/* ───────── upload ───────── */
+// ── Upload ──
 export function uploadFile(file: File, o: { alt: string; decorative: boolean; expect?: Kind }, onProgress: (fraction: number) => void): Promise<Item> {
   return new Promise((resolve, reject) => {
     const fd = new FormData();
@@ -74,7 +78,7 @@ export function uploadFile(file: File, o: { alt: string; decorative: boolean; ex
   });
 }
 
-/* ───────── tiny DOM helper ───────── */
+// ── Tiny DOM helper ──
 type Attrs = Record<string, string | boolean | undefined>;
 function h<K extends keyof HTMLElementTagNameMap>(tag: K, attrs: Attrs = {}, ...kids: (Node | string | null)[]): HTMLElementTagNameMap[K] {
   const el = document.createElement(tag);
@@ -88,7 +92,7 @@ const ICON_CHECK = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" 
 const withIcon = (svg: string) => { const s = document.createElement('span'); s.className = 'mpick-ico'; s.innerHTML = svg; return s; };
 export const icons = { upload: ICON_UPLOAD, file: ICON_FILE, check: ICON_CHECK };
 
-/* ───────── the picker dialog ───────── */
+// ── The picker dialog ──
 let dlg: HTMLDialogElement | null = null;
 export function openPicker(o: PickOpts) {
   dlg?.remove();
@@ -97,12 +101,12 @@ export function openPicker(o: PickOpts) {
   const d = (dlg = h('dialog', { class: 'mpick', 'aria-labelledby': 'mpick-title' }));
   const close = () => { if (d.open) d.close(); };
 
-  // header
+  // Header
   const closeBtn = h('button', { type: 'button', class: 'mpick-x', 'aria-label': 'Close' }, '×');
   closeBtn.addEventListener('click', close);
   const head = h('header', { class: 'mpick-head' }, h('h2', { id: 'mpick-title' }, o.title), closeBtn);
 
-  // upload area: a drop zone, then (after a file is chosen) a small form
+  // Upload area: a drop zone, then (after a file is chosen) a small form.
   const fileInput = h('input', { type: 'file', class: 'visually-hidden', accept: accepts(o.kind, o.raster), tabindex: '-1', 'aria-hidden': 'true' });
   const browse = h('button', { type: 'button', class: 'mpick-link' }, 'browse');
   const dropMsg = h('p', { class: 'mpick-drop-t' }, h('strong', {}, `Drop ${withArticle} here`), ' or ', browse);
@@ -126,7 +130,7 @@ export function openPicker(o: PickOpts) {
     altField, bar, err, h('div', { class: 'row-gap' }, go, cancel));
   const upload = h('div', { class: 'mpick-upload' }, drop, dropErr, form, fileInput);
 
-  // library
+  // Library
   const search = h('input', { type: 'search', class: 'mpick-search', placeholder: 'Search your files', 'aria-label': 'Search your files' });
   const count = h('span', { class: 'hint', role: 'status' });
   const grid = h('ul', { class: 'mpick-grid' });
@@ -157,7 +161,7 @@ export function openPicker(o: PickOpts) {
   };
   search.addEventListener('input', renderGrid);
 
-  // upload flow
+  // Upload flow
   let chosen: File | null = null, busy = false;
   const stage = (file: File) => {
     dropErr.textContent = '';
@@ -181,7 +185,7 @@ export function openPicker(o: PickOpts) {
     t.addEventListener('dragleave', () => upload.classList.remove('is-over'));
     t.addEventListener('drop', (e) => { e.preventDefault(); upload.classList.remove('is-over'); const f = e.dataTransfer?.files?.[0]; if (f && !busy) stage(f); });
   }
-  drop.addEventListener('click', (e) => { if (!(e.target as HTMLElement).closest('button')) fileInput.click(); }); // the "browse" button handles its own click
+  drop.addEventListener('click', (e) => { if (!(e.target as HTMLElement).closest('button')) fileInput.click(); });  // The "browse" button handles its own click
   const doUpload = async () => {
     if (!chosen || busy) return;
     const isImg = !altField.hidden;
@@ -197,11 +201,11 @@ export function openPicker(o: PickOpts) {
   go.addEventListener('click', doUpload);
   altInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); doUpload(); } });
 
-  d.addEventListener('click', (e) => { if (e.target === d) close(); }); // a click on the dimmed backdrop
+  d.addEventListener('click', (e) => { if (e.target === d) close(); });  // A click on the dimmed backdrop
   d.addEventListener('cancel', (e) => { if (busy) e.preventDefault(); });
   d.addEventListener('close', () => { d.remove(); if (dlg === d) dlg = null; });
 
-  // inside the dashboard shell, so its colour variables and form styles apply to the dialog too
+  // Inside the dashboard shell, so its colour variables and form styles apply to the dialog too.
   (document.querySelector('.dash-shell') ?? document.body).append(d);
   renderGrid();
   d.showModal();

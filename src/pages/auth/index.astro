@@ -1,4 +1,7 @@
 ---
+/**
+ * Sign-in page, and the one-time setup form shown while no admin account exists.
+ */
 import Base from '../../layouts/Base.astro';
 import { getPublicSettings } from '../../lib/settings';
 import {
@@ -14,7 +17,7 @@ const adminExists = await hasAnyUser();
 const canSetup = !adminExists && setupEnabled();
 let error = '';
 let email = '';
-let challenge = false; // show a Turnstile check: set when too many wrong passwords have been tried for this account
+let challenge = false;  // Show a Turnstile check: set when too many wrong passwords have been tried for this account
 
 if (Astro.request.method === 'POST') {
   const form = await Astro.request.formData();
@@ -51,9 +54,10 @@ if (Astro.request.method === 'POST') {
       Astro.response.status = 429;
       error = 'Too many attempts. Try again in 15 minutes.';
     } else {
-      // Many wrong passwords for this ACCOUNT, from any number of visitors: stop guessing unless the attempt comes from a browser the owner has
-      // signed in from before, or passes a human check. (A stranger who only knows the email can therefore not keep the owner out, with or
-      // without Turnstile. The password is still required, and the per-network limit above still applies.)
+      // Many wrong passwords for this ACCOUNT, from any number of visitors: stop guessing unless the attempt
+      // comes from a browser the owner has signed in from before, or passes a human check. (A stranger who
+      // only knows the email can therefore not keep the owner out, with or without Turnstile. The password
+      // is still required, and the per-network limit above still applies.).
       let go = true;
       if (await isLimited(acct, ACCOUNT_MAX_FAILS, ACCOUNT_WINDOW_SECS) && !(await isKnownDevice(Astro.cookies, email))) {
         if (!turnstileOn()) { go = false; Astro.response.status = 429; error = 'Too many wrong passwords for this account. Try again in an hour, or sign in from a browser you have used before.'; }
@@ -71,7 +75,7 @@ if (Astro.request.method === 'POST') {
 }
 const site = await getPublicSettings();
 const sitekey = challenge ? turnstileSiteKey() : undefined;
-if (sitekey) Astro.locals.challenge = true; // lets the Content-Security-Policy allow Cloudflare's check on this response
+if (sitekey) Astro.locals.challenge = true;  // Lets the Content-Security-Policy allow Cloudflare's check on this response
 ---
 <Base title={canSetup ? 'Set up' : 'Sign in'} noindex bare>
   {sitekey && <script slot="head" src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>}
@@ -144,7 +148,8 @@ if (sitekey) Astro.locals.challenge = true; // lets the Content-Security-Policy 
 </style>
 
 <script>
-  // A hint while you type a new password. The real rules (12+ characters) are enforced on the server.
+  // A hint while the owner types a new password. The real rules (12+ characters) are enforced on the
+  // server.
   const pw = document.getElementById('s-pw') as HTMLInputElement | null;
   const bar = document.querySelector<HTMLElement>('[data-meter]');
   const text = document.querySelector<HTMLElement>('[data-meter-text]');
@@ -161,7 +166,7 @@ if (sitekey) Astro.locals.challenge = true; // lets the Content-Security-Policy 
 </script>
 
 <script>
-  // Show/hide for password fields (a convenience; the fields work without it)
+  // Show/hide for password fields (a convenience; the fields work without it).
   document.querySelectorAll<HTMLButtonElement>('[data-pw-toggle]').forEach((b) => {
     const input = document.getElementById(b.dataset.pwToggle!) as HTMLInputElement;
     b.hidden = false;

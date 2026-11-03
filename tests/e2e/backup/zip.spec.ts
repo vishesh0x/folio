@@ -2,13 +2,17 @@ import { test, expect } from '@playwright/test';
 import { deflateRawSync } from 'node:zlib';
 import { makeZip, readZip } from '../../../src/scripts/backup';
 
-// The browser code that writes and reads backup zips, tested directly (no server). A backup file may come from another zip program, be damaged, or be
-// hostile, so the reader is as important as the writer.
+// The browser code that writes and reads backup zips, tested directly (no server). A backup file may
+// come from another zip program, be damaged, or be hostile, so the reader is as important as the
+// writer.
 const enc = new TextEncoder();
 const bytes = (blob: Blob) => blob.arrayBuffer();
 
 function crc(b: Uint8Array) { let c = 0xffffffff; for (const x of b) { c ^= x; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; } return (c ^ 0xffffffff) >>> 0; }
-/** A zip built by hand, so tests can make deflated entries (as other zip programs do) and deliberately wrong ones. */
+/**
+ * A zip built by hand, so tests can make deflated entries (as other zip programs do) and deliberately
+ * wrong ones.
+ */
 function rawZip(entries: { name: string; data: Uint8Array; method?: 0 | 8; flags?: number; crc?: number; usize?: number; localOffsetBias?: number }[], eocd: { count?: number; cdOffset?: number } = {}) {
   const parts: Uint8Array[] = [], central: Uint8Array[] = []; let off = 0;
   for (const e of entries) {
@@ -53,7 +57,7 @@ test.describe('refusing what it should not open', () => {
     const ok = rawZip([{ name: 'a', data }]); await refuse(ok.slice(0, ok.byteLength - 10), /not a zip|damaged/);
   });
   test('a file whose content was changed (checksum mismatch) is refused', async () => {
-    const buf = new Uint8Array(rawZip([{ name: 'a.txt', data }])); buf[30 + 5] ^= 0xff;       // a byte of the stored content
+    const buf = new Uint8Array(rawZip([{ name: 'a.txt', data }])); buf[30 + 5] ^= 0xff;  // A byte of the stored content
     await refuse(buf.buffer, /damaged|checksum/);
   });
   for (const name of ['../evil.txt', '/etc/passwd', 'files/../../x', 'a\\b.txt', './x', 'x/./y']) test(`an unsafe file name is refused: ${name}`, async () => { await refuse(rawZip([{ name, data }]), /unsafe file name/); });

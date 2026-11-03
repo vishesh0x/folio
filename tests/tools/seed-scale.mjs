@@ -1,8 +1,13 @@
-// SQL that fills a test database with many files and many long projects, to see what happens to the owner's Files page as the site grows.
-//   assets   how many uploaded files (rows only: nothing is stored in R2, the dashboard lists rows)
-//   projects how many projects;  bodyKb  size of each project's text;  refs  how many pictures each project shows
-// Everything created has an id/slug starting with "scale", so scaleClear() removes exactly that and nothing else.
-export const scaleId = (n) => `scale${String(n).padStart(7, '0')}`;          // 12 characters, like a real id
+/**
+ * SQL that fills a test database with many files and many long projects, to see what happens to the
+ * owner's Files page as the site grows.
+ *   assets   how many uploaded files (rows only: nothing is stored in R2, the dashboard lists rows)
+ *   projects how many projects;  bodyKb  size of each project's text;  refs  how many pictures each
+ *   project shows
+ * Everything created has an id/slug starting with "scale", so scaleClear() removes exactly that and
+ * nothing else.
+ */
+export const scaleId = (n) => `scale${String(n).padStart(7, '0')}`;  // 12 characters, like a real id
 export const scaleFile = (n) => `Photo-${n}.jpg`;
 const q = (s) => `'${String(s).replace(/'/g, "''")}'`;
 const PARA = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. ';

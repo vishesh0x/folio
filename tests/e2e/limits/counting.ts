@@ -1,3 +1,7 @@
+/**
+ * Shared fixtures for the tests that measure how much work a request does.
+ */
+
 import type { APIRequestContext } from '@playwright/test';
 import { sameOrigin } from '../helpers';
 import { SETUP_TOKEN } from '../../../playwright.config';
@@ -14,14 +18,15 @@ export async function signIn(ctx: APIRequestContext, baseURL: string) {
 
 let n = 0;
 /**
- * Make one request through the counting wrapper (tests/tools/counting/entry.mjs) and report how many calls the Worker made to Cloudflare
- * services while answering it: database queries (d1), file storage (r2), the page cache (cache), image processing (images), outgoing fetches (fetch).
- * The free Workers plan allows 50 such calls per request.
+ * Make one request through the counting wrapper (tests/tools/counting/entry.mjs) and report how many
+ * calls the Worker made to Cloudflare services while answering it: database queries (d1), file storage
+ * (r2), the page cache (cache), image processing (images), outgoing fetches (fetch). The free Workers
+ * plan allows 50 such calls per request.
  */
 export async function counted(ctx: APIRequestContext, baseURL: string, method: 'GET' | 'POST', path: string, opts: { form?: Record<string, string>; multipart?: any; limit?: number; limitCache?: number; otherColo?: boolean; failImages?: boolean } = {}) {
   const id = `t${Date.now().toString(36)}-${++n}`;
   const res = await ctx.fetch(path, { method, headers: { ...(method === 'POST' ? sameOrigin(baseURL) : {}), 'x-count-id': id, ...(opts.limit ? { 'x-count-limit': String(opts.limit) } : {}), ...(opts.limitCache ? { 'x-count-limit-cache': String(opts.limitCache) } : {}), ...(opts.otherColo ? { 'x-count-other-colo': '1' } : {}), ...(opts.failImages ? { 'x-count-fail-images': '1' } : {}) }, form: opts.form, multipart: opts.multipart, maxRedirects: 0 });
-  await res.body();                                   // read to the end: a streamed page keeps making calls until the last byte
+  await res.body();  // Read to the end: a streamed page keeps making calls until the last byte
   const counts = (await (await ctx.get(`/__counts?id=${id}`)).json()) as Counts;
   return { res, counts };
 }

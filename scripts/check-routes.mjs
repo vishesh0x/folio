@@ -1,5 +1,5 @@
-// Fails if src/pages contains a route that is not on the list below.
-// Catches leftover test pages and debug endpoints before they get deployed.  Run: npm run check:routes
+// Fails if src/pages contains a route that is not on the list below. Catches leftover test pages and
+// debug endpoints before they get deployed.  Run: npm run check:routes.
 import { readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 

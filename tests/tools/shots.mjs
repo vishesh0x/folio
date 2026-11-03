@@ -1,6 +1,8 @@
 // Dev tool: screenshots + layout measurements of every page at phone/tablet/desktop widths.
-//   BASE=http://localhost:8790 OUT=/tmp/shots node tests/tools/shots.mjs [public|dashboard|all] [widths comma list]
-// Needs a running site with the demo seed (tests/seed/demo.sql). Creates the admin through the setup form if there is none.
+//   BASE=http://localhost:8790 OUT=/tmp/shots node tests/tools/shots.mjs [public|dashboard|all]
+//   [widths comma list]
+// Needs a running site with the demo seed (tests/seed/demo.sql). Creates the admin through the setup
+// form if there is none.
 import { chromium } from '@playwright/test';
 import { mkdirSync } from 'node:fs';
 
@@ -23,7 +25,7 @@ const measure = () => {
       if (!clipped) bad.push(`${name(el)} ${Math.round(r.left)}..${Math.round(r.right)}`);
     }
     if (el.matches('a[href], button, summary, select, input:not([type=hidden]), textarea, [role=button]') && (r.height < 44 || r.width < 44)) {
-      // links inside running text are exempt (WCAG 2.2 inline exception); report the rest
+      // Links inside running text are exempt (WCAG 2.2 inline exception); report the rest.
       if (el.matches('a') && el.closest('p, li, .md, .prose, h1, h2, h3') && !el.closest('nav, .nav, .footer-links, .chips, .menu')) continue;
       small.push(`${name(el)} ${Math.round(r.width)}x${Math.round(r.height)} "${(el.textContent || el.getAttribute('aria-label') || el.value || '').trim().slice(0, 18)}"`);
     }
@@ -35,7 +37,7 @@ const browser = await chromium.launch();
 const mk = (w) => browser.newContext({ viewport: { width: w, height: w >= 1024 ? 800 : 740 }, isMobile: w < 1024, hasTouch: w < 1024, deviceScaleFactor: 1, extraHTTPHeaders: { 'cf-connecting-ip': '10.9.9.9' } });
 const out = (...a) => console.log(...a);
 
-// sign in once (create the admin if needed) and keep the cookies
+// Sign in once (create the admin if needed) and keep the cookies.
 const boot = await mk(1280), bp = await boot.newPage();
 await bp.goto(BASE + '/auth');
 if (await bp.getByRole('heading', { name: 'Set up your site' }).isVisible()) {

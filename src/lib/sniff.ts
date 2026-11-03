@@ -1,9 +1,13 @@
-// Identify uploads by their first bytes, never by the browser-supplied type.
+/** Identify uploads by their first bytes, never by the browser-supplied type. */
 export type Sniffed = { mime: string; ext: string; width: number | null; height: number | null };
 const u16be = (b: Uint8Array, i: number) => (b[i] << 8) | b[i + 1];
 const u32be = (b: Uint8Array, i: number) => ((b[i] << 24) | (b[i + 1] << 16) | (b[i + 2] << 8) | b[i + 3]) >>> 0;
 const ascii = (b: Uint8Array, i: number, n: number) => String.fromCharCode(...b.slice(i, i + n));
 
+/**
+ * Identifies a PNG, JPEG, WebP, GIF, AVIF, ICO or PDF from its first bytes and reads its
+ * dimensions where possible. Returns null for anything else.
+ */
 export function sniffBinary(b: Uint8Array): Sniffed | null {
   if (b.length < 16) return null;
   if (u32be(b, 0) === 0x89504e47 && u32be(b, 4) === 0x0d0a1a0a && ascii(b, 12, 4) === 'IHDR') return { mime: 'image/png', ext: 'png', width: u32be(b, 16), height: u32be(b, 20) };

@@ -1,7 +1,7 @@
 import { test, expect } from '../fixtures';
 import { cspDirective, header } from '../helpers';
 
-// Audit 1.3: security headers and Content-Security-Policy, on the production build.
+// Security headers and Content-Security-Policy, on the production build.
 const PUBLIC = ['/', '/projects', '/now', '/resume', '/contact', '/auth', '/does-not-exist'];
 
 test.describe('security headers on every kind of page', () => {
@@ -40,7 +40,7 @@ test.describe('Content-Security-Policy is strict', () => {
 
   test('cached public pages carry no nonce; uncached pages get a fresh one each time', async ({ request }) => {
     const pub = cspDirective(header(await request.get('/'), 'content-security-policy'), 'script-src')!;
-    expect(pub.some((s) => s.startsWith("'nonce-"))).toBe(false); // a nonce baked into a cached page would be reusable
+    expect(pub.some((s) => s.startsWith("'nonce-"))).toBe(false);  // A nonce baked into a cached page would be reusable
     const n1 = cspDirective(header(await request.get('/auth'), 'content-security-policy'), 'script-src')!.find((s) => s.startsWith("'nonce-"));
     const n2 = cspDirective(header(await request.get('/auth'), 'content-security-policy'), 'script-src')!.find((s) => s.startsWith("'nonce-"));
     expect(n1).toBeTruthy(); expect(n2).toBeTruthy(); expect(n1).not.toBe(n2);
@@ -52,7 +52,7 @@ test.describe('Content-Security-Policy is strict', () => {
     }
   });
 
-  // Known findings (docs: audit-progress.md, Step 1). Marked fixme so the suite stays green; remove `.fixme` once fixed.
+  // Known gaps, marked `fixme` so the suite stays green. Remove `.fixme` once the behaviour is fixed.
   test.fixme('FINDING S1-L2: style-src should not need unsafe-inline', async ({ request }) => {
     expect(cspDirective(header(await request.get('/'), 'content-security-policy'), 'style-src')).not.toContain("'unsafe-inline'");
   });
@@ -73,7 +73,8 @@ test.describe('caching of private responses', () => {
   });
 });
 
-// A real browser enforces the CSP, so this catches a policy that silently breaks the site's own scripts/styles/fonts.
+// A real browser enforces the CSP, so this catches a policy that silently breaks the site's own
+// scripts/styles/fonts.
 test.describe('real browser: no CSP violations on the site\'s own pages', () => {
   for (const path of ['/', '/projects', '/now', '/resume', '/contact', '/auth']) {
     test(`${path}`, async ({ page }) => {
@@ -82,7 +83,7 @@ test.describe('real browser: no CSP violations on the site\'s own pages', () => 
       await page.addInitScript(() => document.addEventListener('securitypolicyviolation', (e) => console.error('CSP violation: ' + e.violatedDirective + ' ' + e.blockedURI)));
       await page.goto(path);
       await page.waitForLoadState('networkidle');
-      // exercise the two hash-allowed inline scripts: the theme switch
+      // Exercise the two hash-allowed inline scripts: the theme switch.
       const dark = page.locator('[data-theme-choice="dark"]').first();
       if (await dark.isVisible()) { await dark.click(); await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark'); }
       expect(violations).toEqual([]);

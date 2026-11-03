@@ -1,4 +1,7 @@
 ---
+/**
+ * Dashboard: resume builder.
+ */
 import Dash from '../../layouts/Dash.astro';
 import PageHead from '../../components/PageHead.astro';
 import MediaField from '../../components/MediaField.astro';
@@ -86,8 +89,9 @@ const ok = Astro.url.searchParams.get('ok');
 const P = posted as { form: string; values: Record<string, string> } | null;
 const isForm = (k: string) => P?.form === k;
 const projById = new Map(projects.map((p) => [p.id, p]));
-// Which forms have an error area of their own on this page? An error for any other form (for example one
-// whose item was just deleted in another tab) is shown at the top instead, so it is never lost or doubled.
+// Which forms have an error area of their own on this page? An error for any other form (for example
+// one whose item was just deleted in another tab) is shown at the top instead, so it is never lost or
+// doubled.
 const inlineKeys = new Set<string>(['sec-add']);
 for (const sec of sections) {
   inlineKeys.add(`ren-${sec.id}`);

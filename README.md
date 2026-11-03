@@ -22,7 +22,7 @@ A portfolio and personal site you run yourself on Cloudflare. Visitors get a fas
 
 ## 1. Run it on your computer
 
-You need a recent Node.js (LTS) and npm.
+You need Node.js 22.12 or newer and npm.
 
 ```bash
 npm install

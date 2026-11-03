@@ -16,10 +16,18 @@ const mac = async (data: string) => {
   return btoa(String.fromCharCode(...sig)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 };
 
+/**
+ * Issues a signed, time-stamped token for a form. Used to reject submissions that arrive too
+ * quickly or from stale pages.
+ */
 export async function issueToken(purpose: string): Promise<string> {
   const ts = Math.floor(Date.now() / 1000);
   return `${ts}.${await mac(`${purpose}.${ts}`)}`;
 }
+/**
+ * Verifies a form token for the given purpose. Returns 'ok', or why it was refused (too fast,
+ * expired or invalid).
+ */
 export async function checkToken(token: string, purpose: string, minAge = 3, maxAge = 7200): Promise<'ok' | 'too-fast' | 'expired' | 'invalid'> {
   const [tsRaw, sig] = token.split('.');
   const ts = Number(tsRaw);

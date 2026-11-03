@@ -1,5 +1,6 @@
-// Runs axe-core (an accessibility checker) over every page of the running counting server (server E, port 8791) in light and dark, at desktop and phone size,
-// and prints what it finds, grouped by problem. Usage: node tests/tools/a11y-scan.mjs [baseUrl]
+// Runs axe-core (an accessibility checker) over every page of the running counting server (server E,
+// port 8791) in light and dark, at desktop and phone size, and prints what it finds, grouped by
+// problem. Usage: node tests/tools/a11y-scan.mjs [baseUrl]
 import { chromium } from '/home/claude/folio/node_modules/playwright/index.mjs';
 import AxeBuilder from '/home/claude/folio/node_modules/@axe-core/playwright/dist/index.mjs';
 import { send, BASE as DEFAULT } from './subrequests.mjs';

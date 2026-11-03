@@ -1,3 +1,7 @@
+/**
+ * Owner-only endpoint that handles uploads from the Files page.
+ */
+
 import type { APIRoute } from 'astro';
 import { saveUpload } from '../../../../lib/assets';
 

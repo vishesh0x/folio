@@ -3,7 +3,8 @@ import { execFileSync } from 'node:child_process';
 import { readdirSync, readFileSync, rmSync } from 'node:fs';
 import { d1, d1All, d1Error, plan } from '../d1';
 
-// Step 3: migrations, indexes, constraints and integrity, checked against the real (local) D1 engine the test server uses.
+// Migrations, indexes, constraints and integrity, checked against the real (local) D1 engine the test
+// server uses.
 const FILES = readdirSync('migrations').filter((f) => f.endsWith('.sql')).sort();
 
 test.describe('migrations', () => {
@@ -37,7 +38,8 @@ test.describe('indexes', () => {
     expect(fks.filter((f) => !first.has(`${f.t}.${f.col}`)).map((f) => `${f.t}.${f.col}`), 'foreign keys without an index').toEqual([]);
   });
 
-  // The statements the site really runs often, and what the plan must (not) contain. "TEMP B-TREE" = an extra sort of every row.
+  // The statements the site really runs often, and what the plan must (not) contain. "TEMP B-TREE" = an
+  // extra sort of every row.
   const CASES: [string, string, RegExp, RegExp?][] = [
     ['inbox, newest first', 'SELECT * FROM messages ORDER BY created_at DESC, id DESC LIMIT 25 OFFSET 0', /idx_messages_recent/, /TEMP B-TREE/],
     ['inbox, unread only', 'SELECT * FROM messages WHERE is_read = 0 ORDER BY created_at DESC, id DESC LIMIT 25', /idx_messages_inbox/, /TEMP B-TREE/],
@@ -69,7 +71,8 @@ test.describe('indexes', () => {
 test.describe('integrity rules are enforced by the database itself', () => {
   test('the database is healthy and has no orphaned rows', () => {
     expect(d1('e2e-a', 'PRAGMA foreign_key_check')).toEqual([]);
-    // (D1 does not allow PRAGMA integrity_check; foreign_key_check is the one it offers, and it covers the relationships)
+  // (D1 does not allow PRAGMA integrity_check; foreign_key_check is the one it offers, and it covers the
+  // relationships).
   });
   test('foreign keys are really enforced (a row pointing at nothing is refused)', () => {
     expect(d1Error('e2e-a', "INSERT INTO resume_entries (section_id, data) VALUES (999999, '{}')")).toMatch(/FOREIGN KEY constraint failed/i);
@@ -80,15 +83,15 @@ test.describe('integrity rules are enforced by the database itself', () => {
     expect(d1Error('e2e-a', "INSERT INTO projects (slug, title) VALUES ('wanderhost-booking', 'dup')")).toMatch(/UNIQUE constraint failed/i);
   });
   test('deleting a parent cleans up exactly what it should', () => {
-    // category -> its items
+    // Category -> its items
     d1('e2e-a', "DELETE FROM now_categories WHERE name = 'tmp-cascade'");
     const [, , , a] = d1All('e2e-a', "INSERT INTO now_categories (name) VALUES ('tmp-cascade'); INSERT INTO now_items (category_id, title) SELECT id, 'tmp-cascade-item' FROM now_categories WHERE name = 'tmp-cascade'; DELETE FROM now_categories WHERE name = 'tmp-cascade'; SELECT count(*) n FROM now_items WHERE title = 'tmp-cascade-item';");
     expect(a[0].n, 'items must go with their category').toBe(0);
-    // project -> its place on the resume
+    // Project -> its place on the resume.
     const before = d1('e2e-a', 'SELECT count(*) n FROM resume_entries')[0].n;
     const [, , b, , c] = d1All('e2e-a', "INSERT INTO projects (slug, title) VALUES ('tmp-cascade-p', 't'); INSERT INTO resume_entries (section_id, project_id, data) SELECT (SELECT id FROM resume_sections WHERE kind = 'projects'), id, '{}' FROM projects WHERE slug = 'tmp-cascade-p'; SELECT count(*) n FROM resume_entries; DELETE FROM projects WHERE slug = 'tmp-cascade-p'; SELECT count(*) n FROM resume_entries;");
     expect(b[0].n).toBe(before + 1); expect(c[0].n, 'the resume entry must go with its project').toBe(before);
-    // asset -> projects keep existing, just lose the picture
+    // Asset -> projects keep existing, just lose the picture.
     const [, , , d] = d1All('e2e-a', "INSERT INTO assets (id, r2_key, filename, mime, size) VALUES ('tmpAsset0001', 'k', 'tmp.png', 'image/png', 1); INSERT INTO projects (slug, title, cover_asset) VALUES ('tmp-cascade-a', 't', 'tmpAsset0001'); DELETE FROM assets WHERE id = 'tmpAsset0001'; SELECT count(*) n, max(cover_asset) c FROM projects WHERE slug = 'tmp-cascade-a';");
     expect(d[0].n, 'the project must survive').toBe(1); expect(d[0].c, 'its cover must be cleared').toBeNull();
     d1('e2e-a', "DELETE FROM projects WHERE slug = 'tmp-cascade-a'");

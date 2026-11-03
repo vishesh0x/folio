@@ -1,4 +1,7 @@
 ---
+/**
+ * Public page shell: head metadata, structured data, navigation, footer and theme handling.
+ */
 import '../styles/global.css';
 import ThemeSwitch from '../components/ThemeSwitch.astro';
 import { NAV } from '../lib/site';
@@ -10,13 +13,14 @@ import paperMono from '../assets/fonts/PaperMono-VF.woff2?url';
 interface Props { title?: string; description?: string; noindex?: boolean; bare?: boolean; ogImage?: string | null; ogAlt?: string; ogType?: 'website' | 'article'; published?: Date; modified?: Date; errorPage?: boolean; }
 const { title, description, noindex = false, bare = false, ogImage, ogAlt, ogType = 'website', published, modified, errorPage = false } = Astro.props;
 
-// Normal pages FAIL if the database does (the middleware answers 503), so a page is never built from placeholder settings and cached.
-// Error pages are the exception: they must render even when the database is the problem, so they fall back to defaults and mark the
-// response as degraded, which the middleware never caches.
+// Normal pages FAIL if the database does (the middleware answers 503), so a page is never built from
+// placeholder settings and cached. Error pages are the exception: they must render even when the
+// database is the problem, so they fall back to defaults and mark the response as degraded, which the
+// middleware never caches.
 let s = SETTINGS_DEFAULTS;
 if (errorPage) { try { s = await getPublicSettings(); } catch { Astro.locals.degraded = true; } } else s = await getPublicSettings();
 let fav = null, og = null;
-try { // a database problem must never stop an error page from rendering
+try {  // A database problem must never stop an error page from rendering
   fav = await loadAsset(s.favicon_asset ?? undefined);
   og = ogImage === undefined ? await loadAsset(s.og_asset ?? undefined) : null;
 } catch {}
@@ -41,7 +45,10 @@ const ogUrl = ogImage ? new URL(ogImage, origin).href
     <meta name="theme-color" content="#f7f7f4" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#141217" media="(prefers-color-scheme: dark)" />
     {noindex && <meta name="robots" content="noindex" />}
-    {/* A page that asks not to be indexed (sign-in, 404, error pages) names no canonical address: it has nothing to be the preferred copy of. */}
+    {/*
+      A page that asks not to be indexed (sign-in, 404, error pages) names no canonical address: it has
+      nothing to be the preferred copy of.
+    */}
     {!noindex && !errorPage && <link rel="canonical" href={origin + path} />}
     {svgIcon
       ? <link rel="icon" type="image/svg+xml" href={`/icons/favicon.svg?v=${v}`} />
@@ -66,7 +73,10 @@ const ogUrl = ogImage ? new URL(ogImage, origin).href
       <link rel="preload" href={paperMono} as="font" type="font/woff2" crossorigin />
     </>}
     <slot name="head" />
-    <!-- Runs before first paint so there is never a light/dark flash. No saved choice = no attribute = follow the OS. -->
+    {/*
+      Runs before first paint so there is never a light/dark flash. No saved choice = no attribute =
+      follow the OS.
+    */}
     <script is:inline set:html={THEME_INIT}></script>
   </head>
   <body>

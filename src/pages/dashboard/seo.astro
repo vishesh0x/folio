@@ -1,4 +1,7 @@
 ---
+/**
+ * Dashboard: search and sharing settings for each main page.
+ */
 import { env } from 'cloudflare:workers';
 import Dash from '../../layouts/Dash.astro';
 import PageHead from '../../components/PageHead.astro';
@@ -30,7 +33,7 @@ if (Astro.request.method === 'POST') {
   for (const p of PAGES) {
     const title = text(`${p.key}_title`, 120), description = text(`${p.key}_description`, 300);
     const og = String(f.get(`${p.key}_og`) ?? '');
-    const ogId = images.some((a) => a.id === og) ? og : null; // only real uploaded images are accepted
+    const ogId = images.some((a) => a.id === og) ? og : null;  // Only real uploaded images are accepted
     const noindex = f.get(`${p.key}_noindex`) === 'on' ? 1 : 0;
     stmts.push(!title && !description && !ogId && !noindex
       ? env.DB.prepare('DELETE FROM seo_pages WHERE page = ?').bind(p.key)
@@ -91,7 +94,7 @@ const host = origin.replace(/^https?:\/\//, '');
 </Dash>
 
 <script>
-  // Live character counts and a search-result preview that follow what you type.
+  // Live character counts and a search-result preview that follow what the owner types.
   document.querySelectorAll<HTMLElement>('[data-seo]').forEach((card) => {
     const t = card.querySelector<HTMLInputElement>('input[data-soft]')!;
     const d = card.querySelector<HTMLTextAreaElement>('textarea[data-soft]')!;

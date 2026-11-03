@@ -2,8 +2,9 @@ import { test, expect } from '../fixtures';
 import { withRetry } from '../fixtures';
 import { AUTH_FILE, header, sameOrigin } from '../helpers';
 
-// Step 2: cache rules. Public pages are cached at the edge by the Worker (Cache API), keyed by a "content version" that moves on at every
-// dashboard save, so a save shows up at once and nothing ever needs purging. Browsers always revalidate (cheap 304).
+// Cache rules. Public pages are cached at the edge by the Worker (Cache API), keyed by a "content
+// version" that moves on at every dashboard save, so a save shows up at once and nothing ever needs
+// purging. Browsers always revalidate (cheap 304).
 const anon = { cookies: [], origins: [] };
 const PAGES = ['/', '/projects', '/projects/wanderhost-booking', '/now', '/resume'];
 const REVALIDATE = 'public, max-age=0, must-revalidate';
@@ -68,7 +69,7 @@ test.describe('conditional requests (the 304 that makes revisits nearly free)', 
     }
   });
   test('a stale or different validator gets the full page', async ({ request }) => {
-    for (const v of ['"v1-old"', 'W/"v1-old"', '"v1-old", "v2-old"', '*']) {   // "*" is not a version we hold, so never a 304 for a page
+    for (const v of ['"v1-old"', 'W/"v1-old"', '"v1-old", "v2-old"', '*']) {  // "*" is not a version the server holds, so never a 304 for a page
       const r = await request.get('/now', { headers: { 'if-none-match': v } });
       expect(r.status(), v).toBe(200); expect((await r.body()).length).toBeGreaterThan(1000);
     }
@@ -132,7 +133,7 @@ test.describe('pages that are not found', () => {
     const again = await request.get('/projects/does-not-exist-yet');
     expect(again.status()).toBe(404); expect(header(again, 'x-cache')).toBe('HIT'); expect(header(again, 'etag')).toBe('');
     expect((await request.get('/projects/does-not-exist-yet', { headers: { 'if-none-match': '*' } })).status(), 'a 404 is never turned into a 304').toBe(404);
-    await save(playwright, baseURL!);   // publishing it would bump the version the same way
+    await save(playwright, baseURL!);  // Publishing it would bump the version the same way
     expect(header(await request.get('/projects/does-not-exist-yet'), 'x-cache')).toBe('MISS');
   });
 });

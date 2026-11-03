@@ -1,4 +1,5 @@
-// Dev tool: how much JavaScript each page really downloads (raw and gzipped), and how many inline scripts it contains.
+// Dev tool: how much JavaScript each page really downloads (raw and gzipped), and how many inline
+// scripts it contains.
 //   BASE=http://localhost:8790 node tests/tools/js-weight.mjs
 import { chromium } from '@playwright/test';
 import { gzipSync } from 'node:zlib';

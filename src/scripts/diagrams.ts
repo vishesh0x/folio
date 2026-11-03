@@ -1,15 +1,17 @@
-// Draws ```mermaid fences (the same diagrams you write in Obsidian).
+// Draws ```mermaid fences (the same diagrams the owner writes in Obsidian).
 //
-// The Markdown renderer outputs each diagram as <figure data-diagram> holding its source in a normal code block. That block
-// is what you see without JavaScript, while the diagram loads, and if the diagram has a mistake in it.
+// The Markdown renderer outputs each diagram as <figure data-diagram> holding its source in a normal
+// code block. That block is what is shown without JavaScript, while the diagram loads, and if the
+// diagram has a mistake in it.
 //
-// Cost control: Mermaid is large, so it is a separate file that is only downloaded when a page actually has a diagram, and
-// (on the public site) only once that diagram is within about a screen of being visible. Pages without diagrams ship none of it.
-// It is served from this site (CSP: script-src 'self'), never from a CDN.
+// Cost control: Mermaid is large, so it is a separate file that is only downloaded when a page
+// actually has a diagram, and (on the public site) only once that diagram is within about a screen of
+// being visible. Pages without diagrams ship none of it. It is served from this site (CSP: script-src
+// 'self'), never from a CDN.
 type Mermaid = typeof import('mermaid').default;
 
 const SELECTOR = 'figure[data-diagram]';
-const MAX_SOURCE = 30_000; // characters; a safety limit, far above any real diagram
+const MAX_SOURCE = 30_000;  // Characters; a safety limit, far above any real diagram
 let loading: Promise<Mermaid> | null = null;
 let queue: Promise<void> = Promise.resolve();
 let watching = false;
@@ -17,7 +19,10 @@ let seq = 0;
 
 const load = () => (loading ??= import('mermaid').then((m) => m.default));
 
-/** Resolve a CSS colour variable (light-dark() and all) to #rrggbb, which is what Mermaid's theme wants. */
+/**
+ * Resolve a CSS colour variable (light-dark() and all) to #rrggbb, which is what Mermaid's theme
+ * wants.
+ */
 function colour(cssVar: string, fallback: string): string {
   const el = document.createElement('span');
   el.style.cssText = `position:absolute;visibility:hidden;color:var(${cssVar})`;
@@ -26,7 +31,7 @@ function colour(cssVar: string, fallback: string): string {
   el.remove();
   const n = c.match(/[\d.]+/g)?.map(Number);
   if (!n || n.length < 3) return fallback;
-  const scale = c.startsWith('color(') ? 255 : 1; // color(srgb 0.1 0.2 0.3) uses 0..1
+  const scale = c.startsWith('color(') ? 255 : 1;  // color(srgb 0.1 0.2 0.3) uses 0..1
   return '#' + n.slice(0, 3).map((x) => Math.round(x * scale).toString(16).padStart(2, '0')).join('');
 }
 
@@ -63,12 +68,12 @@ async function drawOne(fig: HTMLElement) {
   try {
     const mm = await load();
     mm.initialize({ startOnLoad: false, securityLevel: 'strict', layout: 'dagre', theme: 'base', themeVariables: themeVariables(), fontFamily: getComputedStyle(document.body).fontFamily });
-    await mm.parse(source);                         // throws on a mistake, without leaving debris on the page
+    await mm.parse(source);  // Throws on a mistake, without leaving debris on the page
     const id = `diagram-${++seq}`;
     const { svg } = await mm.render(id, source);
     document.getElementById('d' + id)?.remove();
     let view = fig.querySelector<HTMLElement>('.diagram-view');
-    if (!view) {                                    // first draw: keep the source, tucked into a "Diagram source" disclosure
+    if (!view) {  // First draw: keep the source, tucked into a "Diagram source" disclosure
       const pre = fig.querySelector('pre')!;
       const details = document.createElement('details'); details.className = 'diagram-src';
       const summary = document.createElement('summary'); summary.textContent = 'Diagram source';
@@ -78,21 +83,22 @@ async function drawOne(fig: HTMLElement) {
     }
     view.setAttribute('role', 'img');
     view.setAttribute('aria-label', /^\s*accTitle\s*:\s*(.+)$/m.exec(source)?.[1].trim() || 'Diagram');
-    view.innerHTML = svg;                           // Mermaid's strict mode has already sanitised labels
+    view.innerHTML = svg;  // Mermaid's strict mode has already sanitised labels
     const el = view.querySelector('svg');
-    if (el) {                                       // natural size, but allowed to shrink to half size (still legible on a retina phone); wider than that scrolls inside its box
+    if (el) {  // Natural size, but allowed to shrink to half size (still legible on a retina phone); wider than that scrolls inside its box
       const w = el.viewBox?.baseVal?.width || el.getBoundingClientRect().width;
       el.removeAttribute('height');
       el.style.cssText = `width:${w}px;max-width:100%;min-width:${Math.round(Math.max(240, Math.min(w, w * 0.5)))}px;height:auto`;
     }
-    // A box that scrolls sideways must be reachable by keyboard (WCAG 2.1.1): it joins the Tab order only while its drawing is wider than the box,
-    // and a visible ring shows where it is. Arrow keys then scroll it.
+    // A box that scrolls sideways must be reachable by keyboard (WCAG 2.1.1): it joins the Tab order only
+    // while its drawing is wider than the box, and a visible ring shows where it is. Arrow keys then
+    // scroll it.
     const fit = () => { if (view!.scrollWidth > view!.clientWidth + 1) view!.tabIndex = 0; else view!.removeAttribute('tabindex'); };
     fit(); new ResizeObserver(fit).observe(view);
     fig.querySelector('.diagram-error')?.remove();
     fig.dataset.state = 'ready';
   } catch (e) {
-    document.querySelectorAll('[id^="ddiagram-"]').forEach((n) => n.remove()); // Mermaid can leave its error drawing behind
+    document.querySelectorAll('[id^="ddiagram-"]').forEach((n) => n.remove());  // Mermaid can leave its error drawing behind
     if (fig.dataset.state !== 'ready') problem(String((e as Error)?.message ?? e).split('\n')[0].slice(0, 140));
   }
 }
@@ -108,7 +114,10 @@ function watchTheme() {
   matchMedia('(prefers-color-scheme: dark)').addEventListener('change', redraw);
 }
 
-/** Draw every diagram under `root`. `immediate` skips the "only when near the screen" wait (used by the editor preview). */
+/**
+ * Draw every diagram under `root`. `immediate` skips the "only when near the screen" wait (used by the
+ * editor preview).
+ */
 export function renderDiagrams(root: ParentNode = document, opts: { immediate?: boolean } = {}) {
   const figures = Array.from(root.querySelectorAll<HTMLElement>(SELECTOR)).filter((f) => !f.dataset.state);
   if (!figures.length) return;

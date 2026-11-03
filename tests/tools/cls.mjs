@@ -1,5 +1,7 @@
-// Dev tool: measures Cumulative Layout Shift (and what moved) when images arrive LATE, like on a slow phone connection.
-//   BASE=http://localhost:8790 DELAY=1500 node tests/tools/cls.mjs /projects/wanderhost-booking [/other-path ...]
+// Dev tool: measures Cumulative Layout Shift (and what moved) when images arrive LATE, like on a slow
+// phone connection.
+//   BASE=http://localhost:8790 DELAY=1500 node tests/tools/cls.mjs /projects/wanderhost-booking
+//   [/other-path ...]
 import { chromium } from '@playwright/test';
 const BASE = process.env.BASE ?? 'http://localhost:8790', DELAY = Number(process.env.DELAY ?? 1500);
 const b = await chromium.launch();

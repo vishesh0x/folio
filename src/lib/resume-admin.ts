@@ -1,11 +1,20 @@
+/**
+ * Data access and form parsing for the resume builder in the dashboard.
+ */
+
 import { env } from 'cloudflare:workers';
 import { KINDS, KIND_TITLE, cleanEntryData, httpUrl, str, type Kind } from './resume';
 
+/** Limits on resume size. */
 export const MAX_SECTIONS = 15, MAX_ENTRIES = 40;
+/** A resume entry as the builder shows it. */
 export type BEntry = { id: number; project_id: number | null; visible: number; d: Record<string, any> };
+/** A resume section with its entries, as the builder shows it. */
 export type BSection = { id: number; kind: Kind; title: string; visible: number; entries: BEntry[] };
+/** A project that can be linked from the resume. */
 export type PickProject = { id: number; title: string; slug: string; status: string };
 
+/** Loads every section, entry and linkable project for the builder. */
 export async function loadBuilder() {
   const rows = (await env.DB.prepare(
     `SELECT s.id AS sid, s.kind, s.title, s.visible AS svis, e.id AS eid, e.project_id, e.data, e.visible AS evis
@@ -24,11 +33,12 @@ export async function loadBuilder() {
   return { sections, projects };
 }
 
-/* ───── turning a posted form into clean entry data ───── */
+// ── Turning a posted form into clean entry data ──
 const line = (f: FormData, k: string, max: number) => String(f.get(k) ?? '').replace(/\s+/g, ' ').trim().slice(0, max);
 const text = (f: FormData, k: string, max: number) => String(f.get(k) ?? '').replace(/\r\n?/g, '\n').replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '').trim().slice(0, max);
 const lines = (f: FormData, k: string) => text(f, k, 6000).split('\n').map((l) => l.replace(/^[\s•*-]+/, '').trim()).filter(Boolean);
 
+/** Reads and validates an entry from a submitted form. */
 export function entryFromForm(kind: Kind, f: FormData): { data?: Record<string, any>; error?: string } {
   let raw: Record<string, unknown>, need: string | null = null;
   switch (kind) {
@@ -55,10 +65,11 @@ export function entryFromForm(kind: Kind, f: FormData): { data?: Record<string, 
   return need ? { error: need } : { data: cleanEntryData(kind, raw) };
 }
 
-/* ───── sections ───── */
+// ── Sections ──
 const renumber = (table: 'resume_sections' | 'resume_entries', ids: number[]) =>
   env.DB.batch(ids.map((id, n) => env.DB.prepare(`UPDATE ${table} SET sort_order = ? WHERE id = ?`).bind(n, id)));
 
+/** Adds a section of the given kind. Returns an error message, or null. */
 export async function addSection(kind: string, title: string): Promise<string | null> {
   if (!(KINDS as readonly string[]).includes(kind)) return 'Choose what kind of section to add.';
   const info = (await env.DB.prepare('SELECT count(*) AS n, coalesce(max(sort_order), -1) AS m FROM resume_sections').first<{ n: number; m: number }>())!;
@@ -66,14 +77,19 @@ export async function addSection(kind: string, title: string): Promise<string | 
   await env.DB.prepare('INSERT INTO resume_sections (kind, title, visible, sort_order) VALUES (?, ?, 1, ?)').bind(kind, str(title, 80) || KIND_TITLE[kind], info.m + 1).run();
   return null;
 }
+/** Creates a typical set of sections for an empty resume. Returns an error message, or null. */
 export async function starterLayout(): Promise<string | null> {
   if ((await env.DB.prepare('SELECT count(*) AS n FROM resume_sections').first<{ n: number }>())!.n > 0) return 'You already have sections.';
   for (const k of ['summary', 'experience', 'education', 'skills', 'projects'] as const) await addSection(k, KIND_TITLE[k]);
   return null;
 }
+/** Renames a section. */
 export const renameSection = async (id: number, title: string) => (await env.DB.prepare('UPDATE resume_sections SET title = ? WHERE id = ?').bind(str(title, 80), id).run()).meta.changes > 0;
+/** Shows or hides a section. */
 export const setSectionVisible = async (id: number, v: boolean) => (await env.DB.prepare('UPDATE resume_sections SET visible = ? WHERE id = ?').bind(v ? 1 : 0, id).run()).meta.changes > 0;
-export const deleteSection = async (id: number) => (await env.DB.prepare('DELETE FROM resume_sections WHERE id = ?').bind(id).run()).meta.changes > 0; // its entries go with it
+/** Deletes a section and its entries. */
+export const deleteSection = async (id: number) => (await env.DB.prepare('DELETE FROM resume_sections WHERE id = ?').bind(id).run()).meta.changes > 0;  // Its entries go with it
+/** Moves a section up or down. Returns false when it cannot move. */
 export async function moveSection(id: number, dir: 'up' | 'down'): Promise<boolean> {
   const ids = (await env.DB.prepare('SELECT id FROM resume_sections ORDER BY sort_order, id').all<{ id: number }>()).results.map((r) => r.id);
   const i = ids.indexOf(id), j = dir === 'up' ? i - 1 : i + 1;
@@ -82,7 +98,7 @@ export async function moveSection(id: number, dir: 'up' | 'down'): Promise<boole
   [ids[i], ids[j]] = [ids[j], ids[i]]; await renumber('resume_sections', ids); return true;
 }
 
-/* ───── entries ───── */
+// ── Entries ──
 export async function addEntry(sectionId: number, data: Record<string, any>, projectId: number | null): Promise<string | null> {
   const sec = await env.DB.prepare('SELECT kind FROM resume_sections WHERE id = ?').bind(sectionId).first<{ kind: string }>();
   if (!sec) return 'That section no longer exists.';
@@ -96,10 +112,15 @@ export async function addEntry(sectionId: number, data: Record<string, any>, pro
   await env.DB.prepare('INSERT INTO resume_entries (section_id, project_id, data, visible, sort_order) VALUES (?, ?, ?, 1, ?)').bind(sectionId, projectId, JSON.stringify(data), info.m + 1).run();
   return null;
 }
+/** Replaces an entry's data. */
 export const updateEntry = async (id: number, data: Record<string, any>) => (await env.DB.prepare('UPDATE resume_entries SET data = ? WHERE id = ?').bind(JSON.stringify(data), id).run()).meta.changes > 0;
+/** Shows or hides an entry. */
 export const setEntryVisible = async (id: number, v: boolean) => (await env.DB.prepare('UPDATE resume_entries SET visible = ? WHERE id = ?').bind(v ? 1 : 0, id).run()).meta.changes > 0;
+/** Deletes an entry. */
 export const deleteEntry = async (id: number) => (await env.DB.prepare('DELETE FROM resume_entries WHERE id = ?').bind(id).run()).meta.changes > 0;
+/** Looks up an entry's section kind, linked project and section. */
 export const entryKind = async (id: number) => (await env.DB.prepare('SELECT s.kind, e.project_id, e.section_id FROM resume_entries e JOIN resume_sections s ON s.id = e.section_id WHERE e.id = ?').bind(id).first<{ kind: Kind; project_id: number | null; section_id: number }>());
+/** Moves an entry up or down within its section. Returns false when it cannot move. */
 export async function moveEntry(id: number, dir: 'up' | 'down'): Promise<boolean> {
   const me = await env.DB.prepare('SELECT section_id FROM resume_entries WHERE id = ?').bind(id).first<{ section_id: number }>();
   if (!me) return false;
@@ -109,4 +130,5 @@ export async function moveEntry(id: number, dir: 'up' | 'down'): Promise<boolean
   [ids[i], ids[j]] = [ids[j], ids[i]]; await renumber('resume_entries', ids); return true;
 }
 
+/** Looks up a section's kind. */
 export const sectionKind = async (id: number) => (await env.DB.prepare('SELECT kind FROM resume_sections WHERE id = ?').bind(id).first<{ kind: Kind }>())?.kind ?? null;

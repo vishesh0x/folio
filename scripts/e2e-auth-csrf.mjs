@@ -1,12 +1,15 @@
 #!/usr/bin/env node
 // End-to-end check of first-admin sign-up and the cross-site (CSRF) refusal table.
-// Needs the production build running locally:   npm run build && npm run preview   (http://localhost:8787)
+// Needs the production build running locally:   npm run build && npm run preview
+// (http://localhost:8787)
 // Run:   node scripts/e2e-auth-csrf.mjs            (BASE=http://localhost:8787 by default)
 //
-// WARNING: this wipes users, sessions, login_attempts and projects in the LOCAL database. Never point it at production.
+// WARNING: this wipes users, sessions, login_attempts and projects in the LOCAL database. Never point
+// it at production.
 //
-// Why raw node:http: no client adds Origin / Sec-Fetch-* headers behind our back, and no cookie library silently
-// drops the `Secure` + `__Host-` session cookie (it is Set over plain http://localhost). Cookies are handled by hand.
+// Why raw node:http: no client adds Origin / Sec-Fetch-* headers without the test's knowledge, and no
+// cookie library silently drops the `Secure` + `__Host-` session cookie (it is Set over plain
+// http://localhost). Cookies are handled by hand.
 import http from 'node:http';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -15,17 +18,18 @@ import { dirname, resolve } from 'node:path';
 const BASE = new URL(process.env.BASE ?? 'http://localhost:8787');
 if (!['localhost', '127.0.0.1'].includes(BASE.hostname)) { console.error('Refusing to run against a non-local host.'); process.exit(2); }
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const TOKEN = process.env.ADMIN_SETUP_TOKEN ?? 'test-setup-token-0123456789abcdef'; // must match .dev.vars
+const TOKEN = process.env.ADMIN_SETUP_TOKEN ?? 'test-setup-token-0123456789abcdef';  // Must match .dev.vars
 const ORIGIN = BASE.origin;
 const PW = 'correct horse battery';
 
-/* ───── helpers ───── */
+// ── Helpers ──
 let ipCounter = 10;
-const freshIp = () => `203.0.113.${++ipCounter}`; // each case gets its own rate-limit bucket (the site keys limits on cf-connecting-ip)
+const freshIp = () => `203.0.113.${++ipCounter}`;  // Each case gets its own rate-limit bucket (the site keys limits on cf-connecting-ip)
 
-// `wrangler dev` sometimes drops the connection of the first requests that follow a `wrangler d1 execute --local` run from
-// ANOTHER process (this script resets the database that way). Reproduced on the untouched original project too, and the dropped
-// requests never reach the app (they are absent from the server log), so one retry is safe. Retries are counted and reported.
+// `wrangler dev` sometimes drops the connection of the first requests that follow a `wrangler d1
+// execute --local` run from ANOTHER process (this script resets the database that way). Reproduced on
+// the untouched original project too, and the dropped requests never reach the app (they are absent
+// from the server log), so one retry is safe. Retries are counted and reported.
 let transportRetries = 0;
 async function request(opts) {
   try { return await requestOnce(opts); }
@@ -73,7 +77,7 @@ function check(group, name, got, want, note = '') {
 const sameOrigin = { 'sec-fetch-site': 'same-origin', origin: ORIGIN };
 const setupForm = (over = {}) => ({ mode: 'setup', token: TOKEN, email: 'me@example.com', password: PW, confirm: PW, ...over });
 
-/* ───── 1. sign-up ───── */
+// ── 1. sign-up ──
 async function signUpSuite() {
   console.log('\n== SIGN-UP ==');
   reset();
@@ -111,7 +115,7 @@ async function signUpSuite() {
   const signedIn = await request({ path: '/auth', cookie });
   check(g, 'GET /auth while signed in -> redirect to /dashboard', `${signedIn.status} ${signedIn.headers.location}`, '302 /dashboard');
 
-  // login / logout
+  // Login / logout
   const bad = await post({ mode: 'login', email: 'me@example.com', password: 'wrong wrong wrong' });
   check(g, 'login with wrong password -> 401', bad.status, 401);
   const good = await post({ mode: 'login', email: 'me@example.com', password: PW });
@@ -120,7 +124,7 @@ async function signUpSuite() {
   check(g, 'same-origin logout -> 303 /auth', `${out.status} ${out.headers.location}`, '303 /auth');
   check(g, 'logged-out cookie no longer opens the dashboard', (await request({ path: '/dashboard', cookie: cookieFrom(good) })).status, 302);
 
-  // rate limit
+  // Rate limit
   console.log('-- rate limits');
   reset();
   const ip = freshIp();
@@ -130,7 +134,7 @@ async function signUpSuite() {
   check(g, '6th attempt with the CORRECT token is still 429', (await lim(setupForm())).status, 429);
   check(g, 'a different IP with the correct token succeeds', (await post(setupForm())).status, 302);
 
-  // atomic first admin, 3 trials of 3 simultaneous requests
+  // Atomic first admin, 3 trials of 3 simultaneous requests.
   console.log('-- simultaneous registration');
   for (let t = 1; t <= 3; t++) {
     reset();
@@ -138,7 +142,8 @@ async function signUpSuite() {
     check(g, `trial ${t}: 3 simultaneous sign-ups -> exactly 1 admin`, counts().users, 1, `statuses ${rs.map((r) => r.status).join(',')}`);
   }
 
-  // informational: the shared "local" bucket (only exists when cf-connecting-ip is missing, i.e. local testing)
+  // Informational: the shared "local" bucket (only exists when cf-connecting-ip is missing, i.e. local
+  // testing).
   console.log('-- local-testing artefact');
   reset();
   const noIp = (form) => request({ method: 'POST', path: '/auth', form, headers: sameOrigin });
@@ -148,7 +153,7 @@ async function signUpSuite() {
 }
 
 
-/* ───── 1b. the check itself, called directly (covers what the local proxy hides) ───── */
+// ── 1b. the check itself, called directly (covers what the local proxy hides) ──
 async function unitSuite() {
   console.log('\n== isSameOrigin() DIRECT ==');
   let isSameOrigin;
@@ -170,7 +175,7 @@ async function unitSuite() {
   for (const [name, site, h, want] of cases) check(g, name, isSameOrigin(R(h), U(site)), want);
 }
 
-/* ───── 2. CSRF table ───── */
+// ── 2. CSRF table ──
 const VARIANTS = [
   // [label, headers, allowed?]
   ['A  Sec-Fetch-Site: same-origin (+Origin same)',          { 'sec-fetch-site': 'same-origin', origin: ORIGIN }, true],
@@ -181,14 +186,15 @@ const VARIANTS = [
   ['F  no Sec-Fetch-Site, Origin = evil',                    { origin: 'https://evil.example' }, false],
   ['G  no Sec-Fetch-Site, Origin: null (sandboxed iframe)',  { origin: 'null' }, false],
   ['H  no Sec-Fetch-Site, Origin = other port',              { origin: `${BASE.protocol}//${BASE.hostname}:9999` }, false],
-  // (scheme mismatch, http vs https, cannot be tested over HTTP here: `wrangler dev`'s local proxy rewrites Origin/Referer to its own
-  //  address before the Worker sees them. It is checked directly against isSameOrigin() in unitSuite() below.)
+  // (scheme mismatch, http vs https, cannot be tested over HTTP here: `wrangler dev`'s local proxy
+  // rewrites Origin/Referer to its own address before the Worker sees them. It is checked directly
+  // against isSameOrigin() in unitSuite() below.).
   ['J  no Sec-Fetch-*, no Origin, no Referer',               {}, false],
   ['K  no Sec-Fetch-*, no Origin, Referer = this site',      { referer: `${ORIGIN}/dashboard` }, true],
   ['L  no Sec-Fetch-*, no Origin, Referer = evil',           { referer: 'https://evil.example/page' }, false],
   ['M  no Sec-Fetch-*, no Origin, Referer = garbage',        { referer: 'not a url' }, false],
   ['N  Sec-Fetch-Site: cross-site BUT Origin = this site',   { 'sec-fetch-site': 'cross-site', origin: ORIGIN }, false],
-  ['O  Sec-Fetch-Site: same-origin BUT Origin = evil',       { 'sec-fetch-site': 'same-origin', origin: 'https://evil.example' }, true], // informational: Sec-Fetch-Site wins; browsers never produce this
+  ['O  Sec-Fetch-Site: same-origin BUT Origin = evil',       { 'sec-fetch-site': 'same-origin', origin: 'https://evil.example' }, true],  // Informational: Sec-Fetch-Site wins; browsers never produce this
 ];
 
 async function csrfSuite() {
@@ -199,17 +205,19 @@ async function csrfSuite() {
   const cookie = cookieFrom(signup);
   check(g, 'precondition: signed in', (await request({ path: '/dashboard', cookie })).status, 200);
 
-  // Side-effect probe over HTTP (much faster than shelling out to wrangler): how many new-project marks the dashboard list shows.
+  // Side-effect probe over HTTP (much faster than shelling out to wrangler): how many new-project marks
+  // the dashboard list shows.
   const projectMarks = async (c) => ((await request({ path: '/dashboard/projects', cookie: c })).text.match(/Untitled project/g) ?? []).length;
 
-  // Each target: how to send it, how to tell "reached the handler" from "refused", and a side effect to watch.
+  // Each target: how to send it, how to tell "reached the handler" from "refused", and a side effect to
+  // watch.
   const TARGETS = [
     { name: 'POST /auth  (public form)',            send: (h) => request({ method: 'POST', path: '/auth', form: { mode: 'login', email: 'nobody@example.com', password: 'wrong wrong wrong' }, headers: { ...h, 'cf-connecting-ip': freshIp() } }), reached: (r) => r.status === 401 },
     { name: 'POST /api/reveal  (public JSON)',      send: (h) => request({ method: 'POST', path: '/api/reveal', json: { kind: 'email' }, headers: { ...h, 'cf-connecting-ip': freshIp() } }), reached: (r) => r.status !== 403 },
     { name: 'POST /api/admin/preview  (session)',   send: (h) => request({ method: 'POST', path: '/api/admin/preview', json: { md: '# hi' }, headers: h, cookie }), reached: (r) => r.status === 200 },
     { name: 'POST /api/admin/inbox  (session)',     send: (h) => request({ method: 'POST', path: '/api/admin/inbox', form: { action: 'mark-all-read' }, headers: h, cookie }), reached: (r) => r.status === 303 },
     { name: 'POST /api/admin/projects create (writes a row)', send: (h) => request({ method: 'POST', path: '/api/admin/projects', form: { action: 'create' }, headers: h, cookie }), reached: (r) => r.status === 303 },
-    { name: 'POST /api/admin/assets/upload  (file upload)', send: (h) => request({ method: 'POST', path: '/api/admin/assets/upload', multipart: true, headers: h, cookie }), reached: (r) => r.status === 400 }, // allowed: reaches the handler, which rejects the .txt
+    { name: 'POST /api/admin/assets/upload  (file upload)', send: (h) => request({ method: 'POST', path: '/api/admin/assets/upload', multipart: true, headers: h, cookie }), reached: (r) => r.status === 400 },  // Allowed: reaches the handler, which rejects the .txt
     { name: 'PUT  /api/admin/projects  (method coverage)',    send: (h) => request({ method: 'PUT', path: '/api/admin/projects', form: { action: 'create' }, headers: h, cookie }), reached: (r) => r.status !== 403 },
   ];
 
@@ -237,11 +245,11 @@ async function csrfSuite() {
   for (const [n, row] of matrix) console.log(n.padEnd(52) + row.map((c) => c.padStart(7)).join(''));
   console.log('\nvariants:'); for (const [l, , a] of VARIANTS) console.log(`  ${l}  -> ${a ? 'allowed' : 'refused'}`);
 
-  // session survives every refused request
+  // Session survives every refused request.
   check(g, 'session survived the whole table (dashboard still 200)', (await request({ path: '/dashboard', cookie })).status, 200);
   check(g, 'session row still in the database', counts().sessions, 1);
 
-  // logout, the destructive one: cross-site refused and session survives, same-origin signs out
+  // Logout, the destructive one: cross-site refused and session survives, same-origin signs out.
   console.log('-- logout');
   const xs = await request({ method: 'POST', path: '/auth/logout', headers: { 'sec-fetch-site': 'cross-site', origin: 'https://evil.example' }, cookie });
   check(g, 'cross-site POST /auth/logout -> 403', xs.status, 403);
@@ -255,13 +263,13 @@ async function csrfSuite() {
   check(g, 'same-origin logout -> 303', same.status, 303);
   check(g, 'session is gone afterwards', `${(await request({ path: '/dashboard', cookie })).status}`, '302');
 
-  // safe methods are never blocked by the check
+  // Safe methods are never blocked by the check.
   console.log('-- safe methods');
   check(g, 'GET / with Sec-Fetch-Site: cross-site is served', (await request({ path: '/', headers: { 'sec-fetch-site': 'cross-site' } })).status, 200);
   check(g, 'unauthenticated POST /api/admin/* -> 401 (auth guard runs before CSRF)', (await request({ method: 'POST', path: '/api/admin/inbox', form: { action: 'mark-all-read' }, headers: { 'sec-fetch-site': 'cross-site' } })).status, 401);
 }
 
-/* ───── run ───── */
+// ── Run ──
 try {
   const probe = await request({ path: '/' });
   if (probe.status !== 200) throw new Error(`Site not answering at ${ORIGIN} (status ${probe.status})`);

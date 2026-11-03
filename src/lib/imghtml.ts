@@ -1,12 +1,19 @@
 // One implementation of "show an uploaded image", used by <Img> and by the Markdown renderer.
 import { WIDTHS, fallbackFormat } from './media';
 
+/** The picture fields needed to render an image tag. */
 export type ImgAsset = { id: string; filename: string; mime: string; width: number | null; height: number | null; alt: string; decorative: number };
+/** Rendering options for an image: alt override, sizes, loading priority, class, fit and ratio. */
 export type ImgOpts = { alt?: string; sizes?: string; eager?: boolean; class?: string; fit?: 'contain' | 'cover'; ratio?: string; natural?: boolean };
 
+/** Escapes text for use in HTML content and attribute values. */
 export const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 const RESIZABLE = ['image/jpeg', 'image/png', 'image/webp', 'image/avif'];
 
+/**
+ * Renders a responsive <img> for an uploaded picture, with its natural size so the page does not
+ * shift while loading.
+ */
 export function imgHtml(a: ImgAsset, o: ImgOpts = {}): string {
   const { sizes = '(min-width: 72rem) 72rem, 100vw', eager = false, fit = 'contain' } = o;
   const text = (o.alt ?? a.alt ?? '').trim();
@@ -20,8 +27,9 @@ export function imgHtml(a: ImgAsset, o: ImgOpts = {}): string {
     ` loading="${eager ? 'eager' : 'lazy'}" decoding="${eager ? 'sync' : 'async'}"` +
     (eager ? ' fetchpriority="high"' : '') + (o.class ? ` class="${esc(o.class)}"` : '') +
     (fit === 'cover' ? ` style="object-fit:cover;${o.ratio ? `aspect-ratio:${esc(o.ratio)};width:100%;` : ''}"`
-      // `natural`: hands the file's own size to the CSS (--nw/--nh) so the stylesheet can give the image a DEFINITE width before it
-      // has loaded. Without one, a not-yet-loaded <img> is 0 x 0 and everything below it jumps when it arrives.
+      // `natural`: hands the file's own size to the CSS (--nw/--nh) so the stylesheet can give the image a
+      // DEFINITE width before it has loaded. Without one, a not-yet-loaded <img> is 0 x 0 and everything
+      // below it jumps when it arrives.
       : o.natural && a.width && a.height ? ` style="--nw:${a.width};--nh:${a.height};max-width:min(100%,${a.width}px)"` : '');
 
   if (!RESIZABLE.includes(a.mime)) return `<img src="${base}"${common}>`;

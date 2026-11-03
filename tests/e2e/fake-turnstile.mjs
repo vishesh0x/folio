@@ -1,12 +1,15 @@
-// A FAKE Cloudflare Turnstile "siteverify" endpoint for tests (the real one is not reachable from CI sandboxes and a real
+// A FAKE Cloudflare Turnstile "siteverify" endpoint for tests (the real one is not reachable from CI
+// sandboxes and a real
 // verifier cannot be told to fail on demand). It copies the real response shape.
-//   token "good-…"     → success (once only; a second use answers timeout-or-duplicate, like Cloudflare)
+//   token "good-…"     → success (once only; a second use answers timeout-or-duplicate, like
+//                      Cloudflare)
 //   token "drop-…"     → the connection is destroyed (Cloudflare unreachable)
 //   token "garbage-…"  → an HTML page instead of JSON
 //   token "slow-…"     → answers after 7 s (the Worker gives up after 5 s)
 //   token "wronghost-…"  → success, but earned on another site (hostname evil.example)
 //   token "wrongaction-…" → success, but by a different widget (action "other")
-//   token "act_<name>-…"  → success, earned by the widget with action <name>   (a plain "good-…" names no action, like an unnamed widget)
+//   token "act_<name>-…"  → success, earned by the widget with action <name>   (a plain "good-…" names
+//                         no action, like an unnamed widget)
 //   anything else      → success:false
 // Extra endpoints for assertions:  GET /health   GET /calls   POST /reset
 import http from 'node:http';

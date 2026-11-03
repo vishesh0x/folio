@@ -10,7 +10,8 @@ export const POST: APIRoute = async ({ request }) => {
   const id = Number(f.get('id'));
   const to = String(f.get('redirect') ?? '/dashboard/inbox');
   if (action === 'mark-all-read') { await markAllRead(); return back(to); }
-  // Deleting people's data in bulk needs the confirmation box ticked; the result is shown on the inbox page (?deleted=N).
+  // Deleting people's data in bulk needs the confirmation box ticked; the result is shown on the inbox
+  // page (?deleted=N).
   if (action === 'delete-email' || action === 'delete-older') {
     if (f.get('confirm') !== 'yes') return back('/dashboard/inbox?deleted=none');
     if (action === 'delete-email') { const email = String(f.get('email') ?? '').trim(); if (!email || email.length > 254) return back('/dashboard/inbox?deleted=none'); return back(`/dashboard/inbox?deleted=${await deleteByEmail(email)}`); }

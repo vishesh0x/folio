@@ -1,10 +1,14 @@
 import { env } from 'cloudflare:workers';
 
-// A number that changes whenever you save anything in the dashboard. Cached public pages are stored under it,
-// so a save instantly makes the next visitor get a fresh page. It is remembered for 5 seconds per server
-// instance so that cache hits do not need a database round trip.
+// A number that changes whenever the owner saves anything in the dashboard. Cached public pages are
+// stored under it, so a save instantly makes the next visitor get a fresh page. It is remembered for 5
+// seconds per server instance so that cache hits do not need a database round trip.
 let memo = { v: '0', t: 0 };
 
+/**
+ * The current content version. Remembered for a few seconds per server instance to keep database
+ * reads low.
+ */
 export async function contentVersion(): Promise<string> {
   const now = Date.now();
   if (now - memo.t < 5000) return memo.v;
@@ -14,6 +18,7 @@ export async function contentVersion(): Promise<string> {
   } catch { memo = { ...memo, t: now }; }
   return memo.v;
 }
+/** Moves the content version on, so every cached public page is replaced on its next visit. */
 export async function bumpContentVersion() {
   const v = String(Date.now());
   await env.DB.prepare("INSERT INTO settings (key, value) VALUES ('content_version', ?1) ON CONFLICT(key) DO UPDATE SET value = ?1").bind(v).run();
@@ -21,9 +26,10 @@ export async function bumpContentVersion() {
 }
 
 /**
- * Keep a response in this data center's edge cache under the current content version. The version changes on every dashboard save,
- * so the next visitor gets fresh content at once, and nothing needs purging. `name` must come from a SMALL fixed set (never from
- * the visitor's URL), otherwise someone could fill the cache with junk.
+ * Keep a response in this data center's edge cache under the current content version. The version
+ * changes on every dashboard save, so the next visitor gets fresh content at once, and nothing needs
+ * purging. `name` must come from a SMALL fixed set (never from the visitor's URL), otherwise someone
+ * could fill the cache with junk.
  */
 export async function versionedCache(origin: string, name: string, ttl: number, make: () => Promise<Response>): Promise<Response> {
   const key = new Request(`${origin}/__v/${__BUILD_ID__}/${await contentVersion()}/${name}`);

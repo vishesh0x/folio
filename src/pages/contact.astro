@@ -1,4 +1,8 @@
 ---
+/**
+ * Public contact page and form handler: timing token, honeypot, rate limit, optional Turnstile
+ * check, and storage of the message.
+ */
 import { env } from 'cloudflare:workers';
 import Base from '../layouts/Base.astro';
 import Reveal from '../components/Reveal.astro';
@@ -23,11 +27,11 @@ if (Astro.request.method === 'POST') {
   const get = (k: string, max: number) => String(f.get(k) ?? '').replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '').trim().slice(0, max);
   v.name = get('name', 100); v.email = get('email', 254); v.subject = get('subject', 150); v.message = get('message', 5000);
 
-  const trap = String(f.get('website') ?? '');         // hidden field: people leave it empty, bots fill it
+  const trap = String(f.get('website') ?? '');  // Hidden field: people leave it empty, bots fill it
   const timing = await checkToken(String(f.get('t') ?? ''), 'contact');
 
   if (trap) {
-    return Astro.redirect('/contact?sent=1', 303);     // pretend it worked so bots do not adapt; nothing is stored
+    return Astro.redirect('/contact?sent=1', 303);  // Pretend it worked so bots do not adapt; nothing is stored
   } else if (timing === 'invalid' || timing === 'expired') {
     Astro.response.status = 400; formError = 'This form expired. Please check your message and send it again.';
   } else if (timing === 'too-fast') {

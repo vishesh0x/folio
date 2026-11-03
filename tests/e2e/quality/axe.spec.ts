@@ -2,8 +2,9 @@ import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 import { AUTH_FILE } from '../helpers';
 
-// Step 6: axe-core (the accessibility checker used by Google Lighthouse) over every page, in light and dark, on a desktop and on a phone.
-// Rules: WCAG 2.0, 2.1 and 2.2 level A and AA (colour contrast, names and labels, landmarks, headings, target size...) plus axe's best practices.
+// axe-core (the accessibility checker used by Google Lighthouse) over every page, in light and dark,
+// on a desktop and on a phone. Rules: WCAG 2.0, 2.1 and 2.2 level A and AA (colour contrast, names and
+// labels, landmarks, headings, target size...) plus axe's best practices.
 const TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa', 'best-practice'];
 const PUBLIC = ['/', '/projects', '/projects/wanderhost-booking', '/projects/pocket-ledger', '/now', '/resume', '/contact', '/privacy', '/auth', '/no-such-page'];
 const DASH = ['/dashboard', '/dashboard/projects', '/dashboard/assets', '/dashboard/settings', '/dashboard/seo', '/dashboard/inbox', '/dashboard/now', '/dashboard/resume'];
@@ -11,7 +12,7 @@ const SCREENS = [{ name: 'desktop', viewport: { width: 1280, height: 900 } }, { 
 
 async function scan(page: any, path: string) {
   await page.goto(path, { waitUntil: 'networkidle' });
-  if (path.includes('/projects/')) { await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight)); await page.waitForTimeout(1500); }   // draw the lazy diagrams too
+  if (path.includes('/projects/')) { await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight)); await page.waitForTimeout(1500); }  // Draw the lazy diagrams too
   const r = await new AxeBuilder({ page }).withTags(TAGS).analyze();
   return r.violations.flatMap((v) => v.nodes.map((n) => `${path}: [${v.impact}] ${v.id} - ${v.help}\n      ${n.target.join(' ')}\n      ${n.html.slice(0, 120)}\n      ${(n.any[0]?.message ?? '').slice(0, 160)}`));
 }

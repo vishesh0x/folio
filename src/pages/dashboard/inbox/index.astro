@@ -1,11 +1,14 @@
 ---
+/**
+ * Dashboard: message list with filters, CSV export and bulk deletion.
+ */
 import Dash from '../../../layouts/Dash.astro';
 import PageHead from '../../../components/PageHead.astro';
 import { listMessages } from '../../../lib/inbox';
 import { ago } from '../../../lib/format';
 
 const rawDeleted = Astro.url.searchParams.get('deleted');
-const deleted = rawDeleted && /^(\d{1,6}|none)$/.test(rawDeleted) ? rawDeleted : null;   // only a count or "none" is ever shown (never text from the address)
+const deleted = rawDeleted && /^(\d{1,6}|none)$/.test(rawDeleted) ? rawDeleted : null;  // Only a count or "none" is ever shown (never text from the address)
 const filter = Astro.url.searchParams.get('filter') === 'unread' ? 'unread' : 'all';
 const { rows, total, pages, page } = await listMessages(filter, Number(Astro.url.searchParams.get('page')) || 1);
 const q = (p: number) => `/dashboard/inbox?${filter === 'unread' ? 'filter=unread&' : ''}page=${p}`;

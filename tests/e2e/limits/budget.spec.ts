@@ -8,10 +8,12 @@ import { upload, pdf } from '../uploads';
 import { r2Has } from '../d1';
 import { scaleSql, scaleClear, scaleId, scaleFile } from '../../tools/seed-scale.mjs';
 
-// Step 5: Workers limits on the FREE plan. A request may make at most 50 calls to Cloudflare services (database, file storage, the page cache,
-// image processing, outgoing fetches) and use about 10 ms of CPU. Server E runs the site through a wrapper that COUNTS those calls (it changes nothing else).
-// Rule used here: ordinary pages stay under a third of the limit; the two bulk jobs the owner can start (deleting a picture, cleaning old pictures) stay
-// under it with room to spare, so adding one more step to either can never push a real request over the edge unnoticed.
+// Workers limits on the FREE plan. A request may make at most 50 calls to Cloudflare services
+// (database, file storage, the page cache, image processing, outgoing fetches) and use about 10 ms of
+// CPU. Server E runs the site through a wrapper that COUNTS those calls (it changes nothing else).
+// Rule used here: ordinary pages stay under a third of the limit; the two bulk jobs the owner can
+// start (deleting a picture, cleaning old pictures) stay under it with room to spare, so adding one
+// more step to either can never push a real request over the edge unnoticed.
 test.describe.configure({ mode: 'serial' });
 const FREE_LIMIT = 50;
 const png = readFileSync('tests/fixtures/plain.png'), dirty = readFileSync('tests/fixtures/photo-gps.jpg');
@@ -48,7 +50,8 @@ test.describe('the owner\'s bulk jobs', () => {
     const { res, counts } = await counted(owner, base, 'POST', '/api/admin/assets/delete', { form: { id: up.json.asset.id } });
     expect(decodeURIComponent(res.headers()['location'] ?? '')).toContain('ok=Deleted');
     expect(counts.cache, 'every variant this site can ask for (11 widths x AVIF/WebP/PNG, the share JPEG, the original and the "missing" marker)').toBe(11 * 3 + 1 + 2);
-    // Measured: 44 of the 50 allowed. If this fails after adding a width to the ladder (src/lib/media.ts), the delete is about to stop fitting.
+    // Measured: 44 of the 50 allowed. If this fails after adding a width to the ladder (src/lib/media.ts),
+    // the delete is about to stop fitting.
     expect(counts.total, counts.calls.join('\n')).toBeLessThanOrEqual(FREE_LIMIT - 5);
   });
 
@@ -74,7 +77,7 @@ test.describe('the owner\'s bulk jobs', () => {
     const up = await upload(owner, base, `limits-${Date.now().toString(36)}.png`, 'image/png', png, 'x');
     const id = up.json.asset.id as string, key = `assets/${id}/${up.json.asset.filename}`;
     expect(r2Has('e2e-e', key)).toBe(true);
-    // the cache allows only 20 calls, as if it had been given more work than a request may do
+    // The cache allows only 20 calls, as if it had been given more work than a request may do.
     const { res, counts } = await counted(owner, base, 'POST', '/api/admin/assets/delete', { form: { id }, limitCache: 20 });
     expect(counts.refused, 'the squeeze was real: some cache calls were refused').toBeGreaterThan(0);
     expect(decodeURIComponent(res.headers()['location'] ?? '')).toContain('ok=Deleted');
@@ -108,7 +111,8 @@ test.describe('the owner\'s bulk jobs', () => {
   });
 });
 
-// The Files page lists every file. It must not ask the database more questions, or call anything more, as the library grows.
+// The Files page lists every file. It must not ask the database more questions, or call anything more,
+// as the library grows.
 const tmp = () => join(mkdtempSync(join(tmpdir(), 'scale-')), 'seed.sql');
 test.describe('the Files page as the library grows', () => {
   test.afterAll(() => { d1('e2e-e', scaleClear()); });
@@ -124,7 +128,8 @@ test.describe('the Files page as the library grows', () => {
     const bigText = await big.res.text(), smallText = await small.res.text();
     const cards = (bigText.match(/<li class="file"/g) ?? []).length, fewer = (smallText.match(/<li class="file"/g) ?? []).length;
     expect(cards, '300 files are listed 48 at a time').toBe(48);
-    // The page's CPU cost is mostly drawing one card per file (about 12 microseconds each, measured), so the weight of ONE card is what to watch (today about 2.3 KB):
+    // The page's CPU cost is mostly drawing one card per file (about 12 microseconds each, measured), so
+    // the weight of ONE card is what to watch (today about 2.3 KB):
     // the difference between a page of 48 cards and a page of 10, divided by the 38 extra cards.
     expect((bigText.length - smallText.length) / (cards - fewer), 'bytes per card').toBeLessThan(3_500);
   });

@@ -3,8 +3,14 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
-// S1-M4: secrets must never reach the repository. These checks read the project's files (never print a secret, only where it is).
-/** Remove // and /* *\/ comments and trailing commas from JSONC, leaving anything inside a string untouched. */
+/**
+ * S1-M4: secrets must never reach the repository. These checks read the project's files (never print a
+ * secret, only where it is).
+ */
+/**
+ * Remove // and /* *\/ comments and trailing commas from JSONC, leaving anything inside a string
+ * untouched.
+ */
 function stripJsonc(src: string): string {
   let out = '', i = 0, str = false;
   while (i < src.length) {
@@ -35,7 +41,7 @@ test.describe('.gitignore', () => {
   test('the example env file is committed and holds no real values', () => {
     expect(existsSync('.dev.vars.example')).toBe(true);
     for (const line of readFileSync('.dev.vars.example', 'utf8').split('\n')) {
-      const m = /^([A-Z_]+)=(.*)$/.exec(line.trim()); if (!m) continue;                      // commented-out lines are documentation
+      const m = /^([A-Z_]+)=(.*)$/.exec(line.trim()); if (!m) continue;  // Commented-out lines are documentation
       expect(m[2], `${m[1]} in .dev.vars.example must be a placeholder`).toMatch(/^(change-me[\w-]*|)$/);
     }
     expect(readFileSync('.dev.vars.example', 'utf8')).toContain('RATE_LIMIT_SALT');
@@ -56,8 +62,9 @@ test.describe('secret-looking files', () => {
 });
 
 test.describe('no secrets inside the code', () => {
-  // Real code and configuration. (The older scripts/ folder contains deliberately WRONG tokens that its checks assert are refused, so it is
-  // covered by the exact-format patterns only, not by the generic "looks like a credential" one.)
+  // Real code and configuration. (The older scripts/ folder contains deliberately WRONG tokens that its
+  // checks assert are refused, so it is covered by the exact-format patterns only, not by the generic
+  // "looks like a credential" one.).
   const CODE = ALL.filter((f) => /^(\.\/)?(src|migrations|scripts)\//.test(f) || /(^|\/)(wrangler\.jsonc|astro\.config\.mjs|package\.json|README\.md|\.dev\.vars\.example)$/.test(f));
   const PATTERNS: [string, RegExp][] = [
     ['private key block', /-----BEGIN (?:RSA |EC |OPENSSH |DSA |PGP )?PRIVATE KEY-----/],

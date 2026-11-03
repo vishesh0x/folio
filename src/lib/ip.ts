@@ -1,14 +1,15 @@
 /**
  * Which "network" is a visitor on, for rate limiting?
  *
- * IPv4: the address itself. IPv6: the first 64 bits (the /64). One home or phone connection is given a whole /64, i.e. 2^64 addresses,
- * so counting per full IPv6 address would let a single visitor start over with a new address on every attempt. An IPv4-mapped IPv6
- * address (::ffff:1.2.3.4) is the same visitor as 1.2.3.4. Anything that is not an IP address ("local" in development) is left alone.
- * Pure function, no dependencies, so it can be tested directly.
+ * IPv4: the address itself. IPv6: the first 64 bits (the /64). One home or phone connection is given a
+ * whole /64, i.e. 2^64 addresses, so counting per full IPv6 address would let a single visitor start
+ * over with a new address on every attempt. An IPv4-mapped IPv6 address (::ffff:1.2.3.4) is the same
+ * visitor as 1.2.3.4. Anything that is not an IP address ("local" in development) is left alone. Pure
+ * function, no dependencies, so it can be tested directly.
  */
 function parseV6(s: string): number[] | null {
   let ip = s;
-  const dotted = /(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(ip);          // trailing IPv4 part, e.g. ::ffff:1.2.3.4
+  const dotted = /(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(ip);  // Trailing IPv4 part, e.g. ::ffff:1.2.3.4
   if (dotted) {
     const o = dotted.slice(1).map(Number);
     if (o.some((n) => n > 255)) return null;
@@ -24,6 +25,10 @@ function parseV6(s: string): number[] | null {
   return groups.map((g) => parseInt(g, 16));
 }
 
+/**
+ * Maps an address to the "network" that is rate limited: an IPv4 address as it is, an IPv6 address
+ * by its /64.
+ */
 export function networkOf(raw: string): string {
   const ip = raw.trim().toLowerCase().replace(/^\[|\]$/g, '').replace(/%.*$/, '');
   if (/^\d{1,3}(\.\d{1,3}){3}$/.test(ip)) return ip;

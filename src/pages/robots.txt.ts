@@ -1,3 +1,7 @@
+/**
+ * robots.txt: crawling rules and the sitemap location, cached per content version.
+ */
+
 import type { APIRoute } from 'astro';
 import { getPublicSettings } from '../lib/settings';
 import { versionedCache } from '../lib/content-version';

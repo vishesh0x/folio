@@ -1,3 +1,7 @@
+/**
+ * Owner-only form actions for projects.
+ */
+
 import type { APIRoute } from 'astro';
 import { createProject, deleteProject, duplicateProject, move, setFeatured, setStatus, uniqueSlug } from '../../../lib/projects-admin';
 

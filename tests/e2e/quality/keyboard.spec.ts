@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-// Step 6: using the site without a mouse (WCAG 2.1.1, 2.4.1, 2.4.7, 2.4.11, 3.3.1).
+// Using the site without a mouse (WCAG 2.1.1, 2.4.1, 2.4.7, 2.4.11, 3.3.1).
 test.use({ storageState: { cookies: [], origins: [] } });
 const PAGES = ['/', '/projects', '/projects/wanderhost-booking', '/now', '/resume', '/contact', '/privacy'];
 
@@ -17,7 +17,8 @@ for (const scheme of ['light', 'dark'] as const) {
         await page.keyboard.press('Enter');
         expect(new URL(page.url()).hash).toBe('#main');
         await page.keyboard.press('Tab');
-        // After the skip link the next stop is the page's first control, or the footer if the content has none (the privacy page): never back in the header or menu.
+        // After the skip link the next stop is the page's first control, or the footer if the content has none
+        // (the privacy page): never back in the header or menu.
         expect(await page.evaluate(() => !!document.activeElement && !document.activeElement.closest('header') && document.activeElement !== document.body), 'the next Tab stop is past the menu').toBe(true);
       });
 
@@ -32,7 +33,7 @@ for (const scheme of ['light', 'dark'] as const) {
             const sticky = hdr && getComputedStyle(document.querySelector('header')!).position !== 'static';
             const out = (c: CSSStyleDeclaration) => c.outlineStyle !== 'none' && parseFloat(c.outlineWidth) >= 2;
             let ring = out(cs) || (cs.boxShadow !== 'none' && /\d/.test(cs.boxShadow));
-            for (let n = e.parentElement, k = 0; n && k < 4 && !ring; n = n.parentElement, k++) ring = out(getComputedStyle(n));   // a card link rings its whole card
+            for (let n = e.parentElement, k = 0; n && k < 4 && !ring; n = n.parentElement, k++) ring = out(getComputedStyle(n));  // A card link rings its whole card
             return { id: `${e.tagName.toLowerCase()}|${e.getAttribute('href') ?? e.getAttribute('name') ?? e.id ?? ''}|${Math.round(box.x)},${Math.round(box.y + scrollY)}`, label: (e.textContent || e.getAttribute('aria-label') || '').trim().slice(0, 30), ring, hidden: !!sticky && !e.closest('header') && !e.matches('a[href="#main"]') && box.top < hdr!.bottom - 1 && box.bottom > 0, vis: box.width > 0 && box.height > 0 };
           });
           if (!r) continue; if (seen.has(r.id)) break; seen.add(r.id);
@@ -64,7 +65,7 @@ test.describe('mobile menu', () => {
 test.describe('when something goes wrong, the error takes focus (so a keyboard or screen reader user hears it and is in the right place)', () => {
   test('contact form: an empty send puts focus on the error summary, and each field points at its own message', async ({ page }) => {
     await page.goto('/contact', { waitUntil: 'networkidle' });
-    await page.waitForTimeout(2600);               // the anti-spam timer: a form sent sooner is refused with a different message
+    await page.waitForTimeout(2600);  // The anti-spam timer: a form sent sooner is refused with a different message
     await page.getByRole('button', { name: /send/i }).click();
     await expect(page.locator('#form-error')).toBeFocused();
     await expect(page.locator('#form-error')).toHaveAttribute('role', 'alert');
@@ -96,7 +97,7 @@ test.describe('diagrams that scroll sideways', () => {
     await wide.focus(); await expect(wide).toBeFocused();
     await page.keyboard.press('ArrowRight'); await page.keyboard.press('ArrowRight');
     expect(await wide.evaluate((e) => e.scrollLeft), 'arrow keys scroll it').toBeGreaterThan(0);
-    // a wide screen: every diagram fits, so none is a Tab stop
+    // A wide screen: every diagram fits, so none is a Tab stop.
     await page.setViewportSize({ width: 1600, height: 900 });
     await expect.poll(() => page.locator('.diagram-view[tabindex]').count()).toBeLessThan(info.filter((i) => i.overflow).length);
   });

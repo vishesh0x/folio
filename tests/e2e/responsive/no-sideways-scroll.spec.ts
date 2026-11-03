@@ -1,9 +1,10 @@
 import { test, expect } from '@playwright/test';
 import { AUTH_FILE, WIDTHS, layoutProblems, openPage } from '../helpers';
 
-// The page must never be wider than the screen: no sideways scrolling, nothing poking out past the edge.
-// Run against demo content that includes the nasty cases (a 70-character unbroken word, a very long URL, a wide table, a very
-// long project title and tag), because short, tidy sample text hides exactly these bugs.
+// The page must never be wider than the screen: no sideways scrolling, nothing poking out past the
+// edge. Run against demo content that includes the nasty cases (a 70-character unbroken word, a very
+// long URL, a wide table, a very long project title and tag), because short, tidy sample text hides
+// exactly these bugs.
 const PUBLIC: Array<[string, string]> = [
   ['home', '/'], ['projects', '/projects'], ['project with table, code and a long URL', '/projects/wanderhost-booking'],
   ['project with a very long title', '/projects/an-extremely-long-project-title-with-Antidisestablishmentarianism-inside'],

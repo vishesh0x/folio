@@ -1,7 +1,8 @@
 #!/usr/bin/env node
-// Runs the REAL built script of the "Show email / phone" button inside a simulated page (jsdom) with a FAKE Turnstile.
-// It checks the browser-side logic: when Turnstile is loaded, what the widget is asked for, what is sent to /api/reveal,
-// and what the visitor sees when things go wrong. It does NOT talk to the real Turnstile (that needs a deployed site).
+// Runs the REAL built script of the "Show email / phone" button inside a simulated page (jsdom) with a
+// FAKE Turnstile. It checks the browser-side logic: when Turnstile is loaded, what the widget is asked
+// for, what is sent to /api/reveal, and what the visitor sees when things go wrong. It does NOT talk
+// to the real Turnstile (that needs a deployed site).
 //
 //   npm run build && npm i --no-save jsdom && node scripts/e2e-reveal-client.mjs
 import { readdirSync, readFileSync } from 'node:fs';

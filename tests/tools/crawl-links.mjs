@@ -1,14 +1,19 @@
-// Finds broken links. Starts at the home page and the sitemap, follows every internal link, and checks that every link, picture, script, style sheet and
-// #anchor on every page leads somewhere that exists. With --external it also checks links to other websites (needs the internet).
-//   node tests/tools/crawl-links.mjs https://visheshraghuvanshi.in --external        (against your real site; run it from your own computer)
-//   node tests/tools/crawl-links.mjs http://localhost:8787                          (against a local test server)
-// Exit code 1 if anything internal is broken.  An external site that answers 403/429/999 is reported as "could not check", not as broken (many sites refuse bots).
+// Finds broken links. Starts at the home page and the sitemap, follows every internal link, and checks
+// that every link, picture, script, style sheet and
+// #anchor on every page leads somewhere that exists. With --external it also checks links to other
+// websites (needs the internet).
+//   node tests/tools/crawl-links.mjs https://visheshraghuvanshi.in --external        (against the live
+//   site; run it from the owner's computer)
+//   node tests/tools/crawl-links.mjs http://localhost:8787                          (against a local
+//   test server)
+// Exit code 1 if anything internal is broken.  An external site that answers 403/429/999 is reported
+// as "could not check", not as broken (many sites refuse bots).
 const ATTR = /\b(href|src|srcset|poster|action)\s*=\s*"([^"]*)"/gi;
 const decode = (s) => s.replace(/&amp;/g, '&').replace(/&#38;/g, '&').replace(/&quot;/g, '"');
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 async function get(url, { method = 'GET', timeout = 12000, redirects = 'manual' } = {}) {
-  for (let attempt = 0; ; attempt++) {                       // the local test proxy sometimes drops a connection: try again
+  for (let attempt = 0; ; attempt++) {  // The local test proxy sometimes drops a connection: try again
     try { return await fetch(url, { method, redirect: redirects, headers: { 'user-agent': 'folio-link-check/1 (+owner)', connection: 'close' }, signal: AbortSignal.timeout(timeout) }); }
     catch (e) { if (attempt >= 2) throw e; await sleep(300); }
   }
@@ -19,7 +24,7 @@ export async function crawl(base, { external = false, max = 400, log = () => {} 
   const add = (path) => { if (!seen.has(path)) { seen.set(path, true); queue.push(path); } };
   seen.set('/', true);
   try { const sm = await (await get(origin + '/sitemap.xml')).text(); for (const m of sm.matchAll(/<loc>([^<]+)<\/loc>/g)) { const u = new URL(m[1], origin); add(u.pathname + u.search); } } catch { problems.push({ kind: 'internal', where: '/sitemap.xml', url: '/sitemap.xml', why: 'could not be read' }); }
-  const resources = []; // [pageUrl, resourceUrl, kind]
+  const resources = [];  // [pageUrl, resourceUrl, kind]
   while (queue.length && pages.size < max) {
     const path = queue.shift(); let res;
     try { res = await get(origin + path); } catch (e) { problems.push({ kind: 'internal', where: 'crawl', url: path, why: String(e.cause?.code ?? e.message) }); continue; }
@@ -42,14 +47,14 @@ export async function crawl(base, { external = false, max = 400, log = () => {} 
       }
     }
   }
-  // every internal resource answers (pages were fetched above; the rest are fetched once)
+  // Every internal resource answers (pages were fetched above; the rest are fetched once).
   const checked = new Map();
   for (const [from, url, attr] of resources) {
     if (attr === 'external') continue;
     if (!checked.has(url)) { const known = pages.get(url); if (known) checked.set(url, known.status); else { try { const r = await get(origin + url, { method: 'GET' }); checked.set(url, r.status); await r.body?.cancel(); } catch (e) { checked.set(url, String(e.cause?.code ?? e.message)); } } }
     const st = checked.get(url); if (st !== 200 && !(typeof st === 'number' && st >= 300 && st < 400)) problems.push({ kind: 'internal', where: from, url, why: `${attr} answers ${st}` });
   }
-  // other websites
+  // Other websites
   const exts = [...new Set(resources.filter((r) => r[2] === 'external').map((r) => r[1]))];
   const externals = [];
   if (external) for (const url of exts) {

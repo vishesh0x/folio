@@ -1,3 +1,9 @@
+/**
+ * Request pipeline for every route: database-outage handling, canonical redirects, edge caching of
+ * public pages, the sign-in gate for the owner area, same-origin and body-size checks, security
+ * headers and the Content-Security-Policy.
+ */
+
 import { defineMiddleware } from 'astro:middleware';
 import { env } from 'cloudflare:workers';
 import { getUser } from './lib/auth';
@@ -10,11 +16,12 @@ import { etagMatches } from './lib/http-cache';
 import { isDbUnavailable, unavailablePage } from './lib/db-errors';
 
 const PROTECTED = /^\/(dashboard|api\/admin)(\/|$)/;
-const PUBLIC_PAGE = /^\/(projects(\/[a-z0-9-]+)?|now|resume)?$/; // pages that look the same to every visitor
-const TURNSTILE_PAGE = /^\/(contact|resume)\/?$/; // the pages that can show a Turnstile check (contact form, reveal buttons)
+const PUBLIC_PAGE = /^\/(projects(\/[a-z0-9-]+)?|now|resume)?$/;  // Pages that look the same to every visitor
+const TURNSTILE_PAGE = /^\/(contact|resume)\/?$/;  // The pages that can show a Turnstile check (contact form, reveal buttons)
 const TRACKING = /^(utm_[a-z]+|fbclid|gclid|ref)$/;
-// Seconds a cached public page counts as fresh (a dashboard save replaces it at once, whatever its age). A page is kept for a day, though,
-// so that if the database is down when a page has gone stale, the stale copy is shown rather than an error (see `stale` below).
+// Seconds a cached public page counts as fresh (a dashboard save replaces it at once, whatever its
+// age). A page is kept for a day, though, so that if the database is down when a page has gone stale,
+// the stale copy is shown rather than an error (see `stale` below).
 const edgeTtl = () => Math.min(3600, Math.max(1, Number(env.PAGE_CACHE_TTL) || 300));
 const KEEP = 86400;
 const json = (body: unknown, status: number, extra: Record<string, string> = {}) =>
@@ -23,9 +30,10 @@ const json = (body: unknown, status: number, extra: Record<string, string> = {})
 const CF_WEB_ANALYTICS = true;
 
 /**
- * The ONE place a database failure is turned into an answer. A visitor gets a 503 with Retry-After (search engines and CDNs treat that
- * as "come back shortly", unlike a 500), nothing is cached, and no page is built from placeholder data. Only genuine database errors are
- * caught here; bugs still surface as 500.
+ * The ONE place a database failure is turned into an answer. A visitor gets a 503 with Retry-After
+ * (search engines and CDNs treat that as "come back shortly", unlike a 500), nothing is cached, and no
+ * page is built from placeholder data. Only genuine database errors are caught here; bugs still
+ * surface as 500.
  */
 export const onRequest = defineMiddleware(async (ctx, next) => {
   const stale: { hit: Response | null } = { hit: null };
@@ -34,7 +42,7 @@ export const onRequest = defineMiddleware(async (ctx, next) => {
   } catch (e) {
     if (!isDbUnavailable(e)) throw e;
     console.error(`[db-unavailable] ${ctx.request.method} ${ctx.url.pathname}: ${String((e as Error)?.message ?? e).slice(0, 200)}`);
-    if (stale.hit) { // a cached copy exists (just past its freshness window): better than an error page
+    if (stale.hit) {  // A cached copy exists (just past its freshness window): better than an error page
       const h = new Headers(stale.hit.headers); h.set('Cache-Control', 'public, max-age=0, must-revalidate'); h.set('X-Cache', 'STALE'); h.delete('x-stored-at');
       return new Response(stale.hit.body, { status: stale.hit.status, headers: h });
     }
@@ -51,16 +59,19 @@ async function handle(ctx: Parameters<Parameters<typeof defineMiddleware>[0]>[0]
   const path = ctx.url.pathname;
   const method = ctx.request.method;
 
-  // One address per page: /projects/ is sent to /projects (a permanent redirect), so the cache and search engines see a single URL.
-  // The target is rebuilt from the path segments only, so //evil.example/ can never become a redirect to another site.
+  // One address per page: /projects/ is sent to /projects (a permanent redirect), so the cache and
+  // search engines see a single URL. The target is rebuilt from the path segments only, so
+  // //evil.example/ can never become a redirect to another site.
   if ((method === 'GET' || method === 'HEAD') && path.length > 1 && path.endsWith('/') && !PROTECTED.test(path) && !path.startsWith('/auth') && !path.startsWith('/api/')) {
     return new Response(null, { status: 301, headers: { Location: '/' + path.replace(/^\/+|\/+$/g, '') + ctx.url.search, 'Cache-Control': 'public, max-age=3600' } });
   }
 
-  // Public pages are served from the edge cache when possible (GET only, no query other than tracking tags).
+  // Public pages are served from the edge cache when possible (GET only, no query other than tracking
+  // tags).
   const cacheable = method === 'GET' && PUBLIC_PAGE.test(path) && [...ctx.url.searchParams.keys()].every((k) => TRACKING.test(k));
-  // Browsers must re-check on every visit (so a dashboard save is never hidden behind an old copy), but the check is
-  // cheap: the validator is the content version, and an unchanged page is answered with an empty 304.
+  // Browsers must re-check on every visit (so a dashboard save is never hidden behind an old copy), but
+  // the check is cheap: the validator is the content version, and an unchanged page is answered with an
+  // empty 304.
   const REVALIDATE = 'public, max-age=0, must-revalidate';
   let cacheKey: Request | null = null, etag = '';
   if (cacheable) {
@@ -70,11 +81,11 @@ async function handle(ctx: Parameters<Parameters<typeof defineMiddleware>[0]>[0]
     cacheKey = new Request(`${ctx.url.origin}/__page/${__BUILD_ID__}/${version}${path}`);
     const hit = await caches.default.match(cacheKey);
     const age = hit ? Date.now() - Number(hit.headers.get('x-stored-at') || 0) : 0;
-    if (hit && hit.status === 200 && age >= edgeTtl() * 1000) stale.hit = hit; // too old to call fresh: rebuild it, but keep this as the fallback
+    if (hit && hit.status === 200 && age >= edgeTtl() * 1000) stale.hit = hit;  // Too old to call fresh: rebuild it, but keep this as the fallback
     else if (hit) {
       const h = new Headers(hit.headers); h.delete('x-stored-at');
       h.set('Cache-Control', REVALIDATE); h.set('X-Cache', 'HIT');
-      if (hit.status === 200) h.set('ETag', etag); // a remembered "not found" has no validator, so it is never answered with a 304
+      if (hit.status === 200) h.set('ETag', etag);  // A remembered "not found" has no validator, so it is never answered with a 304
       return new Response(hit.body, { status: hit.status, headers: h });
     }
   }
@@ -85,18 +96,19 @@ async function handle(ctx: Parameters<Parameters<typeof defineMiddleware>[0]>[0]
     ctx.locals.user = user;
   }
 
-  // Cross-site request forgery protection (replaces Astro's built-in check, so the refusal can be a designed page).
-  // Every POST/PUT/PATCH/DELETE must be provably same-origin (see src/lib/csrf.ts).
+  // Cross-site request forgery protection (replaces Astro's built-in check, so the refusal can be a
+  // designed page). Every POST/PUT/PATCH/DELETE must be provably same-origin (see src/lib/csrf.ts).
   let res: Response;
   const unsafe = !['GET', 'HEAD', 'OPTIONS'].includes(method);
-  if (unsafe && !path.startsWith('/error/') && !isSameOrigin(ctx.request, ctx.url)) { // /error/* is exempt so the rewrite below cannot loop
+  if (unsafe && !path.startsWith('/error/') && !isSameOrigin(ctx.request, ctx.url)) {  // /error/* is exempt so the rewrite below cannot loop
     res = path.startsWith('/api/') ? json({ error: 'Forbidden' }, 403) : await ctx.rewrite('/error/403');
   } else if (unsafe && !path.startsWith('/error/') && lengthMissing(ctx.request.headers.get('content-length'), ctx.request.body !== null)) {
-    // A body with no declared size (chunked) would be read in full before any limit could apply: refuse it (see src/lib/body-limit.ts).
+    // A body with no declared size (chunked) would be read in full before any limit could apply: refuse it
+    // (see src/lib/body-limit.ts).
     res = new Response('A Content-Length header is required.', { status: 411, headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' } });
-  } else if (unsafe && !path.startsWith('/error/') && requestTooLarge(path, ctx.request.headers.get('content-length'))) { // /error/* is exempt: a refused request is rewritten there and must keep its own status
-    // Refused before the body is read (see src/lib/body-limit.ts). The Files page's own upload form gets its usual red message; the editors'
-    // upload boxes get JSON; anything else a plain 413.
+  } else if (unsafe && !path.startsWith('/error/') && requestTooLarge(path, ctx.request.headers.get('content-length'))) {  // /error/* is exempt: a refused request is rewritten there and must keep its own status
+    // Refused before the body is read (see src/lib/body-limit.ts). The Files page's own upload form gets
+    // its usual red message; the editors' upload boxes get JSON; anything else a plain 413.
     const msg = tooLargeMessage(path);
     res = path === '/api/admin/assets' ? new Response(null, { status: 303, headers: { Location: `/dashboard/assets?error=${encodeURIComponent(msg)}`, 'Cache-Control': 'no-store' } })
       : path.startsWith('/api/') ? json({ ok: false, error: msg }, 413)
@@ -107,7 +119,8 @@ async function handle(ctx: Parameters<Parameters<typeof defineMiddleware>[0]>[0]
 
   const h = new Headers(res.headers);
   h.set('X-Content-Type-Options', 'nosniff');
-  // The owner's pages, the API, sign-in and error pages are never for search results. (robots.txt also asks crawlers to stay out; this covers a link someone shares.)
+  // The owner's pages, the API, sign-in and error pages are never for search results. (robots.txt also
+  // asks crawlers to stay out; this covers a link someone shares.).
   if (/^\/(dashboard|auth|api|error)(\/|$)/.test(path) || path === '/resume/download') h.set('X-Robots-Tag', 'noindex, nofollow');
   h.set('X-Frame-Options', 'DENY');
   h.set('Referrer-Policy', 'strict-origin-when-cross-origin');
@@ -115,10 +128,11 @@ async function handle(ctx: Parameters<Parameters<typeof defineMiddleware>[0]>[0]
   if (import.meta.env.PROD) {
     h.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
     // The dev server injects its own inline scripts, so the strict policy is production-only.
-    const ts = turnstileOn() && (TURNSTILE_PAGE.test(path) || ctx.locals.challenge) ? ' https://challenges.cloudflare.com' : ''; // optional spam check widget
-    // Cloudflare Web Analytics: when it is switched on in the Cloudflare dashboard, Cloudflare adds its beacon script to every HTML page
-    // and the beacon reports to cloudflareinsights.com. Allowed on public pages only (never sign-in or the dashboard). To stop using it,
-    // turn it off in Cloudflare (Analytics & Logs > Web Analytics) and set this to false.
+    const ts = turnstileOn() && (TURNSTILE_PAGE.test(path) || ctx.locals.challenge) ? ' https://challenges.cloudflare.com' : '';  // Optional spam check widget
+    // Cloudflare Web Analytics: when it is switched on in the Cloudflare dashboard, Cloudflare adds its
+    // beacon script to every HTML page and the beacon reports to cloudflareinsights.com. Allowed on public
+    // pages only (never sign-in or the dashboard). To stop using it, turn it off in Cloudflare (Analytics
+    // & Logs > Web Analytics) and set this to false.
     const beacon = CF_WEB_ANALYTICS && !PROTECTED.test(path) && !path.startsWith('/auth') && !path.startsWith('/api/');
     // Cached pages must not contain a per-request nonce, so they rely on script hashes only.
     const script = ["'self'", ...(await inlineScriptHashes()), ...(cacheable ? [] : [`'nonce-${nonce}'`])].join(' ');
@@ -136,13 +150,14 @@ async function handle(ctx: Parameters<Parameters<typeof defineMiddleware>[0]>[0]
       "frame-ancestors 'none'",
     ].join('; '));
   }
-  if (PROTECTED.test(path) || path.startsWith('/auth') || path === '/contact') h.set('Cache-Control', 'private, no-store'); // /contact carries a one-time form token
+  if (PROTECTED.test(path) || path.startsWith('/auth') || path === '/contact') h.set('Cache-Control', 'private, no-store');  // /contact carries a one-time form token
 
   // Anything saved in the dashboard makes cached pages out of date: move the content version on.
   if (unsafe && PROTECTED.test(path) && res.status < 400) await bumpContentVersion();
 
-  // A page that is not found (e.g. /projects/typo) is remembered for a minute, so repeated requests do not each cost database queries.
-  // It is stored under the current content version, so publishing that project makes the real page appear immediately.
+  // A page that is not found (e.g. /projects/typo) is remembered for a minute, so repeated requests do
+  // not each cost database queries. It is stored under the current content version, so publishing that
+  // project makes the real page appear immediately.
   if (cacheKey && !ctx.locals.degraded && res.status === 404 && (h.get('content-type') ?? '').startsWith('text/html')) {
     const body = await res.arrayBuffer();
     h.delete('set-cookie');

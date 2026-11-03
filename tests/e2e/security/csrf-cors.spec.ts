@@ -1,7 +1,8 @@
 import { test, expect } from '../fixtures';
 import { AUTH_FILE, sameOrigin, crossSite, freshIp, header } from '../helpers';
 
-// Audit 1.3 (CORS) and cross-site request forgery. The site refuses every unsafe request that cannot be proven same-origin.
+// CORS and cross-site request forgery. The site refuses every unsafe request that cannot be proven
+// same-origin.
 const ENDPOINTS: Array<[string, any]> = [
   ['/contact', { form: { name: 'a', email: 'a@b.co', message: 'hello hello hello' } }],
   ['/auth', { form: { mode: 'login', email: 'x@y.zz', password: 'x' } }],

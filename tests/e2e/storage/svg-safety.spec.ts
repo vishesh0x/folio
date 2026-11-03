@@ -2,8 +2,9 @@ import { test, expect, withRetry } from '../fixtures';
 import { AUTH_FILE, header } from '../helpers';
 import { upload, removeAsset, svg } from '../uploads';
 
-// Step 4: an SVG is a small program as much as a picture (scripts, event handlers, links, external files). Every file below is an attack that
-// has worked somewhere. For each one the site must either refuse it, or keep only a harmless version, and serve what it keeps in a locked box.
+// An SVG is a small program as much as a picture (scripts, event handlers, links, external files).
+// Every file below is an attack that has worked somewhere. For each one the site must either refuse
+// it, or keep only a harmless version, and serve what it keeps in a locked box.
 test.use({ storageState: AUTH_FILE });
 
 const ATTACKS: [string, Buffer][] = [
@@ -29,7 +30,7 @@ const ATTACKS: [string, Buffer][] = [
   ['UTF-16 text (a way to slip past byte filters)', Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>', 'utf16le')])],
   ['null bytes inside the tag name', Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><scr\0ipt>alert(1)</scr\0ipt></svg>')],
 ];
-// What must never appear in a version the site keeps
+// What must never appear in a version the site keeps.
 const FORBIDDEN: [string, RegExp][] = [
   ['a script', /<\s*script/i], ['an event handler', /\bon[a-z]+\s*=/i], ['javascript:', /javascript\s*:/i], ['vbscript:', /vbscript\s*:/i], ['foreignObject', /foreignobject/i],
   ['iframe/embed/object', /<\s*(iframe|embed|object)/i], ['an external address', /(?:href|src)\s*=\s*["']?\s*(?:https?:)?\/\//i], ['an @import', /@import/i], ['a url() to another site', /url\(\s*["']?\s*(?:https?:)?\/\//i],
@@ -40,12 +41,12 @@ for (const [name, bytes] of ATTACKS) {
   test(`${name}: refused, or kept only in a harmless form`, async ({ playwright, baseURL }) => {
     const a = withRetry(await playwright.request.newContext({ baseURL, storageState: AUTH_FILE })), visitor = withRetry(await playwright.request.newContext({ baseURL, storageState: { cookies: [], origins: [] } }));
     const r = await upload(a, baseURL!, 'evil.svg', 'image/svg+xml', bytes, 'An attack');
-    if (r.status === 400) { expect(r.json.ok).toBe(false); await a.dispose(); await visitor.dispose(); return; }   // refused: fine
+    if (r.status === 400) { expect(r.json.ok).toBe(false); await a.dispose(); await visitor.dispose(); return; }  // Refused: fine
     expect(r.status, JSON.stringify(r.json)).toBe(200);
     const served = await visitor.get(r.json.asset.url), body = await served.text();
     const found = FORBIDDEN.filter(([, re]) => re.test(body)).map(([n]) => n);
     expect(found, `kept version still contains ${found.join(', ')}: ${body.slice(0, 200)}`).toEqual([]);
-    // and whatever is kept is served in a locked box, as an image and never as a page
+    // And whatever is kept is served in a locked box, as an image and never as a page.
     expect(header(served, 'content-type')).toBe('image/svg+xml'); expect(header(served, 'x-content-type-options')).toBe('nosniff');
     const csp = header(served, 'content-security-policy'); expect(csp).toContain("default-src 'none'"); expect(csp).toContain('sandbox');
     await removeAsset(a, baseURL!, r.json.asset.id); await a.dispose(); await visitor.dispose();

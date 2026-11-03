@@ -1,8 +1,6 @@
-// SVG sanitiser (allow-list). Runs on Workers using the built-in HTMLRewriter.
-// Anything not on the list is removed, including all scripts, event handlers,
-// external references, animation (can rewrite hrefs) and <foreignObject>.
-// Output is only ever stored if it passes the final checks at the bottom.
-
+// SVG sanitiser (allow-list). Runs on Workers using the built-in HTMLRewriter. Anything not on the
+// list is removed, including all scripts, event handlers, external references, animation (can rewrite
+// hrefs) and <foreignObject>. Output is only ever stored if it passes the final checks at the bottom.
 const ELEMENTS = new Set((
   'svg g defs symbol use path rect circle ellipse line polyline polygon text tspan textpath title desc ' +
   'lineargradient radialgradient stop pattern clippath mask marker filter image style ' +
@@ -22,9 +20,13 @@ function cleanCss(css: string): string {
   return css.replace(/</g, '').split(/(?<=\})/).filter((rule) => !BAD_CSS.test(rule)).join('');
 }
 
+/**
+ * Reduces an SVG to a safe subset of elements and attributes. Returns null when the file is not
+ * usable.
+ */
 export async function sanitizeSvg(input: string): Promise<string | null> {
   if (input.length > 1_000_000) return null;
-  if (/<!ENTITY|<!DOCTYPE[^>]*\[/i.test(input)) return null; // entity-expansion attacks
+  if (/<!ENTITY|<!DOCTYPE[^>]*\[/i.test(input)) return null;  // Entity-expansion attacks
 
   const prepared = input
     .replace(/<\?[\s\S]*?\?>/g, '')
@@ -68,6 +70,7 @@ export async function sanitizeSvg(input: string): Promise<string | null> {
   return out;
 }
 
+/** Reads the intrinsic size of an SVG from its viewBox or width and height. */
 export function svgSize(svg: string): { width: number | null; height: number | null } {
   const vb = svg.match(/<svg[^>]*\sviewBox\s*=\s*["']\s*[-\d.]+[\s,]+[-\d.]+[\s,]+([\d.]+)[\s,]+([\d.]+)/i);
   if (vb) return { width: Math.round(+vb[1]) || null, height: Math.round(+vb[2]) || null };

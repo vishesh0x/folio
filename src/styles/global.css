@@ -1,59 +1,76 @@
-@import '@fontsource-variable/jetbrains-mono';   /* code only: code blocks, inline code, the Markdown editor */
+@import '@fontsource-variable/jetbrains-mono';  /* Code only: code blocks, inline code, the Markdown editor */
 
-/* Paper Mono (SIL Open Font License, see src/assets/fonts/OFL-PaperMono.txt) is the voice of the whole site. One variable file,
-   weights 100-800, upright only: there is no italic, so synthesised slants are switched off below. */
+/*
+ * Paper Mono (SIL Open Font License, see src/assets/fonts/OFL-PaperMono.txt) is the voice of the whole
+ * site. One variable file,
+ *    weights 100-800, upright only: there is no italic, so synthesised slants are switched off below.
+ */
 @font-face {
   font-family: 'Paper Mono'; font-style: normal; font-weight: 100 800; font-display: swap;
   src: url('../assets/fonts/PaperMono-VF.woff2') format('woff2');
 }
 
-/* While Paper Mono downloads the browser shows a fallback. If the fallback is narrower, the text re-wraps when the real font arrives and
-   the page jumps. These faces are the common system monospaces scaled to Paper Mono's width, so nothing re-wraps. */
-@font-face { font-family: 'Paper Mono Fallback Consolas'; src: local('Consolas'); size-adjust: 110.2%; }   /* Windows: 0.55em wide */
-@font-face { font-family: 'Paper Mono Fallback'; size-adjust: 101%;                                          /* macOS, iOS, Linux, Android: ~0.60em wide */
+/*
+ * While Paper Mono downloads the browser shows a fallback. If the fallback is narrower, the text
+ * re-wraps when the real font arrives and
+ *    the page jumps. These faces are the common system monospaces scaled to Paper Mono's width, so
+ *    nothing re-wraps.
+ */
+@font-face { font-family: 'Paper Mono Fallback Consolas'; src: local('Consolas'); size-adjust: 110.2%; }  /* Windows: 0.55em wide */
+@font-face { font-family: 'Paper Mono Fallback'; size-adjust: 101%;  /* macOS, iOS, Linux, Android: ~0.60em wide */
   src: local('SF Mono'), local('SFMono-Regular'), local('Menlo'), local('Courier New'), local('DejaVu Sans Mono'), local('Liberation Mono'), local('Roboto Mono'), local('Noto Sans Mono'); }
 
-/* ───────── Design tokens ─────────
-   Look: heavy Paper Mono headlines, 2px outlined cards, hard offset shadows, dashed rules.
-   Palette: vermilion #e43d12, rose #d6536d, pink #ffa2b6, marigold #efb11d, bone #ebe9e1.
-   Roles  : vermilion = action + accent word | marigold = highlight (active toggle, badge, focus in dark) |
-            pink/rose = soft accents (text selection, callouts, errors) | bone = bands and panels.
-   Contrast: raw #e43d12 is only 3.5:1 on light backgrounds, so link TEXT uses a deeper #b92a06 (5+:1) and the
-            raw colour stays on big or decorative things. Borders that define a control or card use --outline,
-            which is kept at 3:1 or better in BOTH themes (so form fields stay visible in dark mode).
-   light-dark() follows color-scheme, which the theme switch sets via data-theme="light|dark"; with no
-   attribute the site follows the operating system. */
+/*
+ * ───────── Design tokens ─────────
+ *    Look: heavy Paper Mono headlines, 2px outlined cards, hard offset shadows, dashed rules.
+ *    Palette: vermilion #e43d12, rose #d6536d, pink #ffa2b6, marigold #efb11d, bone #ebe9e1.
+ *    Roles  : vermilion = action + accent word | marigold = highlight (active toggle, badge, focus in
+ *           dark) |
+ *             pink/rose = soft accents (text selection, callouts, errors) | bone = bands and panels.
+ *    Contrast: raw #e43d12 is only 3.5:1 on light backgrounds, so link TEXT uses a deeper #b92a06
+ *    (5+:1) and the
+ *             raw colour stays on big or decorative things. Borders that define a control or card use
+ *             --outline,
+ *             which is kept at 3:1 or better in BOTH themes (so form fields stay visible in dark
+ *             mode).
+ *    light-dark() follows color-scheme, which the theme switch sets via data-theme="light|dark"; with
+ *    no
+ *    attribute the site follows the operating system.
+ */
 :root {
   color-scheme: light dark;
 
   --bg:       light-dark(#f7f7f4, #141217);
-  --surface:  light-dark(#ebe9e1, #1f1c24);   /* bands, hover fills */
+  --surface:  light-dark(#ebe9e1, #1f1c24);  /* Bands, hover fills */
   --card:     light-dark(#ffffff, #1a1820);
   --ink:      light-dark(#1b1a1f, #f4f1ea);
   --muted:    light-dark(#5d5b63, #a9a5b0);
-  --outline:  light-dark(#1b1a1f, #8f8a99);   /* borders that define a control or card */
-  --line:     light-dark(#cfccc2, #3d3945);   /* decorative hairlines and dashed rules */
-  --brand:    light-dark(#e43d12, #ff5a30);   /* accent word, live dot, hover shadow */
-  --brand-d:  light-dark(#cf370f, #ff5a30);   /* button fill */
+  --outline:  light-dark(#1b1a1f, #8f8a99);  /* Borders that define a control or card */
+  --line:     light-dark(#cfccc2, #3d3945);  /* Decorative hairlines and dashed rules */
+  --brand:    light-dark(#e43d12, #ff5a30);  /* Accent word, live dot, hover shadow */
+  --brand-d:  light-dark(#cf370f, #ff5a30);  /* Button fill */
   --on-brand: light-dark(#ffffff, #141217);
   --link:     light-dark(#b92a06, #ff7452);
   --gold:     #efb11d;
   --on-gold:  #1b1a1f;
   --rose:     #d6536d;
   --pink:     #ffa2b6;
-  --tint:     light-dark(#ffe0e7, #38202a);   /* soft pink wash */
-  --focus:    light-dark(#1b1a1f, #efb11d);   /* gold is too pale to see on a light page, so light mode uses ink */
+  --tint:     light-dark(#ffe0e7, #38202a);  /* Soft pink wash */
+  --focus:    light-dark(#1b1a1f, #efb11d);  /* Gold is too pale to see on a light page, so light mode uses ink */
   --danger:   light-dark(#a31f43, #ff9db0);
 
-  /* names used by the dashboard styles */
+  /* Names used by the dashboard styles. */
   --text: var(--ink); --heading: var(--ink); --surface-2: var(--surface); --line-strong: var(--outline);
   --primary: var(--ink); --on-primary: var(--bg); --accent: var(--brand); --hi: var(--gold); --on-hi: var(--on-gold);
 
   --font-body: 'Paper Mono', 'Paper Mono Fallback Consolas', 'Paper Mono Fallback', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
   --font-display: var(--font-body);
-  --font-mono: 'JetBrains Mono Variable', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace; /* CODE ONLY */
+  --font-mono: 'JetBrains Mono Variable', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;  /* CODE ONLY */
 
-  /* Paper Mono sets about 0.6em per character, wider than the proportional face it replaces, so the scale is a notch smaller. */
+  /*
+   * Paper Mono sets about 0.6em per character, wider than the proportional face it replaces, so the
+   * scale is a notch smaller.
+   */
   --step--1: .85rem;
   --step-0:  1rem;
   --step-1:  1.2rem;
@@ -68,7 +85,7 @@
 :root[data-theme='light'] { color-scheme: light; }
 :root[data-theme='dark']  { color-scheme: dark; }
 
-/* ───────── Base ───────── */
+/* ── Base ── */
 *, *::before, *::after { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; font-synthesis: none; /* Paper Mono has no italic: never fake a slant */ scroll-behavior: smooth; scroll-padding-top: calc(var(--header-h) + 12px); }
 @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } *, *::before, *::after { animation: none !important; transition: none !important; } }
@@ -80,16 +97,16 @@ h1 { font-size: var(--step-4); font-weight: 800; letter-spacing: -.04em; }
 h2 { font-size: clamp(1.7rem, 1.2rem + 2.2vw, 2.9rem); font-weight: 800; }
 h3 { font-size: 1.25rem; font-weight: 700; letter-spacing: -.01em; line-height: 1.2; }
 h4 { font-size: var(--step-1); font-weight: 700; letter-spacing: -.01em; line-height: 1.25; }
-em, i, cite, dfn { font-style: normal; }       /* no italic exists in Paper Mono; emphasis is drawn instead of slanted */
+em, i, cite, dfn { font-style: normal; }  /* No italic exists in Paper Mono; emphasis is drawn instead of slanted */
 .md em, .prose em { text-decoration: underline; text-decoration-color: var(--brand); text-decoration-thickness: 2px; text-underline-offset: .22em; }
 h1 em, h2 em { color: var(--brand); text-decoration: none; }
-.dot { color: var(--brand); }                 /* the full stop after a page title */
+.dot { color: var(--brand); }  /* The full stop after a page title */
 p { margin: 0 0 1em; text-wrap: pretty; }
 a { color: var(--link); text-underline-offset: .2em; text-decoration-thickness: 1px; }
 a:hover { text-decoration-thickness: 2px; }
 :focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; border-radius: 6px; }
 img, svg, video { max-width: 100%; height: auto; display: block; }
-img { object-fit: contain; }                  /* never crops; only an element that opts in with .cover or fit="cover" does */
+img { object-fit: contain; }  /* Never crops; only an element that opts in with .cover or fit="cover" does */
 img.cover { object-fit: cover; }
 [hidden] { display: none !important; }
 code { font: .88em var(--font-mono); background: var(--surface); padding: .1em .35em; border-radius: 6px; }
@@ -99,22 +116,26 @@ code { font: .88em var(--font-mono); background: var(--surface); padding: .1em .
 .muted { color: var(--muted); }
 .lead { font-size: clamp(1.1rem, 1rem + .5vw, 1.35rem); line-height: 1.5; color: var(--muted); max-width: 40rem; margin-bottom: 1.2rem; }
 
-/* ───────── Layout ───────── */
+/* ── Layout ── */
 .wrap { width: min(var(--wrap), 100% - 2 * var(--gutter)); margin-inline: auto; }
 .prose { max-width: var(--prose); }
 .section { padding-block: clamp(3rem, 7vw, 4.5rem); }
 .band { background: var(--surface); }
 .stack > * + * { margin-top: var(--stack, 1rem); }
-/* A grid track defaults to min-width:auto, so ONE long unbroken word or URL stretches a whole single-column grid wider than the
-   phone. minmax(0, 1fr) lets the column shrink and the text wrap instead. Larger-screen layouts below override these. */
+/*
+ * A grid track defaults to min-width:auto, so ONE long unbroken word or URL stretches a whole
+ * single-column grid wider than the
+ *    phone. minmax(0, 1fr) lets the column shrink and the text wrap instead. Larger-screen layouts
+ *    below override these.
+ */
 .hero, .err, .contact-grid, .now-grid, .project-body, .filters, .paper-body { grid-template-columns: minmax(0, 1fr); }
-/* Long words and links wrap inside their box instead of poking out of it */
+/* Long words and links wrap inside their box instead of poking out of it. */
 .card, .now-item, .tl, .pager a, .paper-main, .paper-side, .cv-top, .link-rows a { overflow-wrap: anywhere; }
 .visually-hidden { position: absolute !important; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .skip { position: absolute; left: 1rem; top: -4rem; background: var(--ink); color: var(--bg); padding: .6rem 1rem; border-radius: var(--r-pill); z-index: 100; font-weight: 700; }
 .skip:focus { top: 1rem; }
 
-/* ───────── Buttons, tags, chips, cards ───────── */
+/* ── Buttons, tags, chips, cards ── */
 .btn {
   --lift: 4px;
   display: inline-flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer; text-decoration: none;
@@ -130,7 +151,7 @@ code { font: .88em var(--font-mono); background: var(--surface); padding: .1em .
 .btn-meta { font-weight: 500; font-size: .85em; }
 
 .tags { display: flex; flex-wrap: wrap; gap: 6px; list-style: none; margin: 0; padding: 0; }
-.tag { display: inline-block; padding: 4px 12px; border: 1.5px solid var(--outline); border-radius: var(--r-pill); color: var(--ink); background: transparent; }   /* static label: never styled like a button */
+.tag { display: inline-block; padding: 4px 12px; border: 1.5px solid var(--outline); border-radius: var(--r-pill); color: var(--ink); background: transparent; }  /* Static label: never styled like a button */
 .chips { display: flex; flex-wrap: wrap; gap: 8px; }
 .chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 14px; border: 1.5px solid var(--outline); border-radius: var(--r-pill); background: transparent; color: var(--ink); text-decoration: none; cursor: pointer; font: 500 .75rem/1.3 var(--font-body); letter-spacing: .08em; text-transform: uppercase; }
 .chip span { opacity: .7; }
@@ -141,9 +162,9 @@ code { font: .88em var(--font-mono); background: var(--surface); padding: .1em .
 .card.lift:hover { transform: translateY(-4px); box-shadow: 0 8px 0 var(--brand); }
 @media (prefers-reduced-motion: reduce) { .card.lift:hover { transform: none; } }
 
-/* ───────── Forms ───────── */
+/* ── Forms ── */
 .field { display: grid; gap: 6px; }
-.field label, .field legend { font-weight: 600; font-size: .9rem; color: var(--ink); }        /* sentence-case labels read better than tiny capitals */
+.field label, .field legend { font-weight: 600; font-size: .9rem; color: var(--ink); }  /* Sentence-case labels read better than tiny capitals */
 .field input:not([type='checkbox'], [type='radio'], [type='file'], [type='range'], [type='hidden']), .field textarea, .field select, .search {
   width: 100%; font: inherit; color: var(--ink); background: var(--card);
   border: 2px solid var(--outline); border-radius: var(--r-input); padding: 13px 17px; transition: box-shadow .15s;
@@ -162,7 +183,7 @@ textarea { resize: vertical; }
 .flash.error { background: var(--tint); color: var(--ink); border-left: 8px solid var(--rose); }
 .notice { background: var(--tint); border: 2px solid var(--outline); border-left: 8px solid var(--rose); border-radius: var(--r-input); padding: .8rem 1rem; margin: 0; }
 
-/* ───────── Site header and footer ───────── */
+/* ── Site header and footer ── */
 .site-header { position: sticky; top: 0; z-index: 20; background: color-mix(in srgb, var(--bg) 94%, transparent); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); border-bottom: 1px dashed var(--outline); }
 .site-header .bar { display: flex; align-items: center; gap: 16px; min-height: var(--header-h); flex-wrap: wrap; }
 .logo { margin-right: auto; font-weight: 900; font-size: 1.4rem; letter-spacing: -.05em; text-decoration: none; color: var(--ink); max-width: min(55vw, 22rem); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -179,16 +200,19 @@ textarea { resize: vertical; }
 .seg button { border: 0; background: none; color: var(--ink); font: 500 .75rem/1 var(--font-body); padding: 7px 11px; border-radius: var(--r-pill); cursor: pointer; }
 .seg button[aria-pressed='true'] { background: var(--gold); color: var(--on-gold); }
 .seg button:focus-visible { outline-offset: 1px; }
-html:not(.js) .seg, html:not(.js) .js-only { display: none; }               /* the theme switch needs JavaScript */
+html:not(.js) .seg, html:not(.js) .js-only { display: none; }  /* The theme switch needs JavaScript */
 .burger { display: none; border: 2px solid var(--outline); background: var(--card); color: var(--ink); border-radius: var(--r-pill); padding: 8px 16px; font: 500 .75rem/1 var(--font-body); letter-spacing: .08em; text-transform: uppercase; cursor: pointer; }
 @media (max-width: 860px) {
   .js .burger { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; min-width: 44px; padding: 0 18px; flex: none; }
-  .js .menu { display: none; position: absolute; top: var(--header-h); left: 0; right: 0; flex-direction: column; align-items: stretch; gap: 12px; padding: 12px var(--gutter) 20px; background: var(--bg); border-bottom: 1px dashed var(--outline); box-shadow: 0 18px 30px -18px rgb(0 0 0 / .35); max-height: calc(100dvh - var(--header-h)); overflow-y: auto; overscroll-behavior: contain; }   /* a short phone in landscape can still reach every link */
+  .js .menu { display: none; position: absolute; top: var(--header-h); left: 0; right: 0; flex-direction: column; align-items: stretch; gap: 12px; padding: 12px var(--gutter) 20px; background: var(--bg); border-bottom: 1px dashed var(--outline); box-shadow: 0 18px 30px -18px rgb(0 0 0 / .35); max-height: calc(100dvh - var(--header-h)); overflow-y: auto; overscroll-behavior: contain; }  /* A short phone in landscape can still reach every link */
   .js .menu.open { display: flex; }
   .js .nav { flex-direction: column; gap: 4px; } .js .nav a { display: flex; align-items: center; min-height: 48px; padding: 0 16px; font-size: 1rem; }
   .js .seg { align-self: flex-start; } .js .seg button { min-height: 44px; padding: 0 18px; font-size: .8rem; }
   .site-header .bar { flex-wrap: nowrap; gap: 12px; }
-  /* The name wraps onto a second line instead of being cut off with an ellipsis, and shrinks a little on very narrow phones */
+  /*
+   * The name wraps onto a second line instead of being cut off with an ellipsis, and shrinks a little on
+   * very narrow phones.
+   */
   .logo { flex: 1 1 0; min-width: 0; max-width: none; margin-right: 0; padding-block: 13px; font-size: clamp(1.05rem, 5.2vw, 1.4rem); line-height: 1.15; white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; }
 }
 @media (max-width: 860px) { html:not(.js) .site-header .bar { padding-block: 10px; } html:not(.js) .logo { max-width: 100%; } }
@@ -204,11 +228,11 @@ html:not(.js) .seg, html:not(.js) .js-only { display: none; }               /* t
 @media (max-width: 640px) {
   .site-footer { padding: 28px 0 32px; margin-top: 16px; }
   .site-footer .wrap { flex-direction: column; align-items: flex-start; gap: 18px; }
-  .foot-copy .foot-line { display: block; } .foot-copy .foot-line + .foot-line::before { content: none; }   /* copyright on one line, tagline on the next: no lonely word left over */
+  .foot-copy .foot-line { display: block; } .foot-copy .foot-line + .foot-line::before { content: none; }  /* Copyright on one line, tagline on the next: no lonely word left over */
   .footer-links { gap: 8px; }
 }
 
-/* ───────── Home ───────── */
+/* ── Home ── */
 .hero { padding-block: clamp(3.5rem, 9vw, 6.5rem) clamp(2.5rem, 6vw, 4.5rem); display: grid; gap: 2.5rem; align-items: center; }
 @media (min-width: 60rem) { .hero:has(.portrait) { grid-template-columns: 1.5fr 1fr; } }
 .avail { display: inline-flex; align-items: center; gap: 8px; margin: 0 0 22px; padding: 6px 14px; border: 1.5px solid var(--outline); border-radius: var(--r-pill); background: var(--gold); color: var(--on-gold); font: 500 .75rem/1.2 var(--font-body); letter-spacing: .08em; text-transform: uppercase; }
@@ -216,7 +240,7 @@ html:not(.js) .seg, html:not(.js) .js-only { display: none; }               /* t
 .hero h1 { margin-bottom: .3em; }
 .hero-text > .lead { margin: 22px 0 30px; max-width: 36rem; font-size: clamp(1.1rem, 1rem + .6vw, 1.4rem); }
 .hero-cta { display: flex; gap: 14px; flex-wrap: wrap; margin: 0; }
-.portrait img { border: 2px solid var(--outline); border-radius: var(--r-card); background: var(--surface); box-shadow: 10px 10px 0 var(--brand); width: min(100%, calc(34rem * var(--nw, 1) / var(--nh, 1)), calc(var(--nw, 99999) * 1px)); height: auto; margin-inline: auto; }   /* same idea as .project-cover img */
+.portrait img { border: 2px solid var(--outline); border-radius: var(--r-card); background: var(--surface); box-shadow: 10px 10px 0 var(--brand); width: min(100%, calc(34rem * var(--nw, 1) / var(--nh, 1)), calc(var(--nw, 99999) * 1px)); height: auto; margin-inline: auto; }  /* Same idea as .project-cover img */
 .portrait { padding: 0 12px 12px 0; }
 .hl-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
 .hl { border: 2px solid var(--outline); border-radius: var(--r-card); padding: 24px; background: var(--card); color: var(--ink); }
@@ -234,31 +258,31 @@ html:not(.js) .seg, html:not(.js) .js-only { display: none; }               /* t
 .closing .lead { margin-inline: auto; }
 .closing h2 { font-size: clamp(2.4rem, 1.4rem + 5.4vw, 5.5rem); font-weight: 900; letter-spacing: -.045em; }
 
-/* ───────── Project cards ───────── */
-.pgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 290px), 1fr)); gap: 24px; }   /* auto-fit: two cards share the row instead of leaving it half empty */
+/* ── Project cards ── */
+.pgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 290px), 1fr)); gap: 24px; }  /* Auto-fit: two cards share the row instead of leaving it half empty */
 .pgrid > :only-child { max-width: 34rem; }
 .pcard { position: relative; display: flex; flex-direction: column; padding: 0; overflow: hidden; }
 .pcard-media { position: relative; aspect-ratio: 4 / 3; display: grid; place-items: center; background: var(--surface); border-bottom: 2px solid var(--outline); overflow: hidden; }
 .pcard-media picture { display: contents; }
-.pcard-media img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }   /* the tile is always 4:3; the whole picture is shown inside it and any spare room is the tile colour */
+.pcard-media img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }  /* The tile is always 4:3; the whole picture is shown inside it and any spare room is the tile colour */
 .pcard-initial { font-size: 5rem; font-weight: 900; color: var(--muted); }
 .pcard-body { padding: 20px 22px 24px; display: grid; gap: 8px; align-content: start; }
 .pcard-body :is(h2, h3) { font-size: 1.4rem; margin: 0; letter-spacing: -.03em; line-height: 1.1; }
 .pcard-body p { margin: 0; color: var(--muted); font-size: .95rem; }
 .pcard-link { color: var(--ink); text-decoration: none; }
-.pcard-link::after { content: ''; position: absolute; inset: 0; }                       /* the whole card is clickable */
+.pcard-link::after { content: ''; position: absolute; inset: 0; }  /* The whole card is clickable */
 .pcard-link:focus-visible { outline: none; }
 .pcard:has(.pcard-link:focus-visible) { outline: 3px solid var(--focus); outline-offset: 3px; }
 .empty { margin-top: 2rem; color: var(--muted); }
 
-/* ───────── Projects page ───────── */
+/* ── Projects page ── */
 .page-title { padding-block: clamp(3rem, 7vw, 5rem) 0; }
 .page-title h1 { margin-bottom: 20px; }
 .filters { display: grid; gap: 16px; margin: 28px 0 8px; }
 .result-count { margin: 12px 0 0; color: var(--muted); font-size: .9rem; }
 .no-results { margin-top: 2rem; }
 
-/* ───────── Project page ───────── */
+/* ── Project page ── */
 .project { padding-block: 2rem 4rem; }
 .crumb { margin: 0 0 1.5rem; font: 500 .75rem/1.3 var(--font-body); letter-spacing: .08em; text-transform: uppercase; }
 .crumb a { color: var(--ink); }
@@ -269,8 +293,12 @@ html:not(.js) .seg, html:not(.js) .js-only { display: none; }               /* t
 .project-cover picture { display: contents; }
 .project-cover .frame { display: block; background: var(--surface); border: 2px solid var(--outline); border-radius: var(--r-card); overflow: hidden; }
 .project-cover img { width: min(100%, calc(80vh * var(--nw, 1) / var(--nh, 1)), calc(var(--nw, 99999) * 1px)); height: auto; margin-inline: auto; }
-/* ^ the width is known from the file's own size (--nw/--nh, set by <Img natural>): as wide as the frame, but no taller than 80% of the screen and
-     never bigger than the file. Being definite, it is reserved before the image loads, so nothing below it moves. */
+/*
+ * ^ the width is known from the file's own size (--nw/--nh, set by <Img natural>): as wide as the
+ *   frame, but no taller than 80% of the screen and
+ *      never bigger than the file. Being definite, it is reserved before the image loads, so nothing
+ *      below it moves.
+ */
 .project-body { display: grid; gap: 3rem; margin-top: 2rem; }
 @media (min-width: 64rem) { .project-body.has-toc { grid-template-columns: minmax(0, 40rem) 15rem; justify-content: space-between; align-items: start; } }
 .toc { position: sticky; top: calc(var(--header-h) + 20px); font-size: .9rem; border: 2px solid var(--outline); border-radius: 20px; background: var(--card); padding: 18px 20px; }
@@ -285,9 +313,9 @@ html:not(.js) .seg, html:not(.js) .js-only { display: none; }               /* t
 .pager a span { font: 500 .75rem/1.3 var(--font-body); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
 @media (max-width: 36rem) { .pager { grid-template-columns: 1fr; } }
 
-/* ───────── Markdown content ───────── */
-.md { max-width: 40rem; min-width: 0; overflow-wrap: anywhere; }   /* a pasted URL must wrap, not widen the page */
-.md .table-wrap, .md pre.code { overflow-wrap: normal; }       /* tables and code scroll inside their own box instead */
+/* ── Markdown content ── */
+.md { max-width: 40rem; min-width: 0; overflow-wrap: anywhere; }  /* A pasted URL must wrap, not widen the page */
+.md .table-wrap, .md pre.code { overflow-wrap: normal; }  /* Tables and code scroll inside their own box instead */
 .md > :first-child { margin-top: 0; }
 .md h2 { font-size: clamp(1.7rem, 1.3rem + 1.5vw, 2.4rem); margin-top: 2em; letter-spacing: -.035em; }
 .md h3 { font-size: 1.4rem; margin-top: 1.7em; }
@@ -324,7 +352,7 @@ html:not(.js) .seg, html:not(.js) .js-only { display: none; }               /* t
 .callout[data-type='warning'], .callout[data-type='caution'], .callout[data-type='attention'] { border-left-color: var(--brand); }
 .callout[data-type='danger'], .callout[data-type='error'], .callout[data-type='bug'], .callout[data-type='failure'] { border-left-color: var(--rose); background: var(--tint); }
 
-/* ───────── Now ───────── */
+/* ── Now ── */
 .updated { margin: 0; }
 .now-grid { display: grid; gap: 3rem; margin-top: 2.5rem; }
 .now-cat h2 { font-size: clamp(1.7rem, 1.3rem + 1.6vw, 2.4rem); display: flex; align-items: center; gap: .6rem; margin: 0 0 18px; letter-spacing: -.035em; }
@@ -346,7 +374,7 @@ html:not(.js) .seg, html:not(.js) .js-only { display: none; }               /* t
 .now-done .now-item { background: transparent; }
 .now-tick { color: var(--link); font-weight: 800; }
 
-/* ───────── Contact ───────── */
+/* ── Contact ── */
 .contact-grid { display: grid; gap: 2rem; margin-top: 2.5rem; }
 @media (min-width: 56rem) { .contact-grid { grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); align-items: start; } }
 .contact-side h2 { font-size: 1.4rem; letter-spacing: -.03em; margin-bottom: 1rem; }
@@ -359,10 +387,10 @@ html:not(.js) .seg, html:not(.js) .js-only { display: none; }               /* t
 .reveal .btn svg { flex: none; }
 .cv .reveal .btn { box-shadow: none; border-width: 1.5px; padding: .3rem .8rem; gap: .45rem; font-size: .85rem; }
 .reveal-msg { font-size: .85rem; color: var(--danger); font-weight: 600; }
-.reveal-msg[data-state="busy"] { color: var(--muted); font-weight: 500; } /* "Checking that you are a person…" is not an error */
+.reveal-msg[data-state="busy"] { color: var(--muted); font-weight: 500; }  /* "Checking that the owner is a person…" is not an error */
 .revealed { font-weight: 700; color: var(--ink); }
 
-/* ───────── Error pages ───────── */
+/* ── Error pages ── */
 .err { display: grid; gap: 2.5rem; align-items: center; padding-block: clamp(3rem, 9vw, 6rem); }
 @media (min-width: 52rem) { .err { grid-template-columns: 1.4fr 1fr; } }
 .err h1 { font-size: clamp(1.8rem, 1.2rem + 2.6vw, 3rem); font-weight: 800; letter-spacing: -.04em; line-height: 1.05; margin-bottom: 1rem; }
@@ -372,7 +400,7 @@ html:not(.js) .seg, html:not(.js) .js-only { display: none; }               /* t
 .err-more { margin-top: 2.5rem; }
 .err-more ul { list-style: none; padding: 0; margin: 0; display: grid; gap: .4rem; }
 
-/* ───────── Sign-in ───────── */
+/* ── Sign-in ── */
 .auth { display: grid; justify-items: center; }
 .auth .card { width: min(100%, 31rem); }
 .auth h1 { font-size: var(--step-3); }
@@ -381,7 +409,7 @@ html:not(.js) .seg, html:not(.js) .js-only { display: none; }               /* t
 .meter[data-level='2'] > span { background: var(--gold); } .meter[data-level='3'] > span { background: var(--brand-d); }
 .meter-text { font-size: .85rem; color: var(--muted); margin: 0; min-height: 1.4em; }
 
-/* ───────── Resume ───────── */
+/* ── Resume ── */
 .cv { padding-block: clamp(2rem, 5vw, 3.5rem) 4rem; max-width: 62rem; }
 .cv-top p.eyebrow { margin-bottom: 8px; }
 .cv-top { display: flex; justify-content: space-between; align-items: flex-end; gap: 1rem; flex-wrap: wrap; margin-bottom: 20px; }
@@ -421,7 +449,7 @@ html:not(.js) .seg, html:not(.js) .js-only { display: none; }               /* t
 .cv-plain { margin: 0 0 6px; }
 .paper-body.one .paper-main { display: block; }
 
-/* ───────── Touch screens: every tappable thing is at least 44 x 44 px ───────── */
+/* ── Touch screens: every tappable thing is at least 44 x 44 px ── */
 @media (pointer: coarse) {
   .btn, .btn.sm, .chip, .footer-links a, .burger, .seg button, .pwtoggle, .gate-back { min-height: 44px; }
   .btn.sm { padding-block: 10px; }
@@ -436,7 +464,7 @@ html:not(.js) .seg, html:not(.js) .js-only { display: none; }               /* t
   .crumb a, .gate-back, .cv-links a { display: inline-flex; align-items: center; min-height: 44px; }
 }
 
-/* ───────── Print: a clean one-page copy ───────── */
+/* ── Print: a clean one-page copy ── */
 @media print {
   :root { color-scheme: light; --bg: #fff; --card: #fff; --surface: #fff; --ink: #000; --muted: #444; --outline: #000; --line: #bbb; --link: #000; --brand: #000; --brand-d: #000; }
   .site-header, .site-footer, .skip, .no-print, .reveal-msg, .reveal-ts, noscript { display: none !important; }
@@ -450,7 +478,10 @@ html:not(.js) .seg, html:not(.js) .js-only { display: none; }               /* t
   .tl { break-inside: avoid; padding-bottom: 10px; } .tl::before { box-shadow: 0 0 0 1.5px #000; background: #000; border-color: #fff; }
   a { color: #000; text-decoration: none; }
   .tag { border: 0; padding: 0 .6em 0 0; } .tags li:not(:last-child)::after { content: ','; }
-  /* paper: no buttons that need a click, no links you cannot click, tighter spacing so a typical resume fits one page */
+  /*
+   * Paper: no buttons that need a click, no links that cannot be clicked, tighter spacing so a typical
+   * resume fits one page.
+   */
   [data-reveal], .cv-links { display: none !important; }
   body { font-size: 9pt; line-height: 1.35; }
   .paper-head { padding-bottom: 8px; } .paper-head h1 { font-size: 24pt; margin-bottom: 6px; } .paper-head .role { font-size: 11pt; margin-bottom: 4px; }
@@ -462,7 +493,7 @@ html:not(.js) .seg, html:not(.js) .js-only { display: none; }               /* t
   @page { size: A4; margin: 11mm; }
 }
 
-/* Syntax colours: the highlighter adds these classes while rendering, so they must always ship */
+/* Syntax colours: the highlighter adds these classes while rendering, so they must always ship. */
 .hljs-keyword, .hljs-selector-tag, .hljs-literal, .hljs-built_in { color: var(--link); }
 .hljs-string, .hljs-attr, .hljs-regexp, .hljs-addition { color: light-dark(#b0294f, #ffa2b6); }
 .hljs-number, .hljs-symbol, .hljs-deletion { color: var(--heading); font-weight: 700; }

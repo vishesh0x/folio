@@ -1,3 +1,7 @@
+/**
+ * Owner-only endpoint that updates a file's description (alt text) and decorative flag.
+ */
+
 import type { APIRoute } from 'astro';
 import { env } from 'cloudflare:workers';
 import { getAsset, isImage } from '../../../../lib/assets';

@@ -1,3 +1,7 @@
+/**
+ * Navigation bar and footer layout at common phone widths.
+ */
+
 import { test, expect } from '@playwright/test';
 import { openPage } from '../helpers';
 
@@ -40,7 +44,7 @@ for (const w of [320, 375, 414]) {
       await page.keyboard.press('Escape');
       await expect(menu).not.toHaveClass(/open/); await expect(burger).toBeFocused();
       await burger.tap(); await expect(menu).toHaveClass(/open/);
-      await page.locator('main').dispatchEvent('click');          // a tap on the page itself
+      await page.locator('main').dispatchEvent('click');  // A tap on the page itself
       await expect(menu).not.toHaveClass(/open/); await expect(burger).toHaveAttribute('aria-expanded', 'false');
       await burger.tap(); await menu.getByRole('link', { name: 'Now' }).tap();
       await expect(page).toHaveURL(/\/now$/);

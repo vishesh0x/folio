@@ -1,4 +1,7 @@
 ---
+/**
+ * Dashboard: site settings.
+ */
 import Dash from '../../layouts/Dash.astro';
 import PageHead from '../../components/PageHead.astro';
 import MediaField from '../../components/MediaField.astro';
@@ -35,7 +38,7 @@ if (Astro.request.method === 'POST') {
   if (!error && site === null) error = 'Site URL must start with https:// (or http://).';
   const candidate = { ...next, highlights, site_url: (site ?? t('site_url', 200)).replace(/\/$/, ''), socials,
     favicon_asset: pick('favicon_asset', images), portrait_asset: pick('portrait_asset', images.filter((a) => a.mime !== 'image/x-icon')), og_asset: pick('og_asset', images.filter((a) => a.mime !== 'image/svg+xml')), resume_asset: pick('resume_asset', pdfs) };
-  s = candidate; // on an error the form shows what was typed, not the old values
+  s = candidate;  // On an error the form shows what was typed, not the old values
   if (error) Astro.response.status = 400;
   else { await saveSettings(s); saved = true; }
 }
@@ -138,7 +141,8 @@ const rows = Array.from({ length: MAX_SOCIALS }, (_, i) => s.socials[i] ?? { lab
 </Dash>
 
 <script>
-  // Show only the filled social-link rows plus one empty one; "Add another" reveals the next. Without JavaScript all rows show.
+  // Show only the filled social-link rows plus one empty one; "Add another" reveals the next. Without
+  // JavaScript all rows show.
   const rows = [...document.querySelectorAll<HTMLElement>('[data-social-row]')];
   const add = document.querySelector<HTMLButtonElement>('[data-add-social]')!;
   const sync = () => {

@@ -1,9 +1,10 @@
-// Password hashing and token helpers. Web Crypto only, so it runs on Workers.
-//
-// Cloudflare Workers caps PBKDF2 at 100,000 iterations, so that is what we use.
-// The stored format records the iteration count, so it can be raised later and
-// old hashes will be upgraded the next time that person logs in.
-
+/**
+ * Password hashing and token helpers. Web Crypto only, so it runs on Workers.
+ *
+ * Cloudflare Workers caps PBKDF2 at 100,000 iterations, so that is the value used. The stored format
+ * records the iteration count, so it can be raised later and old hashes will be upgraded the next time
+ * that person logs in.
+ */
 export const PBKDF2_ITERATIONS = 100_000;
 const enc = new TextEncoder();
 
@@ -16,6 +17,7 @@ const b64 = (buf: ArrayBuffer | Uint8Array) => {
 const unb64 = (s: string) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
 const hex = (buf: ArrayBuffer) => [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
 
+/** SHA-256 of a string, as lowercase hexadecimal. */
 export async function sha256Hex(input: string): Promise<string> {
   return hex(await crypto.subtle.digest('SHA-256', enc.encode(input)));
 }
@@ -34,6 +36,10 @@ async function pbkdf2(password: string, salt: Uint8Array, iterations: number): P
   return crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt, iterations }, key, 256);
 }
 
+/**
+ * Hashes a password with PBKDF2-SHA-256 and a random salt. The result records its own iteration
+ * count.
+ */
 export async function hashPassword(password: string): Promise<string> {
   const salt = crypto.getRandomValues(new Uint8Array(16));
   const hash = await pbkdf2(password, salt, PBKDF2_ITERATIONS);
@@ -61,6 +67,10 @@ export async function verifyPassword(password: string, stored: string): Promise<
   return false;
 }
 
+/**
+ * True when a stored hash uses fewer iterations than the current setting, so it can be upgraded
+ * after a successful sign-in.
+ */
 export function needsRehash(stored: string): boolean {
   const parts = stored.split('$');
   if (parts[0] !== 'pbkdf2-sha256' || parts.length !== 4) return true;
@@ -72,6 +82,7 @@ export async function dummyVerify(password: string) {
   await pbkdf2(password, new Uint8Array(16), PBKDF2_ITERATIONS);
 }
 
+/** A URL-safe random token from the given number of random bytes. */
 export function randomToken(bytes = 32): string {
   return b64(crypto.getRandomValues(new Uint8Array(bytes))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }

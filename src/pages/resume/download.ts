@@ -4,7 +4,10 @@ import { getPublicSettings } from '../../lib/settings';
 import { getAsset } from '../../lib/assets';
 import { getResumeOpts } from '../../lib/resume';
 
-// The PDF is served from here, so the page never links to its file address, and search engines are told not to index it.
+/**
+ * The PDF is served from here, so the page never links to its file address, and search engines are
+ * told not to index it.
+ */
 export const GET: APIRoute = async () => {
   const [s, o] = await Promise.all([getPublicSettings(), getResumeOpts()]);
   const a = s.resume_asset ? await getAsset(s.resume_asset) : null;

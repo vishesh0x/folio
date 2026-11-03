@@ -1,11 +1,14 @@
 ---
+/**
+ * Dashboard: a single message with reply and delete actions.
+ */
 import Dash from '../../../layouts/Dash.astro';
 import { getMessage, setRead } from '../../../lib/inbox';
 
 const id = Number(Astro.params.id);
 const m = Number.isInteger(id) && id > 0 ? await getMessage(id) : null;
 if (!m) return Astro.rewrite('/404');
-if (!m.is_read) { await setRead(m.id, true); m.is_read = 1; } // opening a message marks it as read
+if (!m.is_read) { await setRead(m.id, true); m.is_read = 1; }  // Opening a message marks it as read
 const subject = m.subject || '(no subject)';
 const reply = `mailto:${encodeURIComponent(m.email).replace(/%40/g, '@')}?subject=${encodeURIComponent('Re: ' + (m.subject || 'your message'))}`;
 const initials = m.name.trim().split(/\s+/).slice(0, 2).map((x) => x[0] ?? '').join('').toUpperCase() || '?';

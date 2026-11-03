@@ -1,6 +1,9 @@
 ---
+/**
+ * Dashboard page shell: navigation, flash messages and the shared dashboard styles.
+ */
 import Base from './Base.astro';
-import '../styles/dashboard.css'; // after Base, so these rules win ties with the public stylesheet
+import '../styles/dashboard.css';  // After Base, so these rules win ties with the public stylesheet
 import ThemeSwitch from '../components/ThemeSwitch.astro';
 import { unreadCount } from '../lib/inbox';
 import { getSettings } from '../lib/settings';
@@ -11,7 +14,7 @@ const unread = await unreadCount();
 const site = await getSettings();
 const email = Astro.locals.user?.email ?? '';
 
-// 24px line icons, drawn here so the dashboard needs no icon font
+// 24px line icons, drawn here so the dashboard needs no icon font.
 const ICONS: Record<string, string> = {
   overview: '<rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/>',
   inbox: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/>',
@@ -57,7 +60,9 @@ const active = (href: string) => (href === '/dashboard' ? path === href : path =
     </aside>
 
     <div class="dash-col">
-      <!-- Phone and tablet: the sidebar becomes a menu. A <details> element, so it works without JavaScript. -->
+      {/*
+        Phone and tablet: the sidebar becomes a menu. A <details> element, so it works without JavaScript.
+      */}
       <header class="dash-mbar-head">
       <details class="dash-mbar">
         <summary><span>{site.name}<b class="dot">.</b></span>{unread > 0 && <span class="badge" style="background:var(--gold);color:var(--on-gold);border-radius:999px;padding:1px 7px;font-size:.75rem">{unread}<span class="visually-hidden"> unread</span></span>}<span class="dash-burger">Menu</span></summary>
@@ -92,7 +97,7 @@ const active = (href: string) => (href === '/dashboard' ? path === href : path =
         var url = b.hasAttribute('data-copy-text') ? b.getAttribute('data-copy-text') : new URL(b.getAttribute('data-copy'), location.origin).href, old = b.textContent;
         navigator.clipboard.writeText(url).then(function () { b.textContent = 'Copied'; setTimeout(function () { b.textContent = old; }, 1500); });
       }
-      // a "…" menu closes when you click anywhere else
+      // A "…" menu closes when the owner clicks anywhere else.
       document.querySelectorAll('details.more[open]').forEach(function (d) { if (!d.contains(e.target)) d.removeAttribute('open'); });
     });
     document.addEventListener('keydown', function (e) {
@@ -107,7 +112,8 @@ const active = (href: string) => (href === '/dashboard' ? path === href : path =
       var m = e.target.getAttribute && e.target.getAttribute('data-confirm');
       if (m && !confirm(m)) e.preventDefault();
     });
-    // Forms with a save bar: say whether there is anything to save, and warn before leaving with unsaved edits.
+    // Forms with a save bar: say whether there is anything to save, and warn before leaving with unsaved
+    // edits.
     document.querySelectorAll('form[data-savebar]').forEach(function (f) {
       var s = f.querySelector('.savebar .state'), dirty = false, sending = false;
       if (!s) return;

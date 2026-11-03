@@ -1,10 +1,11 @@
 import { test as base, expect, type APIRequestContext } from '@playwright/test';
 
 /**
- * `wrangler dev`'s local proxy occasionally answers 500 "Network connection lost" to a request the Worker never saw (it
- * happens when the Worker replies, e.g. 401/403, without reading the request body). That is a harness flake, not a site
- * bug, and it is not seen on Cloudflare. A REAL application failure renders the site's own "Something broke" page, so we
- * retry only 500s that are NOT that page; genuine app errors still fail the test.
+ * `wrangler dev`'s local proxy occasionally answers 500 "Network connection lost" to a request the
+ * Worker never saw (it happens when the Worker replies, e.g. 401/403, without reading the request
+ * body). That is a harness flake, not a site bug, and it is not seen on Cloudflare. A REAL application
+ * failure renders the site's own "Something broke" page, so only 500s that are not that page are
+ * retried; genuine app errors still fail the test.
  */
 const METHODS = ['get', 'post', 'put', 'patch', 'delete', 'fetch', 'head'] as const;
 export function withRetry(ctx: APIRequestContext, tries = 4): APIRequestContext {

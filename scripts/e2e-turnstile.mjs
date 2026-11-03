@@ -1,7 +1,9 @@
 #!/usr/bin/env node
-// Turnstile checks for the contact form and the "Show email / phone" buttons, against the production build running locally.
+// Turnstile checks for the contact form and the "Show email / phone" buttons, against the production
+// build running locally.
 //
-//   MODE=on   node scripts/e2e-turnstile.mjs   site started with BOTH keys + TURNSTILE_VERIFY_URL (see below)
+//   MODE=on   node scripts/e2e-turnstile.mjs   site started with BOTH keys + TURNSTILE_VERIFY_URL (see
+//             below)
 //   MODE=off  node scripts/e2e-turnstile.mjs   site started with NO keys, or with only ONE of the two
 //
 // .dev.vars for MODE=on (then `npm run build && npm run preview`):
@@ -10,9 +12,10 @@
 //   TURNSTILE_SECRET_KEY=test-secret
 //   TURNSTILE_VERIFY_URL=http://127.0.0.1:9911/verify
 //
-// This script runs a FAKE Cloudflare verifier on 127.0.0.1:9911 (the sandbox/CI has no route to the real one). It copies the
-// real response shape, including the fact that Cloudflare's test keys always answer "action": "test".
-// WARNING: wipes login_attempts and the resume, and overwrites the 'site' and 'resume_opts' settings, in the LOCAL database.
+// This script runs a FAKE Cloudflare verifier on 127.0.0.1:9911 (the sandbox/CI has no route to the
+// real one). It copies the real response shape, including the fact that Cloudflare's test keys always
+// answer "action": "test". WARNING: wipes login_attempts and the resume, and overwrites the 'site' and
+// 'resume_opts' settings, in the LOCAL database.
 import http from 'node:http';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -26,7 +29,7 @@ const ORIGIN = BASE.origin, SAME = { 'sec-fetch-site': 'same-origin', origin: OR
 const EMAIL = 'hello@example.com', PHONE = '+1 555 0100';
 let ipN = 50; const freshIp = () => `198.51.100.${++ipN}`;
 
-/* ───── fake Cloudflare siteverify ───── */
+// ── Fake Cloudflare siteverify ──
 const calls = []; const used = new Set();
 const verifier = http.createServer((req, res) => {
   let raw = ''; req.on('data', (c) => (raw += c));
@@ -34,9 +37,9 @@ const verifier = http.createServer((req, res) => {
     const p = new URLSearchParams(raw); const token = p.get('response') ?? '', secret = p.get('secret');
     calls.push({ token, secret, remoteip: p.get('remoteip') });
     const reply = (o) => { res.setHeader('content-type', 'application/json'); res.end(JSON.stringify(o)); };
-    if (token.startsWith('drop-')) return req.socket.destroy();               // connection dies
-    if (token.startsWith('garbage-')) return res.end('<html>not json</html>'); // unreadable answer
-    if (token.startsWith('slow-')) await new Promise((r) => setTimeout(r, 7000)); // slower than the Worker's 5 s limit
+    if (token.startsWith('drop-')) return req.socket.destroy();  // Connection dies
+    if (token.startsWith('garbage-')) return res.end('<html>not json</html>');  // Unreadable answer
+    if (token.startsWith('slow-')) await new Promise((r) => setTimeout(r, 7000));  // Slower than the Worker's 5 s limit
     const ok = secret === 'test-secret' && /^(good|slow)-/.test(token) && !used.has(token);
     if (ok) used.add(token);
     reply(ok ? { success: true, hostname: 'localhost', action: 'test' } : { success: false, 'error-codes': [used.has(token) ? 'timeout-or-duplicate' : 'invalid-input-response'] });
@@ -44,7 +47,7 @@ const verifier = http.createServer((req, res) => {
 });
 await new Promise((ok) => verifier.listen(9911, '127.0.0.1', ok));
 
-/* ───── helpers ───── */
+// ── Helpers ──
 function request({ method = 'GET', path, headers = {}, form, json, rawBody }) {
   return new Promise((ok, fail) => {
     const h = { host: BASE.host, connection: 'close', ...headers }; let body = null;
@@ -72,9 +75,10 @@ const csp = (r) => r.headers['content-security-policy'] ?? '';
 const dir = (r, name) => (csp(r).split(';').map((s) => s.trim()).find((s) => s.startsWith(name + ' ')) ?? '');
 const TS = 'https://challenges.cloudflare.com';
 
-/* ───── run ───── */
+// ── Run ──
 try {
-  // The resume page only shows its contact block (and so the reveal buttons) when it has at least one section.
+  // The resume page only shows its contact block (and so the reveal buttons) when it has at least one
+  // section.
   sql(`DELETE FROM login_attempts;
        DELETE FROM resume_entries; DELETE FROM resume_sections;
        INSERT INTO resume_sections (id, kind, title, visible, sort_order) VALUES (1, 'summary', 'Summary', 1, 0);
@@ -83,7 +87,7 @@ try {
        INSERT INTO settings (key,value) VALUES ('resume_opts','${JSON.stringify({ show_phone: true, show_email: true, contact_mode: 'reveal', print_reveal: true })}') ON CONFLICT(key) DO UPDATE SET value=excluded.value;
        INSERT INTO settings (key,value) VALUES ('content_version', strftime('%s','now')) ON CONFLICT(key) DO UPDATE SET value=excluded.value;`);
 
-  await new Promise((ok) => setTimeout(ok, 5500)); // the site remembers its content version for 5 s, and we just changed it behind its back
+  await new Promise((ok) => setTimeout(ok, 5500));  // The site remembers its content version for 5 s, and it was just changed behind its back
   const contact = await request({ path: '/contact' });
   const resume = await request({ path: '/resume' });
   const home = await request({ path: '/' });
@@ -164,7 +168,7 @@ try {
     const g3 = 'contact';
     const form = async (token) => {
       const page = await request({ path: '/contact' }); const t = /name="t" value="([^"]+)"/.exec(page.text)?.[1];
-      await new Promise((ok) => setTimeout(ok, 3300)); // the form refuses posts faster than 3 s
+      await new Promise((ok) => setTimeout(ok, 3300));  // The form refuses posts faster than 3 s
       const f = { name: 'Ada', email: 'ada@example.com', subject: 'Hi', message: 'A perfectly ordinary message.', t, website: '' };
       if (token !== undefined) f['cf-turnstile-response'] = token;
       return request({ method: 'POST', path: '/contact', form: f, headers: { ...SAME, 'cf-connecting-ip': freshIp() } });

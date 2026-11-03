@@ -3,8 +3,9 @@ import { readFileSync } from 'node:fs';
 import { AUTH_FILE, header, sameOrigin } from '../helpers';
 import { upload, removeAsset, pngClaiming, pngChunk, pngWithPayload, jpegClaiming, gif, pdf, svg } from '../uploads';
 
-// Step 4: what the site accepts as an upload. The file's own first bytes decide what it is; the name and the type the browser claims are
-// ignored, and a file that is not a real picture/PDF/SVG never reaches storage.
+// What the site accepts as an upload. The file's own first bytes decide what it is; the name and the
+// type the browser claims are ignored, and a file that is not a real picture/PDF/SVG never reaches
+// storage.
 test.use({ storageState: AUTH_FILE });
 const fx = (n: string) => readFileSync(`tests/fixtures/${n}`);
 const made: string[] = [];
@@ -16,7 +17,7 @@ test.afterAll(async ({ playwright, baseURL }) => {
 
 test.describe('accepted: the content decides, not the name or the claimed type', () => {
   const OK: [string, string, string, Buffer, string, string][] = [
-    // description, filename given, type claimed, bytes, expected stored type, expected extension
+    // Description, filename given, type claimed, bytes, expected stored type, expected extension.
     ['a PNG called .jpg and labelled JPEG', 'holiday.jpg', 'image/jpeg', fx('plain.png'), 'image/png', 'png'],
     ['a JPEG called .png', 'x.png', 'image/png', fx('photo-gps-noorient.jpg'), 'image/jpeg', 'jpg'],
     ['a WebP with a PHP-looking name', 'shell.php', 'application/x-php', fx('plain.webp'), 'image/webp', 'webp'],
@@ -128,7 +129,7 @@ test.describe('what the upload hands back and what the file is called', () => {
 test.describe('only the signed-in owner can upload', () => {
   test.use({ storageState: { cookies: [], origins: [] } });
   test('no session: refused; from another site: refused; nothing is stored', async ({ playwright, baseURL }) => {
-    const request = withRetry(await playwright.request.newContext({ baseURL, storageState: { cookies: [], origins: [] } }));   // (retries the local test proxy's occasional 500)
+    const request = withRetry(await playwright.request.newContext({ baseURL, storageState: { cookies: [], origins: [] } }));  // (retries the local test proxy's occasional 500)
     const r = await request.post('/api/admin/assets/upload', { multipart: { file: { name: 'a.png', mimeType: 'image/png', buffer: fx('plain.png') }, alt: 'x' }, headers: sameOrigin(baseURL!), maxRedirects: 0 });
     expect(r.status()).toBe(401);
     const x = await request.post('/api/admin/assets/upload', { multipart: { file: { name: 'a.png', mimeType: 'image/png', buffer: fx('plain.png') }, alt: 'x' }, headers: { 'sec-fetch-site': 'cross-site', origin: 'https://evil.example' }, maxRedirects: 0 });

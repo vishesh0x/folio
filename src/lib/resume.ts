@@ -1,20 +1,26 @@
 import { env } from 'cloudflare:workers';
 
-/* ───────── Options (what the visitor sees, and how contact details are protected) ───────── */
+// ── Options (what the visitor sees, and how contact details are protected) ──
 export type ContactMode = 'reveal' | 'hidden' | 'plain';
+/**
+ * Resume display options: layout, name and headline, and which contact details are shown and how.
+ */
 export type ResumeOpts = {
-  name: string;                // the name printed at the top of the resume; empty uses the site name (Settings)
-  headline: string;            // e.g. "Senior frontend engineer"; falls back to the site tagline
+  name: string;  // The name printed at the top of the resume; empty uses the site name (Settings)
+  headline: string;  // e.g. "Senior frontend engineer"; falls back to the site tagline
   show_email: boolean; show_phone: boolean; show_location: boolean; show_socials: boolean; show_download: boolean;
-  layout: 'two' | 'one';       // two = main column + side column (default), one = a single column
-  print_reveal: boolean;       // the "Print this page" button first reveals email/phone, so the printed copy has them
-  contact_mode: ContactMode;   // reveal = click to show (default) | hidden = not shown, point to contact form | plain = written into the page (scrapable)
+  layout: 'two' | 'one';  // Two = main column + side column (default), one = a single column
+  print_reveal: boolean;  // The "Print this page" button first reveals email/phone, so the printed copy has them
+  contact_mode: ContactMode;  // Reveal = click to show (default) | hidden = not shown, point to contact form | plain = written into the page (scrapable)
 };
+/** Options used until the owner saves their own. */
 export const RESUME_DEFAULTS: ResumeOpts = {
   name: '', headline: '', layout: 'two', print_reveal: false, show_email: true, show_phone: false, show_location: true, show_socials: true, show_download: true, contact_mode: 'reveal',
 };
+/** Loads the resume options, filling in defaults. */
 export async function getResumeOpts(): Promise<ResumeOpts> {
-  // A database failure fails the request; it must not fall back to default contact-visibility settings on a page that gets cached.
+  // A database failure fails the request; it must not fall back to default contact-visibility settings
+  // on a page that gets cached.
   const r = await env.DB.prepare("SELECT value FROM settings WHERE key = 'resume_opts'").first<{ value: string }>();
   let saved = {}; try { if (r) saved = JSON.parse(r.value); } catch {}
   const o = { ...RESUME_DEFAULTS, ...saved };
@@ -24,32 +30,48 @@ export async function getResumeOpts(): Promise<ResumeOpts> {
   o.name = typeof o.name === 'string' ? o.name.trim().slice(0, 80) : '';
   return o;
 }
+/** Saves the resume options. */
 export async function saveResumeOpts(o: ResumeOpts) {
   await env.DB.prepare("INSERT INTO settings (key, value) VALUES ('resume_opts', ?1) ON CONFLICT(key) DO UPDATE SET value = ?1").bind(JSON.stringify(o)).run();
 }
 
-/* ───────── Content ─────────
-   Each section has a `kind`, and each entry keeps its fields as JSON:
-   summary        { text }
-   experience     { role, company, location, start, end, current, description, bullets[] }
-   education      { degree, school, location, start, end, details }
-   skills         { group, items }                     items = comma separated
-   certifications { name, issuer, date, url }
-   projects       (linked to a project in your Projects section; optional { blurb } overrides its summary)
-   custom         { heading, subheading, date, text, bullets[] }                                        */
+/**
+ * ───────── Content ─────────
+ *    Each section has a `kind`, and each entry keeps its fields as JSON:
+ *    summary        { text }
+ *    experience     { role, company, location, start, end, current, description, bullets[] }
+ *    education      { degree, school, location, start, end, details }
+ *    skills         { group, items }                     items = comma separated
+ *    certifications { name, issuer, date, url }
+ *    projects       (linked to a project in the Projects section; optional { blurb } overrides its
+ *                   summary)
+ *    custom         { heading, subheading, date, text, bullets[] }
+ */
 export const KINDS = ['summary', 'experience', 'education', 'skills', 'certifications', 'projects', 'custom'] as const;
+/** Section kinds with their labels in the builder. */
 export const KIND_LABEL: Record<string, string> = { summary: 'Summary', experience: 'Experience', education: 'Education', skills: 'Skills', certifications: 'Certifications', projects: 'Projects', custom: 'Custom section' };
+/** Section kinds with their default titles. */
 export const KIND_TITLE: Record<string, string> = { summary: 'Summary', experience: 'Experience', education: 'Education', skills: 'Skills', certifications: 'Certifications', projects: 'Selected projects', custom: 'More' };
+/** A resume section kind. */
 export type Kind = (typeof KINDS)[number];
 
+/** The project fields a resume entry shows when it links to a project. */
 export type LinkedProject = { slug: string; title: string; summary: string; tags: string[]; live_url: string | null; source_url: string | null };
+/** A resume entry with its data and linked project. */
 export type Entry = { id: number; d: Record<string, any>; project: LinkedProject | null };
+/** A resume section with its visible entries. */
 export type Section = { id: number; kind: Kind; title: string; entries: Entry[] };
 
+/**
+ * Trims a value to a string of at most `max` characters; anything that is not a string becomes
+ * empty.
+ */
 export const str = (v: unknown, max = 600) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
 const list = (v: unknown) => (Array.isArray(v) ? v.map((x) => str(x, 400)).filter(Boolean).slice(0, 30) : []);
+/** Returns the value when it is an http(s) address, otherwise an empty string. */
 export const httpUrl = (u: unknown) => { const s = str(u, 500); return /^https?:\/\//i.test(s) ? s : ''; };
 
+/** Cleans untrusted entry data for the given kind, keeping only known fields within their limits. */
 export function cleanEntryData(kind: Kind, raw: any): Record<string, any> {
   const r = raw && typeof raw === 'object' ? raw : {};
   switch (kind) {
@@ -63,6 +85,7 @@ export function cleanEntryData(kind: Kind, raw: any): Record<string, any> {
   }
 }
 
+/** Loads the visible sections and entries for the public resume. */
 export async function loadResume(): Promise<Section[]> {
   const rows = (await env.DB.prepare(
     `SELECT s.id AS sid, s.kind, s.title, e.id AS eid, e.project_id, e.data
@@ -89,7 +112,7 @@ export async function loadResume(): Promise<Section[]> {
     let data: unknown = {}; try { data = JSON.parse(r.data ?? '{}'); } catch {}
     if (r.project_id) {
       const project = projects.get(r.project_id);
-      if (project) sec.entries.push({ id: r.eid, d: cleanEntryData('projects', data), project }); // unpublished or deleted projects quietly drop out
+      if (project) sec.entries.push({ id: r.eid, d: cleanEntryData('projects', data), project });  // Unpublished or deleted projects quietly drop out
     } else if (sec.kind !== 'projects') {
       sec.entries.push({ id: r.eid, d: cleanEntryData(sec.kind, data), project: null });
     }

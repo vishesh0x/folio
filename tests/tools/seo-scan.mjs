@@ -1,4 +1,5 @@
-// Prints the search and sharing metadata, heading outline and robots signals of each page of the running server (default: server E, port 8791).
+// Prints the search and sharing metadata, heading outline and robots signals of each page of the
+// running server (default: server E, port 8791).
 import { chromium } from '/home/claude/folio/node_modules/playwright/index.mjs';
 const BASE = process.argv[2] ?? 'http://localhost:8791';
 const paths = process.argv.slice(3).length ? process.argv.slice(3) : ['/', '/projects', '/projects/wanderhost-booking', '/now', '/resume', '/contact', '/auth', '/no-such-page', '/projects/secret-draft', '/dashboard'];

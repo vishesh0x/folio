@@ -1,20 +1,26 @@
 import { defineConfig, devices } from '@playwright/test';
 
 /**
- * Folio end-to-end tests. They run against the PRODUCTION BUILD served by `wrangler dev` (so the strict CSP, HSTS and
- * __Host- cookie are all active), never against `astro dev`. Run with:  npm run test:e2e   (it builds first)
+ * Folio end-to-end tests. They run against the PRODUCTION BUILD served by `wrangler dev` (so the
+ * strict CSP, HSTS and __Host- cookie are all active), never against `astro dev`. Run with:  npm run
+ * test:e2e   (it builds first).
  *
- * Two isolated Worker instances, each with its own throwaway local D1/R2 under .wrangler/e2e-*  (wiped on every start):
- *   A  :8787  Turnstile OFF   (default site, seeded with demo content: headers, auth, CSRF/CORS, throttles, responsive layout)
- *   B  :8788  Turnstile ON    (site key + secret + a FAKE Cloudflare verifier on :9911, see tests/e2e/fake-turnstile.mjs)
- *   D  :8789  database-failure tests (seeded; its database is deliberately broken and restored by tests/e2e/resilience; short page-cache lifetime)
+ * Two isolated Worker instances, each with its own throwaway local D1/R2 under .wrangler/e2e-*  (wiped
+ * on every start):
+ *   A  :8787  Turnstile OFF   (default site, seeded with demo content: headers, auth, CSRF/CORS,
+ *      throttles, responsive layout)
+ *   B  :8788  Turnstile ON    (site key + secret + a FAKE Cloudflare verifier on :9911, see
+ *      tests/e2e/fake-turnstile.mjs)
+ *   D  :8789  database-failure tests (seeded; its database is deliberately broken and restored by
+ *      tests/e2e/resilience; short page-cache lifetime)
  *   F  :8792  backup and restore tests (seeded; the tests export the site, damage it, and restore it)
- *   E  :8791  the same site run through tests/tools/counting/entry.mjs, which COUNTS every call to a Cloudflare service per request (Workers limits tests)
- * Nothing here talks to real Cloudflare services or your real database.
+ *   E  :8791  the same site run through tests/tools/counting/entry.mjs, which COUNTS every call to a
+ *      Cloudflare service per request (Workers limits tests)
+ * Nothing here talks to real Cloudflare services or the real database.
  */
 export const PORT_A = 8787, PORT_B = 8788, PORT_D = 8789, PORT_E = 8791, PORT_F = 8792, VERIFIER = 9911;
 export const SETUP_TOKEN = 'e2e-setup-token-0123456789abcdef';
-export const RATE_SALT = 'e2e-rate-limit-salt-fedcba9876543210'; // rate-limit counters are stored under a keyed hash made with this
+export const RATE_SALT = 'e2e-rate-limit-salt-fedcba9876543210';  // Rate-limit counters are stored under a keyed hash made with this
 
 const worker = (port: number, inspector: number, dir: string, vars: Record<string, string>, seed = false, config = '') => ({
   command: [
@@ -22,7 +28,7 @@ const worker = (port: number, inspector: number, dir: string, vars: Record<strin
     `npx wrangler d1 migrations apply folio-db ${config} --local --persist-to .wrangler/${dir}`,
     ...(seed ? [
       `npx wrangler d1 execute folio-db ${config} --local --persist-to .wrangler/${dir} --file tests/seed/demo.sql`,
-      `npx wrangler d1 execute folio-db ${config} --local --persist-to .wrangler/${dir} --file tests/seed/demo-media.sql`,   // asset rows, covers, portrait, diagrams
+      `npx wrangler d1 execute folio-db ${config} --local --persist-to .wrangler/${dir} --file tests/seed/demo-media.sql`,  // Asset rows, covers, portrait, diagrams
       `npx wrangler r2 object put folio-assets/assets/demoCover0001/demo-cover.png --file tests/seed/demo-cover.png --content-type image/png --local --persist-to .wrangler/${dir}`,
     ] : []),
     `npx wrangler dev ${config} --port ${port} --inspector-port ${inspector} --persist-to .wrangler/${dir} ` +
@@ -36,18 +42,19 @@ const worker = (port: number, inspector: number, dir: string, vars: Record<strin
 export default defineConfig({
   testDir: './tests/e2e',
   fullyParallel: false,
-  workers: 1, // the sites keep rate-limit counters in their database; one worker keeps runs predictable
+  workers: 1,  // The sites keep rate-limit counters in their database; one worker keeps runs predictable
   retries: process.env.CI ? 1 : 0,
   reporter: [['list'], ['html', { open: 'never' }]],
   use: {
     trace: 'retain-on-failure',
-    // wrangler dev's local proxy sometimes drops a keep-alive connection when the Worker answers (e.g. 401/403) without reading
-    // the request body ("Network connection lost"). One connection per request avoids that harness flake; it is not a site bug.
+    // wrangler dev's local proxy sometimes drops a keep-alive connection when the Worker answers (e.g.
+    // 401/403) without reading the request body ("Network connection lost"). One connection per request
+    // avoids that harness flake; it is not a site bug.
     extraHTTPHeaders: { connection: 'close' },
   },
   webServer: [
     { command: 'node tests/e2e/fake-turnstile.mjs', url: `http://127.0.0.1:${VERIFIER}/health`, reuseExistingServer: !process.env.CI },
-    worker(PORT_A, 9330, 'e2e-a', { ADMIN_SETUP_TOKEN: SETUP_TOKEN, RATE_LIMIT_SALT: RATE_SALT }, true), // seeded with demo content (tests/seed/demo.sql) so layouts are tested with real-looking data
+    worker(PORT_A, 9330, 'e2e-a', { ADMIN_SETUP_TOKEN: SETUP_TOKEN, RATE_LIMIT_SALT: RATE_SALT }, true),  // Seeded with demo content (tests/seed/demo.sql) so layouts are tested with real-looking data
     worker(PORT_D, 9332, 'e2e-d', { ADMIN_SETUP_TOKEN: SETUP_TOKEN, PAGE_CACHE_TTL: '2' }, true),
     worker(PORT_F, 9335, 'e2e-f', { ADMIN_SETUP_TOKEN: SETUP_TOKEN, RATE_LIMIT_SALT: RATE_SALT }, true),
     worker(PORT_E, 9333, 'e2e-e', { ADMIN_SETUP_TOKEN: SETUP_TOKEN, RATE_LIMIT_SALT: RATE_SALT }, true, '-c tests/tools/counting/wrangler.jsonc'),
@@ -65,42 +72,46 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'], baseURL: `http://localhost:${PORT_A}` },
     },
     {
-      // layout on real phone sizes; each spec sets its own viewport / touch emulation
+      // Layout on real phone sizes; each spec sets its own viewport / touch emulation.
       name: 'responsive', testMatch: /responsive\/.*\.spec\.ts/, dependencies: ['setup'],
       use: { ...devices['Desktop Chrome'], baseURL: `http://localhost:${PORT_A}` },
     },
     {
-      // data: SQL safety, schema/indexes/migrations/integrity, concurrency, retention
+      // Data: SQL safety, schema/indexes/migrations/integrity, concurrency, retention.
       name: 'data', testMatch: /data\/.*\.spec\.ts/, dependencies: ['setup'],
       use: { ...devices['Desktop Chrome'], baseURL: `http://localhost:${PORT_A}` },
     },
     {
-      // storage (R2): what may be uploaded, what is kept inside a file, what is served, and stray-file clean-up
+      // Storage (R2): what may be uploaded, what is kept inside a file, what is served, and stray-file
+      // clean-up.
       name: 'storage', testMatch: /storage\/.*\.spec\.ts/, dependencies: ['setup'],
       use: { ...devices['Desktop Chrome'], baseURL: `http://localhost:${PORT_A}` },
     },
     {
-      // search and sharing metadata, accessibility (axe scan in light/dark, desktop/phone), keyboard use
+      // Search and sharing metadata, accessibility (axe scan in light/dark, desktop/phone), keyboard use.
       name: 'quality', testMatch: /quality\/.*\.spec\.ts/, dependencies: ['setup'],
       use: { ...devices['Desktop Chrome'], baseURL: `http://localhost:${PORT_A}` },
     },
     {
-      // the database goes down and comes back (server D has its own database, so nothing else is affected)
+      // The database goes down and comes back (server D has its own database, so nothing else is affected).
       name: 'resilience', testMatch: /resilience\/.*\.spec\.ts/,
       use: { ...devices['Desktop Chrome'], baseURL: `http://localhost:${PORT_D}` },
     },
     {
-      // page speed and diagrams: eager/lazy images, no layout jumps, inlined CSS, fonts, CSP for the analytics beacon, Mermaid
+      // Page speed and diagrams: eager/lazy images, no layout jumps, inlined CSS, fonts, CSP for the
+      // analytics beacon, Mermaid.
       name: 'performance', testMatch: /performance\/.*\.spec\.ts/, dependencies: ['setup'],
       use: { ...devices['Desktop Chrome'], baseURL: `http://localhost:${PORT_A}` },
     },
     {
-      // backup and restore of the site's data (own server, because the tests damage the site and restore it)
+      // Backup and restore of the site's data (own server, because the tests damage the site and restore
+      // it).
       name: 'backup', testMatch: /backup\/.*\.spec\.ts/,
       use: { ...devices['Desktop Chrome'], baseURL: `http://localhost:${PORT_F}` },
     },
     {
-      // Workers limits (free plan: 50 calls to Cloudflare services per request, 10 ms CPU): how many calls each route really makes, and that bulk work stays inside them
+      // Workers limits (free plan: 50 calls to Cloudflare services per request, 10 ms CPU): how many calls
+      // each route really makes, and that bulk work stays inside them.
       name: 'limits', testMatch: /limits\/.*\.spec\.ts/,
       use: { ...devices['Desktop Chrome'], baseURL: `http://localhost:${PORT_E}` },
     },

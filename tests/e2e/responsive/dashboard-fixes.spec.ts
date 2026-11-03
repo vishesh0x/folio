@@ -35,7 +35,7 @@ test.describe('Resume builder: "What to show"', () => {
       });
       expect(c.tickOpacity).toBe('1');
       expect(c.tick, 'tick is the same colour as the box, so it is invisible').not.toBe(c.boxBg);
-      // and an unchecked chip shows no tick
+      // And an unchecked chip shows no tick.
       const off = page.locator('.toggle:has(input[name="show_phone"])');
       await expect(off.locator('input')).not.toBeChecked();
       expect(await off.evaluate((el) => getComputedStyle(el, '::after').opacity)).toBe('0');
@@ -62,7 +62,8 @@ test.describe('Project editor: "Address" box', () => {
       await openPage(page, '/dashboard/projects/1');
       const view = page.locator('[data-slug-view]');
       await expect(view).toBeVisible();
-      // For each word of the address, the browser must lay it out on ONE line (a broken word has two client rects)
+      // For each word of the address, the browser must lay it out on ONE line (a broken word has two client
+      // rects).
       const broken = await view.locator('.slug .pre').evaluate((el) => {
         const out: string[] = [], walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
         for (let n = walker.nextNode() as Text | null; n; n = walker.nextNode() as Text | null) {

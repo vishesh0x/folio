@@ -11,27 +11,31 @@ def picture(w=64, h=48):
     d.rectangle((4, 4, w - 5, h - 5), outline=(20, 20, 20)); d.text((8, 16), 'TOP', fill=(255, 255, 255))
     return im
 
+# EXIF block full of personal data: orientation ("rotate 90 degrees to display"), camera maker, model and
+# serial number, editing software, capture time and a GPS position (12 58 18 N, 77 35 40 E).
 exif = Image.Exif()
-exif[0x0112] = 6                                            # Orientation: "rotate 90 degrees to display"
+exif[0x0112] = 6
 exif[0x010F] = 'SecretCameraMaker'; exif[0x0110] = 'SecretCameraModel'; exif[0xA431] = 'SERIAL-1234567890'; exif[0x0131] = 'SecretEditingSoftware'
 exif[0x9003] = '2024:06:01 10:20:30'
 gps = exif.get_ifd(0x8825)
-gps[1] = 'N'; gps[2] = (12.0, 58.0, 18.0); gps[3] = 'E'; gps[4] = (77.0, 35.0, 40.0)   # 12 58 18 N, 77 35 40 E (a real place)
+gps[1] = 'N'; gps[2] = (12.0, 58.0, 18.0); gps[3] = 'E'; gps[4] = (77.0, 35.0, 40.0)
 exif[0x8825] = gps
 picture().save('tests/fixtures/photo-gps.jpg', 'JPEG', quality=85, exif=exif, comment=b'SECRET-COMMENT-IN-JPEG', xmp=b'<x:xmpmeta xmlns:x="adobe:ns:meta/">SECRET-XMP</x:xmpmeta>')
 
-# no orientation, only GPS: after stripping there must be no EXIF block at all
+# GPS only, no orientation: after cleaning there must be no EXIF block left at all.
 exif2 = Image.Exif(); gps2 = exif2.get_ifd(0x8825); gps2[1] = 'S'; gps2[2] = (33.0, 51.0, 54.0); gps2[3] = 'E'; gps2[4] = (151.0, 12.0, 34.0); exif2[0x8825] = gps2
 picture().save('tests/fixtures/photo-gps-noorient.jpg', 'JPEG', quality=85, exif=exif2)
 
+# PNG text chunks that carry personal data.
 info = PngImagePlugin.PngInfo()
 info.add_text('Author', 'SECRET-PERSON-NAME'); info.add_text('Comment', 'SECRET-COMMENT-IN-PNG'); info.add_itxt('Description', 'SECRET-ITXT', lang='en')
 picture(40, 40).save('tests/fixtures/photo-meta.png', 'PNG', pnginfo=info, exif=exif)
 
+# A WebP with EXIF and XMP, and pictures without any metadata to compare against.
 picture(48, 48).save('tests/fixtures/photo-meta.webp', 'WEBP', lossless=True, exif=exif, xmp=b'<x:xmpmeta xmlns:x="adobe:ns:meta/">SECRET-XMP-WEBP</x:xmpmeta>')
 picture(48, 48).save('tests/fixtures/plain.webp', 'WEBP', lossless=True)
 picture(32, 32).save('tests/fixtures/plain.png', 'PNG')
 print('done')
 
-# photo-meta.avif and doc-meta.pdf (made with Pillow and pypdf): EXIF/XMP with a camera name and author, a PDF with title/author/producer.
-# Search strings used by the tests: "SecretCam", "Jane Secret", "Private Title".
+# Also used by the tests, made separately with Pillow and pypdf: photo-meta.avif (EXIF and XMP) and
+# doc-meta.pdf (title, author and producer). Search strings: "SecretCam", "Jane Secret", "Private Title".

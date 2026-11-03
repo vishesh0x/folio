@@ -2,7 +2,8 @@ import { test, expect } from '../fixtures';
 import { withRetry } from '../fixtures';
 import { ADMIN_EMAIL, ADMIN_PASSWORD, AUTH_FILE, freshIp, sameOrigin, header, login } from '../helpers';
 
-// Audit: everything under /dashboard and /api/admin must be unreachable without a valid session, including by URL tricks.
+// Everything under /dashboard and /api/admin must be unreachable without a valid session, including by
+// URL tricks.
 const anon = { cookies: [], origins: [] };
 
 test.describe('unauthenticated', () => {
@@ -14,8 +15,8 @@ test.describe('unauthenticated', () => {
     '/%64ashboard', '/%64ashboard/settings', '//dashboard', '/dashboard/../dashboard', '/dashboard/%2e%2e/dashboard'];
   for (const p of PAGES) {
     test(`page ${p} redirects to /auth`, async ({ request, baseURL }) => {
-      const res = await request.get(`${baseURL}${p}`, { maxRedirects: 0 }); // absolute URL: "//dashboard" alone would be read as a host name
-      // either redirected to sign-in, or not found: never the page
+      const res = await request.get(`${baseURL}${p}`, { maxRedirects: 0 });  // Absolute URL: "//dashboard" alone would be read as a host name
+      // Either redirected to sign-in, or not found: never the page.
       expect([302, 404], `${p} → ${res.status()}`).toContain(res.status());
       if (res.status() === 302) expect(header(res, 'location')).toMatch(/\/auth$/);
       expect(await res.text()).not.toContain('Dashboard');
@@ -70,8 +71,8 @@ test.describe('session cookie and lifecycle', () => {
     const c = (await ctx.cookies()).find((x) => x.name === '__Host-session')!;
     expect(c, 'session cookie present').toBeTruthy();
     expect(c).toMatchObject({ httpOnly: true, secure: true, sameSite: 'Lax', path: '/' });
-    expect(c.value.length).toBeGreaterThanOrEqual(40); // 256 random bits
-    expect(await page.evaluate(() => document.cookie)).not.toContain('session'); // invisible to scripts
+    expect(c.value.length).toBeGreaterThanOrEqual(40);  // 256 random bits
+    expect(await page.evaluate(() => document.cookie)).not.toContain('session');  // Invisible to scripts
     await ctx.close();
   });
 

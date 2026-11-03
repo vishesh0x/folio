@@ -1,8 +1,9 @@
 import { test, expect } from '@playwright/test';
 import { crawl } from '../../tools/crawl-links.mjs';
 
-// Step 9: no broken links inside the site. Starts at the home page and the sitemap and follows everything, so a link to a deleted project, a missing
-// picture, a stale #anchor or a mistyped page is found. Links to other websites are checked by tests/tools/crawl-links.mjs --external on your own computer.
+// No broken links inside the site. Starts at the home page and the sitemap and follows everything, so
+// a link to a deleted project, a missing picture, a stale #anchor or a mistyped page is found. Links
+// to other websites are checked by tests/tools/crawl-links.mjs --external on the owner's own computer.
 test.use({ storageState: { cookies: [], origins: [] } });
 test('every link, picture, script, style sheet and #anchor inside the public site leads somewhere that exists', async ({ baseURL }) => {
   test.setTimeout(240_000);

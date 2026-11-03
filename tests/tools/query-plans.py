@@ -6,13 +6,14 @@ SCAN on a small fixed table (settings, seo_pages) is fine. "USE TEMP B-TREE FOR 
 import re, glob, sqlite3, shutil, sys, tempfile, os, itertools
 
 db = sys.argv[1] if len(sys.argv) > 1 else next(p for p in glob.glob('.wrangler/*/v3/d1/miniflare-D1DatabaseObject/*.sqlite') if 'metadata' not in p)
+# Work on a copy. SQLite's backup API is used instead of a file copy because the backup also reads the
+# write-ahead log (a plain copy would miss recent changes, such as a new index).
 tmp = tempfile.mktemp(suffix='.sqlite')
-# the backup API reads the -wal file too (a plain file copy would miss recent changes, such as a new index)
 src = sqlite3.connect(db); con = sqlite3.connect(tmp); src.backup(con); src.close()
 GROWS = {'messages', 'sessions', 'login_attempts', 'assets', 'projects', 'now_items', 'now_categories', 'resume_entries', 'resume_sections', 'users'}
 
-# Expand the few dynamic parts so every real variant is checked
 PROJECT_SELECT = re.search(r"const SELECT = `([^`]*)`", open('src/lib/projects.ts').read()).group(1)
+# Expand the dynamic parts of statements built from template strings, so that every real variant is planned.
 SUBS = [("${SELECT}", [PROJECT_SELECT]), ("${where}", ['', 'WHERE is_read = 0', "WHERE status = 'draft'"]), ("${cols}", ['id, filename, mime, width, height, alt, decorative']),
         ("${table}", ['now_categories', 'now_items', 'resume_sections', 'resume_entries']),
         ("${opts.featured ? 'AND p.featured = 1' : ''}", ['', 'AND p.featured = 1']),

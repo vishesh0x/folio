@@ -1,4 +1,7 @@
 ---
+/**
+ * Project list with a tag filter.
+ */
 import Base from '../../layouts/Base.astro';
 import ProjectCard from '../../components/ProjectCard.astro';
 import { listPublished, allTags } from '../../lib/projects';
@@ -40,8 +43,9 @@ const shown = tag ? all.filter((p) => p.tags.includes(tag)) : all;
 </Base>
 
 <script>
-  // Search is an extra on top of the tag links, which work without JavaScript. Its box is shown by CSS (html.js, set before first paint)
-  // rather than un-hidden here, so it takes its place from the first frame and the filters below it do not jump down when this runs.
+  // Search is an extra on top of the tag links, which work without JavaScript. Its box is shown by CSS
+  // (html.js, set before first paint) rather than un-hidden here, so it takes its place from the first
+  // frame and the filters below it do not jump down when this runs.
   const wrap = document.querySelector<HTMLElement>('[data-search-wrap]');
   const input = document.getElementById('q') as HTMLInputElement | null;
   const cards = [...document.querySelectorAll<HTMLElement>('#grid .pcard')];

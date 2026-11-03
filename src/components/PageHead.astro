@@ -1,5 +1,6 @@
 ---
-// Title row at the top of every dashboard page. The default slot holds the page's main actions (buttons), aligned right.
+// Title row at the top of every dashboard page. The default slot holds the page's main actions
+// (buttons), aligned right.
 interface Props { title: string; lede?: string; }
 const { title, lede } = Astro.props;
 const hasActions = Astro.slots.has('default');

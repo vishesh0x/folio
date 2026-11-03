@@ -1,8 +1,8 @@
 import { test, expect, type Page } from '@playwright/test';
 import { AUTH_FILE, openPage } from '../helpers';
 
-// Everything you tap must be at least 44 x 44 CSS px (WCAG 2.5.5 / Apple HIG), on a touch screen.
-// Text links inside a sentence are exempt, as the WCAG inline exception allows.
+// Every tap target must be at least 44 x 44 CSS px (WCAG 2.5.5 / Apple HIG), on a touch screen. Text
+// links inside a sentence are exempt, as the WCAG inline exception allows.
 const tooSmall = (page: Page, selector: string) => page.evaluate((sel) => {
   const bad: string[] = [];
   for (const el of Array.from(document.querySelectorAll(sel))) {

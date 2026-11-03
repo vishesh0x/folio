@@ -5,8 +5,8 @@ import { acceptAnswer, hostMatches, isCloudflareTestSecret, isLocalHost, verifie
 import { stripMetadata, exifOrientation } from '../../../src/lib/strip';
 import { sniffBinary } from '../../../src/lib/sniff';
 
-// Pure logic, tested directly (no server): IPv6 networks, Turnstile's rules, metadata stripping, file-type detection.
-
+// Pure logic, tested directly (no server): IPv6 networks, Turnstile's rules, metadata stripping,
+// file-type detection.
 test.describe('networkOf: who counts as the same visitor for rate limiting', () => {
   const CASES: [string, string][] = [
     ['203.0.113.9', '203.0.113.9'],
@@ -39,7 +39,7 @@ test.describe('Turnstile rules', () => {
   const REAL = '0x4AAAAAAA-real-looking-secret-key', here = { hostname: 'site.example', action: 'reveal' };
   test('an answer must say success, and name this site and this widget', () => {
     expect(acceptAnswer({ success: true, hostname: 'site.example', action: 'reveal' }, here, REAL)).toBe(true);
-    expect(acceptAnswer({ success: true, hostname: 'www.site.example' }, here, REAL)).toBe(true);        // no action named: an unnamed widget is fine
+    expect(acceptAnswer({ success: true, hostname: 'www.site.example' }, here, REAL)).toBe(true);  // No action named: an unnamed widget is fine
     expect(acceptAnswer({ success: true }, here, REAL)).toBe(true);
     expect(acceptAnswer({ success: false, hostname: 'site.example' }, here, REAL)).toBe(false);
     expect(acceptAnswer({}, here, REAL)).toBe(false);
@@ -61,19 +61,19 @@ test.describe('stripMetadata: location, camera and comments are removed, the pic
   for (const [file, mime] of [['photo-gps.jpg', 'image/jpeg'], ['photo-gps-noorient.jpg', 'image/jpeg'], ['photo-meta.png', 'image/png'], ['photo-meta.webp', 'image/webp']] as const) {
     test(`${file}: nothing personal is left`, () => {
       const before = fx(file), after = stripMetadata(before, mime);
-      const marks = file.includes('noorient') ? ['Exif'] : SECRETS;                       // the GPS-only photo has numbers, not text
+      const marks = file.includes('noorient') ? ['Exif'] : SECRETS;  // The GPS-only photo has numbers, not text
       expect(marks.filter((s) => text(before).includes(s)).length, 'fixture should contain personal data').toBeGreaterThan(0);
       expect(marks.filter((s) => text(after).includes(s))).toEqual([]);
       expect(after.length).toBeLessThan(before.length);
-      expect(sniffBinary(after)?.mime).toBe(mime);                                        // still the same kind of file...
-      expect(sniffBinary(after)?.width).toBe(sniffBinary(before)?.width);                 // ...of the same size
+      expect(sniffBinary(after)?.mime).toBe(mime);  // Still the same kind of file...
+      expect(sniffBinary(after)?.width).toBe(sniffBinary(before)?.width);  // ...of the same size
     });
   }
   test('a phone photo keeps its "rotate me" flag (otherwise portrait photos would show sideways) but nothing else of its EXIF', () => {
     const out = text(stripMetadata(fx('photo-gps.jpg'), 'image/jpeg')), at = out.indexOf('Exif\0\0');
     expect(at).toBeGreaterThan(0);
     expect(exifOrientation(new Uint8Array(Buffer.from(out.slice(at + 6), 'latin1')))).toBe(6);
-    const segment = (out.charCodeAt(at - 2) << 8) | out.charCodeAt(at - 1);              // the length written in front of the EXIF block
+    const segment = (out.charCodeAt(at - 2) << 8) | out.charCodeAt(at - 1);  // The length written in front of the EXIF block
     expect(segment, 'the EXIF block holds only the orientation').toBeLessThanOrEqual(40);
   });
   test('a photo with GPS but no rotation flag ends with no EXIF block at all', () => {
@@ -110,9 +110,9 @@ test.describe('sniffBinary: the first bytes decide', () => {
   });
   test('look-alikes are NOT accepted', () => {
     const e = (s: string) => new TextEncoder().encode(s);
-    expect(sniffBinary(e('GIF<script>alert(1)</script>'))).toBeNull();                       // "GIF" alone is not a GIF
+    expect(sniffBinary(e('GIF<script>alert(1)</script>'))).toBeNull();  // "GIF" alone is not a GIF
     expect(sniffBinary(e('GIF90a\x01\0\x01\0'))).toBeNull();
-    const noIhdr = png.slice(); noIhdr.set(e('XXXX'), 12); expect(sniffBinary(noIhdr)).toBeNull();     // PNG signature but no header chunk
+    const noIhdr = png.slice(); noIhdr.set(e('XXXX'), 12); expect(sniffBinary(noIhdr)).toBeNull();  // PNG signature but no header chunk
     expect(sniffBinary(e('<html><script>alert(1)</script></html>'))).toBeNull(); expect(sniffBinary(e('MZ\x90\0\x03\0\0\0'))).toBeNull(); expect(sniffBinary(e('PK\x03\x04'))).toBeNull();
     expect(sniffBinary(new Uint8Array(0))).toBeNull(); expect(sniffBinary(new Uint8Array(8))).toBeNull();
   });

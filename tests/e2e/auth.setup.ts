@@ -2,8 +2,8 @@ import { test as setup, expect } from '@playwright/test';
 import { ADMIN_EMAIL, ADMIN_PASSWORD, AUTH_FILE, freshIp } from './helpers';
 import { SETUP_TOKEN } from '../../playwright.config';
 
-// Creates the single admin account through the real "Set up your site" form (or signs in if the server was reused), then
-// saves the session so the other tests can start signed in.
+// Creates the single admin account through the real "Set up your site" form (or signs in if the server
+// was reused), then saves the session so the other tests can start signed in.
 setup('create admin and save session', async ({ page }) => {
   await page.setExtraHTTPHeaders({ 'cf-connecting-ip': freshIp() });
   await page.goto('/auth');

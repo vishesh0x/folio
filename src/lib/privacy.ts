@@ -1,6 +1,10 @@
-// The default privacy notice. It is plain-language text that states what this site really does (each claim here has a test that checks the site
-// still behaves that way: tests/e2e/quality/privacy.spec.ts). The owner can replace it in Settings. It is a starting point, not legal advice: the
-// owner should read it once and make sure it is true for their own set-up (for example if Cloudflare Web Analytics is switched off).
+/**
+ * The default privacy notice. It is plain-language text that states what this site really does (each
+ * claim here has a test that checks the site still behaves that way:
+ * tests/e2e/quality/privacy.spec.ts). The owner can replace it in Settings. It is a starting point,
+ * not legal advice: the owner should read it once and make sure it is true for their own set-up (for
+ * example if Cloudflare Web Analytics is switched off).
+ */
 export function defaultPrivacyMd(name: string): string {
   return `This website belongs to ${name}, an individual. This page explains what happens to your information when you visit it. If anything is unclear, or you want to ask about your data, use the contact form on this site.
 

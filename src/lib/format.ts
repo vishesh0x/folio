@@ -1,4 +1,10 @@
+/**
+ * Display formatters for file sizes and relative times.
+ */
+
+/** Formats a size in bytes for display (B, KB, MB or GB). */
 export const bytes = (n: number) => (n >= 1073741824 ? (n / 1073741824).toFixed(2) + ' GB' : n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(n ? 1 : 0, Math.round(n / 1024)) + ' KB');
+/** Formats a Unix timestamp as a short relative time such as "5 minutes ago". */
 export function ago(ts: number, now = Math.floor(Date.now() / 1000)): string {
   const s = Math.max(0, now - ts);
   if (s < 60) return 'just now';

@@ -6,13 +6,14 @@ import { signIn, OWNER } from './counting';
 import { d1, d1File } from '../d1';
 import { scaleSql, scaleClear, scaleFile } from '../../tools/seed-scale.mjs';
 
-// Step 5 (follow-up): the Files page shows 48 files at a time. Filter, search and page live in the address (so they work without JavaScript, can be
-// reloaded and shared), and the cost of the page no longer grows with the size of the library.
+// The Files page shows 48 files at a time. Filter, search and page live in the address (so they work
+// without JavaScript, can be reloaded and shared), and the cost of the page no longer grows with the
+// size of the library.
 test.describe.configure({ mode: 'serial' });
 const N = 130, PDFS = 5, PER = 48;
 let owner: any, base: string;
 let B = { all: 0, image: 0, pdf: 0 };
-const total = () => N + PDFS + B.all, pages = () => Math.ceil(total() / PER);      // files already on the server before this test adds its own
+const total = () => N + PDFS + B.all, pages = () => Math.ceil(total() / PER);  // Files already on the server before this test adds its own
 
 const names = (html: string) => [...html.matchAll(/<p class="file-name" title="([^"]*)"/g)].map((m) => m[1]);
 const get = async (qs = '') => { const r = await owner.get(`/dashboard/assets${qs}`); expect(r.status()).toBe(200); return r.text() as Promise<string>; };
@@ -72,10 +73,10 @@ test('the filter buttons count the whole library and each shows only its kind', 
 test('search finds files by name or description, ignoring capitals, and the page links keep the search', async () => {
   expect(names(await get('?q=photo-12')).sort()).toEqual(['Photo-12.jpg', ...Array.from({ length: 10 }, (_, i) => `Photo-12${i}.jpg`)].sort());
   expect(names(await get('?q=PHOTO-12'))).toHaveLength(11);
-  expect(names(await get('?q=HARBOUR'))).toEqual([scaleFile(42)]);               // found through its description
+  expect(names(await get('?q=HARBOUR'))).toEqual([scaleFile(42)]);  // Found through its description
   const h = await get('?q=photo&type=image');
   expect(h).toMatch(/href="\/dashboard\/assets\?type=image&amp;q=photo&amp;page=2"/);
-  expect(h).toContain('value="photo"');                                           // the box keeps what was typed
+  expect(h).toContain('value="photo"');  // The box keeps what was typed
 });
 
 test('nothing matching says so; hostile or odd search text is just text', async () => {
@@ -109,7 +110,7 @@ test('in a real browser: Older, Images, search and Clear work with the mouse and
   await expect(page).toHaveURL(/type=image$/); await expect(page.locator('li.file')).toHaveCount(PER);
   await page.getByRole('searchbox', { name: 'Search files' }).fill('photo-7'); await page.keyboard.press('Enter');
   await expect(page).toHaveURL(/type=image&q=photo-7/);
-  await expect(page.locator('li.file')).toHaveCount(11);       // Photo-7, Photo-70..79
+  await expect(page.locator('li.file')).toHaveCount(11);  // Photo-7, Photo-70..79
   await page.getByRole('link', { name: 'Clear' }).click();
   await expect(page).toHaveURL(/type=image$/);
   await ctx.close();

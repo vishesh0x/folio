@@ -1,7 +1,8 @@
 import { test, expect } from '@playwright/test';
 import { cspDirective, header, openPage } from '../helpers';
 
-// Lighthouse findings: render-blocking CSS, the font request chain, and the Cloudflare analytics beacon blocked by the CSP.
+// Lighthouse findings: render-blocking CSS, the font request chain, and the Cloudflare analytics
+// beacon blocked by the CSP.
 const anon = { cookies: [], origins: [] };
 test.use({ storageState: anon });
 const PUBLIC = ['/', '/projects', '/projects/wanderhost-booking', '/projects/pocket-ledger', '/now', '/resume', '/contact', '/no-such-page'];
@@ -30,7 +31,7 @@ test.describe('fonts', () => {
   });
   test('the code font is preloaded only on pages that show code', async ({ request }) => {
     const code = /rel="preload" href="\/_astro\/jetbrains-mono-latin-wght-normal\.[\w-]+\.woff2"/;
-    expect(await (await request.get('/projects/wanderhost-booking')).text()).toMatch(code);   // has a code block
+    expect(await (await request.get('/projects/wanderhost-booking')).text()).toMatch(code);  // Has a code block
     for (const path of ['/projects/pocket-ledger', '/', '/projects', '/now']) expect(await (await request.get(path)).text(), path).not.toMatch(code);
   });
   test('preloaded fonts exist and are served as long-lived font files', async ({ request }) => {

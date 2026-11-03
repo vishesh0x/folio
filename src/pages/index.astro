@@ -1,4 +1,7 @@
 ---
+/**
+ * Home page: introduction, highlights and featured projects.
+ */
 import { env } from 'cloudflare:workers';
 import Base from '../layouts/Base.astro';
 import Img from '../components/Img.astro';
@@ -15,7 +18,8 @@ const portrait = await loadAsset(s.portrait_asset ?? undefined);
 let work = await listPublished({ featured: true, limit: 3 });
 if (work.length === 0) work = await listPublished({ limit: 3 });
 
-// No try/catch: a failed query must fail the page (503), not produce a home page without this block that then gets cached.
+// No try/catch: a failed query must fail the page (503), not produce a home page without this block
+// that then gets cached.
 const now = (await env.DB.prepare(`SELECT i.title, c.name AS category FROM now_items i JOIN now_categories c ON c.id = i.category_id
   WHERE i.status = 'current' ORDER BY i.sort_order, i.id LIMIT 4`).all<{ title: string; category: string }>()).results;
 

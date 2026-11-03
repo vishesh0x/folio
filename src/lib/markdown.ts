@@ -3,12 +3,13 @@
 // Supported: headings (with anchors + table of contents), GFM tables / task lists / strikethrough,
 // fenced code with syntax highlighting, ==highlights==, %%comments%%, YAML front matter (ignored),
 // callouts (> [!note] Title), [[wiki links]] to other projects, ![[image embeds]] of uploaded assets.
-// ```mermaid fences become diagrams, drawn in the browser (src/scripts/diagrams.ts); their source stays in the page as text.
-// Not supported: footnotes, math, transclusion of other notes, external images (see below).
+// ```mermaid fences become diagrams, drawn in the browser (src/scripts/diagrams.ts); their source
+// stays in the page as text. Not supported: footnotes, math, transclusion of other notes, external
+// images (see below).
 //
 // Safety: raw HTML in the source is shown as text, never run. Links must be http(s), mailto, or
-// on-site. Images must be uploaded assets (the site's CSP blocks third-party images anyway), so
-// an external image becomes a plain link instead.
+// on-site. Images must be uploaded assets (the site's CSP blocks third-party images anyway), so an
+// external image becomes a plain link instead.
 import { env } from 'cloudflare:workers';
 import { Marked, Lexer, type Token, type Tokens, type TokenizerAndRendererExtension } from 'marked';
 import hljs from 'highlight.js/lib/core';
@@ -30,7 +31,9 @@ import { assetRefs, ASSET_ID as ID } from './asset-refs';
 for (const [n, l] of Object.entries({ javascript, typescript, python, bash, json, css, xml, sql, rust, go, yaml, diff })) hljs.registerLanguage(n, l);
 const ALIAS: Record<string, string> = { js: 'javascript', ts: 'typescript', py: 'python', sh: 'bash', shell: 'bash', zsh: 'bash', html: 'xml', svg: 'xml', yml: 'yaml', jsx: 'javascript', tsx: 'typescript' };
 
+/** One heading in a table of contents. */
 export type TocItem = { depth: number; text: string; id: string };
+/** Rendered HTML and its table of contents. */
 export type Rendered = { html: string; toc: TocItem[] };
 
 const slugify = (s: string) => s.toLowerCase().normalize('NFKD').replace(/[^\w\s-]/g, '').trim().replace(/[\s_]+/g, '-').replace(/-+/g, '-') || 'section';
@@ -47,7 +50,7 @@ function prepare(md: string): string {
 type Ctx = { assets: Map<string, ImgAsset>; byName: Map<string, ImgAsset>; slugs: Map<string, string> };
 
 async function buildContext(md: string): Promise<Ctx> {
-  const { ids, names } = assetRefs(md);      // the same rule the Files page uses to decide what is "in use"
+  const { ids, names } = assetRefs(md);  // The same rule the Files page uses to decide what is "in use"
   const targets = new Set<string>();
   for (const m of md.matchAll(/(?<!!)\[\[([^\]|#]+)/g)) targets.add(m[1].trim());
 
@@ -61,7 +64,7 @@ async function buildContext(md: string): Promise<Ctx> {
   if (names.size) {
     const list = [...names].slice(0, 50).map((n) => n.toLowerCase());
     const r = await env.DB.prepare(`SELECT ${cols} FROM assets WHERE lower(filename) IN (${list.map(() => '?').join(',')}) ORDER BY created_at ASC, rowid ASC`).bind(...list).all<ImgAsset>();
-    r.results.forEach((a) => byName.set(a.filename.toLowerCase(), a)); // newest wins
+    r.results.forEach((a) => byName.set(a.filename.toLowerCase(), a));  // Newest wins
   }
   if (targets.size) {
     const r = await env.DB.prepare("SELECT slug, title FROM projects WHERE status = 'published'").all<{ slug: string; title: string }>();
@@ -73,13 +76,18 @@ async function buildContext(md: string): Promise<Ctx> {
 const safeHref = (h: string) => /^(https?:\/\/|mailto:|\/(?!\/)|#)/i.test(h.trim()) ? h.trim() : null;
 const CONTENT_SIZES = '(min-width: 48rem) 40rem, 100vw';
 
+/**
+ * Renders Markdown to safe HTML. Raw HTML is escaped, links are restricted to safe schemes and
+ * images must be uploaded files.
+ */
 export async function renderMarkdown(source: string): Promise<Rendered> {
   const md = prepare(source);
   const ctx = await buildContext(md);
   const toc: TocItem[] = [];
   const used = new Map<string, number>();
-  // The page title is the h1. Body headings are levelled relative to the shallowest one in the text (so a note that starts at
-  // `##` still begins at h2), and no heading may skip a level below its predecessor (screen-reader users navigate by level).
+  // The page title is the h1. Body headings are levelled relative to the shallowest one in the text (so
+  // a note that starts at `##` still begins at h2), and no heading may skip a level below its
+  // predecessor (screen-reader users navigate by level).
   let minDepth = 6;
   const scan = (tokens: Token[]) => { for (const t of tokens) { if (t.type === 'heading') minDepth = Math.min(minDepth, (t as Tokens.Heading).depth); } };
   scan(new Lexer({ gfm: true }).lex(md));
@@ -127,7 +135,7 @@ export async function renderMarkdown(source: string): Promise<Rendered> {
     gfm: true,
     extensions: [wikiEmbed, wikiLink, highlight],
     renderer: {
-      html: (t: Tokens.HTML | Tokens.Tag) => esc(t.text), // raw HTML is shown as text
+      html: (t: Tokens.HTML | Tokens.Tag) => esc(t.text),  // Raw HTML is shown as text
       // Task-list boxes have no label text of their own, so give each one a spoken name.
       checkbox: (t: Tokens.Checkbox) => `<input type="checkbox" disabled${t.checked ? ' checked' : ''} aria-label="${t.checked ? 'Completed' : 'Not completed'}"> `,
       heading(t: Tokens.Heading) {
@@ -154,8 +162,9 @@ export async function renderMarkdown(source: string): Promise<Rendered> {
       },
       code(t: Tokens.Code) {
         const raw = (t.lang ?? '').trim().split(/\s/)[0].toLowerCase();
-        // The diagram source is escaped text inside a normal code block: it is the fallback shown without JavaScript, while the
-        // diagram loads, and when it has a mistake. src/scripts/diagrams.ts replaces it with the drawing.
+        // The diagram source is escaped text inside a normal code block: it is the fallback shown without
+        // JavaScript, while the diagram loads, and when it has a mistake. src/scripts/diagrams.ts replaces it
+        // with the drawing.
         if (raw === 'mermaid') return `<figure class="diagram" data-diagram><pre class="code" data-lang="mermaid" tabindex="0"><code>${esc(t.text)}</code></pre></figure>\n`;
         const lang = ALIAS[raw] ?? raw;
         const body = lang && hljs.getLanguage(lang) ? hljs.highlight(t.text, { language: lang, ignoreIllegals: true }).value : esc(t.text);

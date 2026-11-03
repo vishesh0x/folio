@@ -4,9 +4,11 @@ import { AUTH_FILE, sameOrigin } from '../helpers';
 import { upload, removeAsset } from '../uploads';
 import { d1 } from '../d1';
 
-// Step 5: the Files page decides which pictures are "in use" (and so cannot be deleted) by reading the text of every project. It must agree
-// with what the page renderer really shows: if a project displays a picture, deleting that picture must be refused. The renderer finds a
-// picture in three ways: /media/<id>/ anywhere, ![[<id>]], and ![[file name]] (ignoring capital letters and spaces around the name).
+// The Files page decides which pictures are "in use" (and so cannot be deleted) by reading the text of
+// every project. It must agree with what the page renderer really shows: if a project displays a
+// picture, deleting that picture must be refused. The renderer finds a picture in three ways:
+// /media/<id>/ anywhere, ![[<id>]], and ![[file name]] (ignoring capital letters and spaces around the
+// name).
 test.use({ storageState: AUTH_FILE });
 const png = readFileSync('tests/fixtures/plain.png');
 let n = 0;

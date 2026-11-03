@@ -1,6 +1,7 @@
 {
-	// TEST-ONLY configuration (server E in playwright.config.ts). It runs the BUILT site through entry.mjs, which counts calls to Cloudflare services.
-	// Never deployed: `npm run deploy` uses the root wrangler.jsonc.
+	// TEST-ONLY configuration (server E in playwright.config.ts). It runs the BUILT site through
+	// entry.mjs, which counts calls to Cloudflare services. Never deployed: `npm run deploy` uses the root
+	// wrangler.jsonc.
 	"name": "folio-counting",
 	"main": "entry.mjs",
 	"compatibility_date": "2026-09-01",

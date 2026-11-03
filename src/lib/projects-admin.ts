@@ -1,14 +1,23 @@
+/**
+ * Owner-side project operations: listing, input limits, slugs, creation, duplication and Markdown
+ * export.
+ */
+
 import { env } from 'cloudflare:workers';
 
+/** A project row as the owner sees it, including drafts. */
 export type AdminProject = {
   id: number; slug: string; title: string; summary: string; body_md: string; tags: string[];
   cover_asset: string | null; cover_alt: string; live_url: string; source_url: string;
   status: 'draft' | 'published'; featured: number; sort_order: number;
   seo_title: string; seo_desc: string; seo_image: string | null; created_at: number; updated_at: number;
 };
+/** The editable fields of a project. */
 export type ProjectInput = Omit<AdminProject, 'id' | 'sort_order' | 'created_at' | 'updated_at'>;
+/** Maximum lengths and counts for project fields. */
 export const LIMITS = { title: 120, summary: 300, body: 200_000, tag: 30, tags: 12, seoTitle: 120, seoDesc: 300, url: 500 };
 
+/** Turns a title into a URL slug of lowercase letters, digits and hyphens. */
 export const slugify = (s: string) =>
   s.toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 80);
 
@@ -17,11 +26,14 @@ function hydrate(r: any): AdminProject {
   return { ...r, tags, cover_alt: r.cover_alt ?? '', live_url: r.live_url ?? '', source_url: r.source_url ?? '', seo_title: r.seo_title ?? '', seo_desc: r.seo_desc ?? '' };
 }
 
+/** Lists projects for the dashboard, optionally only published or only drafts. */
 export async function listAll(filter: 'all' | 'published' | 'draft' = 'all'): Promise<AdminProject[]> {
-  // `filter` is bound as a parameter (never spliced into the SQL), so no value of it can change the statement
+  // `filter` is bound as a parameter (never spliced into the SQL), so no value of it can change the
+  // statement.
   const rows = (await env.DB.prepare(`SELECT * FROM projects WHERE (?1 = 'all' OR status = ?1) ORDER BY sort_order ASC, created_at DESC, id DESC`).bind(filter).all()).results;
   return rows.map(hydrate);
 }
+/** Loads one project by id, or null. */
 export async function getById(id: number): Promise<AdminProject | null> {
   const r = await env.DB.prepare('SELECT * FROM projects WHERE id = ?').bind(id).first();
   return r ? hydrate(r) : null;
@@ -70,9 +82,11 @@ export function parseForm(f: FormData, validImages: Set<string>, validOg: Set<st
   return { input, errors };
 }
 
+/** True when another project already uses the slug. */
 export async function slugTaken(slug: string, exceptId = 0) {
   return !!(await env.DB.prepare('SELECT 1 AS x FROM projects WHERE slug = ? AND id <> ?').bind(slug, exceptId).first());
 }
+/** Returns the slug, with a numeric suffix when needed to make it unique. */
 export async function uniqueSlug(base: string) {
   let s = base || 'project', n = 2;
   while (await slugTaken(s)) s = `${base}-${n++}`;
@@ -81,9 +95,11 @@ export async function uniqueSlug(base: string) {
 
 const cols = (p: ProjectInput) => [p.slug, p.title, p.summary, p.body_md, JSON.stringify(p.tags), p.cover_asset, p.cover_alt, p.live_url || null, p.source_url || null, p.status, p.featured, p.seo_title || null, p.seo_desc || null, p.seo_image];
 
+/** Creates a project and returns its id. */
 export async function createProject(p: ProjectInput): Promise<number> {
-  // "Is this slug free?" and "insert it" are two steps, so two requests at the same moment (a double-click on New project) can both
-  // pick the same slug. The UNIQUE rule in the database correctly refuses the second; it retries with the next free slug.
+  // "Is this slug free?" and "insert it" are two steps, so two requests at the same moment (a
+  // double-click on New project) can both pick the same slug. The UNIQUE rule in the database correctly
+  // refuses the second; it retries with the next free slug.
   let input = p;
   for (let attempt = 0; ; attempt++) {
     try {
@@ -94,13 +110,16 @@ export async function createProject(p: ProjectInput): Promise<number> {
     } catch (e) {
       if (!String(e).includes('UNIQUE') || attempt >= 8) throw e;
       const base = p.slug.replace(/-\d+$/, '') || 'project';
-      // after a few clashes add a random part, so a burst of requests cannot keep colliding
+      // After a few clashes add a random part, so a burst of requests cannot keep colliding.
       input = { ...p, slug: attempt < 3 ? await uniqueSlug(base) : `${base}-${crypto.randomUUID().slice(0, 6)}` };
     }
   }
 }
 
-/** Saves only if nobody changed the project since the editor loaded it (prevents silent overwrites from a second tab). */
+/**
+ * Saves only if nobody changed the project since the editor loaded it (prevents silent overwrites from
+ * a second tab).
+ */
 export async function updateProject(id: number, p: ProjectInput, loadedAt: number): Promise<'ok' | 'conflict' | 'slug-taken'> {
   try {
     const r = await env.DB.prepare(
@@ -113,10 +132,14 @@ export async function updateProject(id: number, p: ProjectInput, loadedAt: numbe
   }
 }
 
+/** Deletes a project. */
 export const deleteProject = (id: number) => env.DB.prepare('DELETE FROM projects WHERE id = ?').bind(id).run();
+/** Publishes a project or turns it back into a draft. */
 export const setStatus = (id: number, s: 'draft' | 'published') => env.DB.prepare('UPDATE projects SET status = ?, updated_at = unixepoch() WHERE id = ?').bind(s, id).run();
+/** Features or unfeatures a project. */
 export const setFeatured = (id: number, on: boolean) => env.DB.prepare('UPDATE projects SET featured = ?, updated_at = unixepoch() WHERE id = ?').bind(on ? 1 : 0, id).run();
 
+/** Copies a project as a new draft and returns its id, or null when the source is gone. */
 export async function duplicateProject(id: number): Promise<number | null> {
   const p = await getById(id);
   if (!p) return null;
@@ -124,7 +147,10 @@ export async function duplicateProject(id: number): Promise<number | null> {
   return createProject({ ...p, title, slug: await uniqueSlug(slugify(title)), status: 'draft', featured: 0 });
 }
 
-/** Moves a project one place in the public order, then renumbers everything 0..n so order is always unambiguous. */
+/**
+ * Moves a project one place in the public order, then renumbers everything 0..n so order is always
+ * unambiguous.
+ */
 export async function move(id: number, dir: 'up' | 'down') {
   const all = await listAll('all');
   const i = all.findIndex((p) => p.id === id), j = dir === 'up' ? i - 1 : i + 1;
@@ -133,6 +159,7 @@ export async function move(id: number, dir: 'up' | 'down') {
   await env.DB.batch(all.map((p, n) => env.DB.prepare('UPDATE projects SET sort_order = ? WHERE id = ?').bind(n, p.id)));
 }
 
+/** Renders a project as a Markdown file with front matter, for download. */
 export function toMarkdownFile(p: AdminProject): string {
   const q = (s: string) => JSON.stringify(s);
   const fm = ['---', `title: ${q(p.title)}`, `summary: ${q(p.summary)}`, `tags: [${p.tags.map(q).join(', ')}]`,

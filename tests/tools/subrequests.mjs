@@ -1,7 +1,9 @@
-// Prints how many calls to Cloudflare services (database, storage, cache, images, outgoing fetch) each route makes per request.
-// Needs the counting server: it is "server E" of the Playwright setup (port 8791). Start it with:  npx playwright test --project=limits --list
-// (any run of the limits project starts it), or by hand as in tests/tools/counting/entry.mjs.   Usage:  node tests/tools/subrequests.mjs [baseUrl]
-// The free Workers plan allows 50 calls per request in total; the "total" column is what to compare.
+// Prints how many calls to Cloudflare services (database, storage, cache, images, outgoing fetch) each
+// route makes per request. Needs the counting server: it is "server E" of the Playwright setup (port
+// 8791). Start it with:  npx playwright test --project=limits --list (any run of the limits project
+// starts it), or by hand as in tests/tools/counting/entry.mjs.   Usage:  node
+// tests/tools/subrequests.mjs [baseUrl] The free Workers plan allows 50 calls per request in total;
+// the "total" column is what to compare.
 const BASE = process.argv[2] ?? 'http://localhost:8791';
 const TOKEN = 'e2e-setup-token-0123456789abcdef', EMAIL = 'tool@example.com', PW = 'correct horse battery staple 42';
 let n = 0, cookie = '';
@@ -10,7 +12,7 @@ const same = { 'sec-fetch-site': 'same-origin', origin: BASE };
 const send = async (method, path, { form, headers = {} } = {}) => {
   const id = `c${Date.now()}-${n++}`;
   let res, body;
-  for (let attempt = 0; ; attempt++) {                  // wrangler dev's local proxy sometimes drops a connection (a test-harness flake, not a site fault): retry
+  for (let attempt = 0; ; attempt++) {  // wrangler dev's local proxy sometimes drops a connection (a test-harness flake, not a site fault): retry
     try {
       res = await fetch(BASE + path, { method, redirect: 'manual', headers: { connection: 'close', 'x-count-id': id, 'cf-connecting-ip': ip(), cookie, ...(method === 'POST' ? same : {}), ...headers }, body: form ? new URLSearchParams(form) : undefined });
       body = await res.arrayBuffer(); break;

@@ -1,8 +1,9 @@
 /**
- * Is this error "the database is unavailable or failing" (as opposed to a bug, or a rule like UNIQUE doing its job)?
- * D1 errors are Errors whose message starts with D1_ERROR / D1_EXEC_ERROR / D1_TYPE_ERROR, or mention SQLITE_*; typical outage
- * messages: "Network connection lost", "D1 DB is overloaded", "D1 DB reset", "no such table" (database not migrated yet).
- * Constraint violations are the database working correctly, so they are NOT an outage.
+ * Is this error "the database is unavailable or failing" (as opposed to a bug, or a rule like UNIQUE
+ * doing its job)? D1 errors are Errors whose message starts with D1_ERROR / D1_EXEC_ERROR /
+ * D1_TYPE_ERROR, or mention SQLITE_*; typical outage messages: "Network connection lost", "D1 DB is
+ * overloaded", "D1 DB reset", "no such table" (database not migrated yet). Constraint violations are
+ * the database working correctly, so they are NOT an outage.
  */
 export function isDbUnavailable(e: unknown): boolean {
   const m = String((e as { message?: string })?.message ?? e);
@@ -10,7 +11,10 @@ export function isDbUnavailable(e: unknown): boolean {
   return /\bD1_[A-Z_]*ERROR\b|D1 DB\b|SQLITE_[A-Z]+|no such table|Network connection lost.*D1|D1.*Network connection lost/i.test(m);
 }
 
-/** A page that needs nothing from the database (it cannot fail the same way), for use while the database is unreachable. */
+/**
+ * A page that needs nothing from the database (it cannot fail the same way), for use while the
+ * database is unreachable.
+ */
 export function unavailablePage(): string {
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex"><title>Back in a moment</title>
 <style>:root{color-scheme:light dark}body{margin:0;min-height:100vh;display:grid;place-items:center;font:16px/1.6 ui-monospace,Menlo,Consolas,monospace;background:Canvas;color:CanvasText}

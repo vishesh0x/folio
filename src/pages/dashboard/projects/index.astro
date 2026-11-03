@@ -1,4 +1,7 @@
 ---
+/**
+ * Dashboard: project list.
+ */
 import Dash from '../../../layouts/Dash.astro';
 import PageHead from '../../../components/PageHead.astro';
 import { listAll } from '../../../lib/projects-admin';
@@ -10,7 +13,7 @@ const all = await listAll('all');
 const rows = filter === 'all' ? all : all.filter((p) => p.status === filter);
 const counts = { all: all.length, published: all.filter((p) => p.status === 'published').length, draft: all.filter((p) => p.status === 'draft').length };
 const deleted = Astro.url.searchParams.get('deleted');
-const thumb = (id: string | null) => (id ? `/media/${id}/cover?w=160&f=webp` : null); // only the id matters to the media route
+const thumb = (id: string | null) => (id ? `/media/${id}/cover?w=160&f=webp` : null);  // Only the id matters to the media route
 const dots = '<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>';
 ---
 <Dash title="Projects">

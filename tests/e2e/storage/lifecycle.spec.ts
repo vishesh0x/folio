@@ -4,8 +4,9 @@ import { AUTH_FILE, header, sameOrigin } from '../helpers';
 import { upload, removeAsset } from '../uploads';
 import { d1, r2Put, r2Has } from '../d1';
 
-// Step 4: files that are in storage but not on the Files list ("stray") cost space and are public to anyone with the address; entries whose
-// file is missing ("broken") show empty pictures. The Storage check on the Files page finds both, and removes strays only.
+// Files that are in storage but not on the Files list ("stray") cost space and are public to anyone
+// with the address; entries whose file is missing ("broken") show empty pictures. The Storage check on
+// the Files page finds both, and removes strays only.
 test.describe.configure({ mode: 'serial' });
 test.use({ storageState: AUTH_FILE });
 const plain = readFileSync('tests/fixtures/plain.png');
@@ -70,7 +71,7 @@ test('refused uploads leave nothing behind in storage', async ({ playwright, bas
 });
 
 test('the storage API is for the signed-in owner only, and tolerates odd input', async ({ playwright, baseURL }) => {
-  const request = await playwright.request.newContext({ baseURL, storageState: { cookies: [], origins: [] } });   // no session
+  const request = await playwright.request.newContext({ baseURL, storageState: { cookies: [], origins: [] } });  // No session
   expect((await request.post('/api/admin/assets/storage', { form: { action: 'check' }, headers: sameOrigin(baseURL!), maxRedirects: 0 })).status()).toBe(401);
   const a = withRetry(await playwright.request.newContext({ baseURL, storageState: AUTH_FILE }));
   await request.dispose();
@@ -88,7 +89,8 @@ test('the Files page offers the check, and shows its answer', async ({ page }) =
 });
 
 test.describe('pictures uploaded BEFORE uploads were cleaned automatically', () => {
-  // Simulated the way it really happened: the file went into storage as the phone made it (location and all) with a database entry.
+  // Simulated the way it really happened: the file went into storage as the phone made it (location and
+  // all) with a database entry.
   const LEGACY = [['legacy00001', 'photo-gps.jpg', 'image/jpeg'], ['legacy00002', 'photo-meta.png', 'image/png'], ['legacy00003', 'photo-meta.webp', 'image/webp'], ['legacy00004', 'plain.png', 'image/png']] as const;
   const SECRETS = ['SecretCamera', 'SECRET-COMMENT', 'SECRET-XMP', 'SECRET-PERSON', 'SECRET-ITXT', 'SERIAL-1234'];
   const scrubAll = async (a: any, baseURL: string) => {
@@ -100,7 +102,7 @@ test.describe('pictures uploaded BEFORE uploads were cleaned automatically', () 
     return total;
   };
   test('the Files page clean-up removes the data from old files, and only from files that have some', async ({ playwright, baseURL }) => {
-    test.setTimeout(120_000);                       // sets up four files through the wrangler command line, about 3 s each
+    test.setTimeout(120_000);  // Sets up four files through the wrangler command line, about 3 s each
     const a = withRetry(await playwright.request.newContext({ baseURL, storageState: AUTH_FILE })), visitor = withRetry(await playwright.request.newContext({ baseURL, storageState: { cookies: [], origins: [] } }));
     const sizes: Record<string, number> = {};
     for (const [id, file, mime] of LEGACY) {
@@ -110,14 +112,14 @@ test.describe('pictures uploaded BEFORE uploads were cleaned automatically', () 
     }
     try {
       const body = async (id: string, file: string) => Buffer.from(await (await visitor.get(`/media/${id}/${file}`)).body());
-      for (const [id, file] of LEGACY.slice(0, 3)) {                                       // the problem, demonstrated (and now cached, as it would be on a real site)
+      for (const [id, file] of LEGACY.slice(0, 3)) {  // The problem, demonstrated (and now cached, as it would be on a real site)
         const b = await body(id, file); await body(id, file);
         expect(SECRETS.filter((s) => b.toString('latin1').includes(s)).length, `${file} should still carry data before the clean-up`).toBeGreaterThan(0);
       }
       const first = await scrubAll(a, baseURL!);
       expect(first.failed).toBe(0); expect(first.cleaned, 'the three files with data').toBe(3); expect(first.bytesSaved).toBeGreaterThan(300);
       for (const [id, file] of LEGACY.slice(0, 3)) {
-        const b = await body(id, file);                                                    // straight after: the cached old copy must be gone too
+        const b = await body(id, file);  // Straight after: the cached old copy must be gone too
         expect(SECRETS.filter((s) => b.toString('latin1').includes(s)), `${file} still carries data after the clean-up`).toEqual([]);
         expect(b.length).toBeLessThan(sizes[id]);
         expect(d1('e2e-a', `SELECT size FROM assets WHERE id = '${id}'`)[0].size, 'the recorded size follows the file').toBe(b.length);

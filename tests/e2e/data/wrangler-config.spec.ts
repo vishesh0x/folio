@@ -4,15 +4,16 @@ import { join } from 'node:path';
 import { createRequire } from 'node:module';
 import { execFileSync } from 'node:child_process';
 
-// Step 5: the deployment configuration (wrangler.jsonc). These read files only; no server is involved.
-const { parse } = createRequire(import.meta.url)('jsonc-parser') as { parse: (s: string) => any };   // wrangler's own comment-tolerant JSON reader
+// The deployment configuration (wrangler.jsonc). These read files only; no server is involved.
+const { parse } = createRequire(import.meta.url)('jsonc-parser') as { parse: (s: string) => any };  // Wrangler's own comment-tolerant JSON reader
 const cfg = parse(readFileSync('wrangler.jsonc', 'utf8'));
 const files = (dir: string): string[] => readdirSync(dir).flatMap((f) => { const p = join(dir, f); return statSync(p).isDirectory() ? files(p) : /\.(ts|astro|mjs)$/.test(f) ? [p] : []; });
 const BINDINGS = ['d1_databases', 'r2_buckets', 'images'] as const;
 const names = (c: any) => ({ d1: (c.d1_databases ?? []).map((x: any) => x.binding), r2: (c.r2_buckets ?? []).map((x: any) => x.binding), images: c.images ? [c.images.binding] : [] });
 
 test('the Worker is reachable only on the site\'s own domain: no workers.dev address, no per-version preview addresses', () => {
-  // Those addresses would skip the zone's firewall and rate-limit rules and serve a duplicate copy of the site.
+  // Those addresses would skip the zone's firewall and rate-limit rules and serve a duplicate copy of
+  // the site.
   expect(cfg.workers_dev).toBe(false);
   expect(cfg.preview_urls).toBe(false);
 });
@@ -20,7 +21,7 @@ test('the Worker is reachable only on the site\'s own domain: no workers.dev add
 test('every environment variable the code reads is declared in src/env.d.ts, and every binding it uses exists in wrangler.jsonc', () => {
   const declared = new Set([...readFileSync('src/env.d.ts', 'utf8').split('interface Env {')[1].split('}')[0].matchAll(/^\s*([A-Z_]+)\??:/gm)].map((m) => m[1]));
   const used = new Set<string>();
-  for (const f of files('src')) for (const m of readFileSync(f, 'utf8').matchAll(/\benv\.([A-Z][A-Z_]+)\b/g)) if (m[1] !== 'PROD') used.add(m[1]);   // env.PROD is Vite's own flag
+  for (const f of files('src')) for (const m of readFileSync(f, 'utf8').matchAll(/\benv\.([A-Z][A-Z_]+)\b/g)) if (m[1] !== 'PROD') used.add(m[1]);  // env.PROD is Vite's own flag
   expect([...used].filter((n) => !declared.has(n)), 'read in code but not declared in src/env.d.ts').toEqual([]);
   const bound = new Set([...names(cfg).d1, ...names(cfg).r2, ...names(cfg).images, ...Object.keys(cfg.vars ?? {})]);
   for (const b of ['DB', 'ASSETS_BUCKET', 'IMAGES']) expect(bound.has(b), `${b} must be bound in wrangler.jsonc`).toBe(true);
@@ -33,7 +34,8 @@ test('no secret is written in wrangler.jsonc: only the public Turnstile site key
 });
 
 test('there is no staging environment, and any environment added later must repeat every binding and share NO resource with production', () => {
-  // Bindings are not inherited: a missing one fails at run time; a copied one would let a rehearsal write to the live database.
+  // Bindings are not inherited: a missing one fails at run time; a copied one would let a rehearsal
+  // write to the live database.
   const envs = Object.entries<any>(cfg.env ?? {});
   // Deliberately none today. If one is added, delete the next line; the loop below then checks it.
   expect(envs.map(([n]) => n)).toEqual([]);
@@ -46,7 +48,8 @@ test('there is no staging environment, and any environment added later must repe
 });
 
 test('the build picks the environment named by CLOUDFLARE_ENV, so a normal build is always production', () => {
-  // dist/server/wrangler.json is what `wrangler deploy` reads after `astro build`. `--env` on deploy does not change it.
+  // dist/server/wrangler.json is what `wrangler deploy` reads after `astro build`. `--env` on deploy
+  // does not change it.
   const built = JSON.parse(readFileSync('dist/server/wrangler.json', 'utf8'));
   test.skip(built.name !== cfg.name, 'dist was built for another environment');
   expect(built.d1_databases[0].database_id).toBe(cfg.d1_databases[0].database_id);
@@ -62,6 +65,7 @@ test('what the server writes to its logs (Cloudflare keeps them) never includes 
 });
 
 test('the deploy script\'s own route check passes (npm run deploy runs it first and refuses to deploy otherwise)', () => {
-  // It once failed for a month on a page added in Step 4 that nobody had put on its list; nothing noticed because tests do not run `npm run deploy`.
+  // A page added without being listed once broke deployment unnoticed, because the tests do not run `npm
+  // run deploy`.
   expect(() => execFileSync('node', ['scripts/check-routes.mjs'], { encoding: 'utf8', stdio: 'pipe' })).not.toThrow();
 });

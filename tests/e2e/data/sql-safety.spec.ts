@@ -5,11 +5,13 @@ import { AUTH_FILE, freshIp, header, login, sameOrigin } from '../helpers';
 import { withRetry } from '../fixtures';
 import { d1 } from '../d1';
 
-// Step 3: SQL injection. Two layers: a STATIC check that nothing in src/ builds SQL from variable text except a short, reviewed list, and
-// DYNAMIC checks that throw hostile text at every input and verify nothing but the intended row changed.
+// SQL injection. Two layers: a STATIC check that nothing in src/ builds SQL from variable text except
+// a short, reviewed list, and DYNAMIC checks that throw hostile text at every input and verify nothing
+// but the intended row changed.
 const files = (dir: string): string[] => readdirSync(dir).flatMap((f) => { const p = join(dir, f); return statSync(p).isDirectory() ? files(p) : /\.(ts|astro)$/.test(f) ? [p] : []; });
 
-// Every `${...}` allowed inside a SQL string, with the reason it is safe. Adding a new one means adding it here, i.e. a conscious review.
+// Every `${...}` allowed inside a SQL string, with the reason it is safe. Adding a new one means
+// adding it here, i.e. a conscious review.
 const ALLOWED: Record<string, string> = {
   'where': 'src/lib/inbox.ts: one of two fixed strings chosen by code',
   'cols': 'src/lib/markdown.ts: a fixed column list',
@@ -76,7 +78,7 @@ test.describe('dynamic: hostile text in every input', () => {
     expect(after.hash, 'the admin password hash must be untouched').toBe(before.hash);
     expect(after.tables, 'no table may be dropped or attached').toBe(before.tables);
     const stored = d1('e2e-a', "SELECT subject FROM messages WHERE subject LIKE '%DROP TABLE messages%' LIMIT 1")[0];
-    expect(stored.subject).toContain("'); DROP TABLE messages;--");   // kept verbatim, as text
+    expect(stored.subject).toContain("'); DROP TABLE messages;--");  // Kept verbatim, as text
   });
 
   test('the inbox shows that text escaped (it cannot become markup)', async ({ playwright, baseURL }) => {

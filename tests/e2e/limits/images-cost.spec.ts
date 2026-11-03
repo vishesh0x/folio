@@ -4,9 +4,10 @@ import { counted, signIn } from './counting';
 import { upload } from '../uploads';
 import { r2Has } from '../d1';
 
-// Step 7: Cloudflare bills EVERY call to the Images binding as a transformation (5,000 a month free), and the page cache is per DATA CENTER with a
-// 7-day life. Each resized picture is therefore made once and kept in R2; another data center reads that copy instead of transforming again.
-// "x-count-other-colo" makes the counting server behave like a data center that has never seen the picture.
+// Cloudflare bills EVERY call to the Images binding as a transformation (5,000 a month free), and the
+// page cache is per DATA CENTER with a 7-day life. Each resized picture is therefore made once and
+// kept in R2; another data center reads that copy instead of transforming again. "x-count-other-colo"
+// makes the counting server behave like a data center that has never seen the picture.
 const png = readFileSync('tests/fixtures/plain.png');
 let owner: any, base: string;
 test.beforeAll(async ({ playwright, baseURL }) => {
@@ -60,7 +61,7 @@ test('when a resized picture cannot be made (allowance used up) the visitor stil
   expect(bad.res.headers()['cache-control'], 'short-lived, never immutable').toBe('public, max-age=60');
   expect(bad.res.headers()['x-degraded']).toBeUndefined();
   expect(r2Has('e2e-e', `variants/${id}/640-avif`), 'nothing is kept').toBe(false);
-  const good = await get(id, name, 'w=640&f=avif');                     // the problem has passed: the real thing replaces the stand-in at once
+  const good = await get(id, name, 'w=640&f=avif');  // The problem has passed: the real thing replaces the stand-in at once
   expect(good.counts.images).toBe(1);
   expect(good.res.headers()['content-type']).toBe('image/avif');
   expect(good.res.headers()['cache-control']).toBe('public, max-age=31536000, immutable');

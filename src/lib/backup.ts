@@ -1,9 +1,12 @@
-// Backup and restore of the site's content: what the dashboard's "Backup & restore" page uses (the page builds and reads the zip file in the
-// browser; the server only ever handles small JSON pieces, so no request comes near the Worker's CPU, memory or 50-call limits).
+// Backup and restore of the site's content: what the dashboard's "Backup & restore" page uses (the
+// page builds and reads the zip file in the browser; the server only ever handles small JSON pieces,
+// so no request comes near the Worker's CPU, memory or 50-call limits).
 //
-// What is NEVER exported or imported: the sign-in account (password hash), sessions, rate-limit counters, internal keys (content version, form secret).
-// Importing is the same trust level as the dashboard (owner only), but a backup file may be old, edited or tampered with, so every value is checked
-// with the SAME rules as the forms (limits, http(s)-only addresses, known sections and kinds); an item that fails is skipped and reported, never half-saved.
+// What is NEVER exported or imported: the sign-in account (password hash), sessions, rate-limit
+// counters, internal keys (content version, form secret). Importing is the same trust level as the
+// dashboard (owner only), but a backup file may be old, edited or tampered with, so every value is
+// checked with the SAME rules as the forms (limits, http(s)-only addresses, known sections and kinds);
+// an item that fails is skipped and reported, never half-saved.
 import { env } from 'cloudflare:workers';
 import { getSettings, saveSettings, cleanUrl, MAX_SOCIALS, SETTINGS_DEFAULTS, type SiteSettings } from './settings';
 import { LIMITS as PL, slugify } from './projects-admin';
@@ -12,26 +15,35 @@ import { KINDS, cleanEntryData, type Kind } from './resume';
 import { MAX_SECTIONS, MAX_ENTRIES } from './resume-admin';
 import { parseName, parseIcon, parseTitle, parseNote, MAX_CATEGORIES, MAX_ITEMS } from './now-admin';
 
+/** Identifier written into every backup manifest. */
 export const FORMAT = 'folio-backup';
+/** Backup format version. */
 export const VERSION = 1;
+/** Pages that carry search and sharing settings. */
 export const PAGES = ['home', 'projects', 'now', 'resume', 'contact'] as const;
 const PAGE = { projects: 10, assets: 200, messages: 200 };
 
 type Row = Record<string, any>;
+/** Outcome of importing one part of a backup. */
 export type Report = { ok: true; added: number; updated: number; skipped: number; problems: string[] };
 const report = (): Report => ({ ok: true, added: 0, updated: 0, skipped: 0, problems: [] });
 const isObj = (v: unknown): v is Row => !!v && typeof v === 'object' && !Array.isArray(v);
 const line = (v: unknown, max: number) => (typeof v === 'string' ? v.replace(/\s+/g, ' ').trim().slice(0, max) : '');
 const block = (v: unknown, max: number) => (typeof v === 'string' ? v.replace(/\r\n?/g, '\n').replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '').trim().slice(0, max) : '');
-/** Long text exactly as the form keeps it: line endings normalised, control characters dropped, NOT trimmed (a text may end with a newline). */
+/**
+ * Long text exactly as the form keeps it: line endings normalised, control characters dropped, NOT
+ * trimmed (a text may end with a newline).
+ */
 const longText = (v: unknown, max: number) => (typeof v === 'string' ? v.replace(/\r\n?/g, '\n').replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '').slice(0, max) : '');
-/** An address kept exactly as written when it is an acceptable http(s) address (cleanUrl alone would rewrite "https://x.com" as "https://x.com/"). */
+/**
+ * An address kept exactly as written when it is an acceptable http(s) address (cleanUrl alone would
+ * rewrite "https://x.com" as "https://x.com/").
+ */
 const keepUrl = (v: string, allowMail = false) => (v && cleanUrl(v, allowMail) ? v : cleanUrl(v, allowMail));
 const int = (v: unknown) => (Number.isInteger(v) && (v as number) >= 0 && (v as number) < 4_102_444_800 ? (v as number) : null);
 const flag = (v: unknown) => (v === 1 || v === true ? 1 : 0);
 
-/* ───────────────────────── export ───────────────────────── */
-
+// ── Export ──
 export async function summary() {
   const [p, a, m, rs, re, nc, ni] = await env.DB.batch<{ n: number }>([
     env.DB.prepare('SELECT count(*) AS n FROM projects'), env.DB.prepare('SELECT count(*) AS n FROM assets'), env.DB.prepare('SELECT count(*) AS n FROM messages'),
@@ -40,6 +52,10 @@ export async function summary() {
   return { projects: p.results[0].n, assets: a.results[0].n, messages: m.results[0].n, resume_sections: rs.results[0].n, resume_entries: re.results[0].n, now_categories: nc.results[0].n, now_items: ni.results[0].n };
 }
 
+/**
+ * Returns one named part of the site content (starting after the given row for paged parts), or
+ * null for an unknown part.
+ */
 export async function exportPart(part: string, after: number): Promise<Row | null> {
   switch (part) {
     case 'summary': return summary();
@@ -74,8 +90,7 @@ export async function exportPart(part: string, after: number): Promise<Row | nul
 }
 function safeJson(s: unknown, fallback: unknown) { try { return JSON.parse(String(s)); } catch { return fallback; } }
 
-/* ───────────────────────── import ───────────────────────── */
-
+// ── Import ──
 const assetIds = async () => new Map((await env.DB.prepare('SELECT id, mime FROM assets').all<{ id: string; mime: string }>()).results.map((a) => [a.id, a.mime]));
 
 /** The site settings and the per-page search settings (replaces what is there). */
@@ -84,7 +99,7 @@ export async function importSite(body: Row, dry: boolean): Promise<Report> {
   if (!isObj(raw)) { rep.ok = true; rep.problems.push('The backup has no site settings.'); rep.skipped++; return rep; }
   const t = (k: string, max: number) => line(raw[k], max);
   const base = SETTINGS_DEFAULTS;
-  const next: SiteSettings = { ...base, headline: t('headline', 160), availability: t('availability', 60), name: t('name', 80) || base.name, tagline: t('tagline', 140), bio: block(raw.bio, 1200), location: t('location', 80), email: t('email', 254), phone: t('phone', 30), now_intro: block(raw.now_intro, 400), meta_description: block(raw.meta_description, 300) || base.meta_description, privacy_md: longText(raw.privacy_md, 12000), contact_email: raw.contact_email !== false.trim(), site_url: '', highlights: [], socials: [], og_asset: null, portrait_asset: null, favicon_asset: null, resume_asset: null };
+  const next: SiteSettings = { ...base, headline: t('headline', 160), availability: t('availability', 60), name: t('name', 80) || base.name, tagline: t('tagline', 140), bio: block(raw.bio, 1200), location: t('location', 80), email: t('email', 254), phone: t('phone', 30), now_intro: block(raw.now_intro, 400), meta_description: block(raw.meta_description, 300) || base.meta_description, privacy_md: longText(raw.privacy_md, 12000).trim(), contact_email: raw.contact_email !== false, site_url: '', highlights: [], socials: [], og_asset: null, portrait_asset: null, favicon_asset: null, resume_asset: null };
   if (next.email && validateEmail(next.email)) { rep.problems.push('The email address in the backup does not look right; it was left empty.'); next.email = ''; }
   if (next.phone && !/^[+\d\s().-]{5,30}$/.test(next.phone)) { rep.problems.push('The phone number in the backup has odd characters; it was left empty.'); next.phone = ''; }
   const site = keepUrl(t('site_url', 200));
@@ -115,7 +130,7 @@ export async function importSite(body: Row, dry: boolean): Promise<Report> {
 
 function cleanProject(raw: unknown, assets: Map<string, string>, rep: Report) {
   if (!isObj(raw)) { rep.skipped++; rep.problems.push('A project entry was not readable.'); return null; }
-  const title = line(raw.title, PL.title); const given = line(raw.slug, 100); const slug = /^[A-Za-z0-9][A-Za-z0-9-]*$/.test(given) ? given : slugify(given || title);   // a slug that is already valid is kept as it is (changing it would change the page's address)
+  const title = line(raw.title, PL.title); const given = line(raw.slug, 100); const slug = /^[A-Za-z0-9][A-Za-z0-9-]*$/.test(given) ? given : slugify(given || title);  // A slug that is already valid is kept as it is (changing it would change the page's address)
   if (!title || !slug) { rep.skipped++; rep.problems.push(`A project without a ${title ? 'usable address' : 'title'} was skipped.`); return null; }
   const tags: string[] = [];
   for (const x of Array.isArray(raw.tags) ? raw.tags : []) { const tag = line(x, PL.tag).replace(/^#+\s*/, ''); if (tag && !tags.some((y) => y.toLowerCase() === tag.toLowerCase())) tags.push(tag); }
@@ -126,7 +141,10 @@ function cleanProject(raw: unknown, assets: Map<string, string>, rep: Report) {
   return { slug, title, summary: line(raw.summary, PL.summary), body_md: longText(raw.body_md, PL.body), tags: tags.slice(0, PL.tags), cover_asset: img(raw.cover_asset), cover_alt: line(raw.cover_alt, 300), live_url: url('live_url') || null, source_url: url('source_url') || null, status, featured: flag(raw.featured), sort_order: int(raw.sort_order) ?? 0, seo_title: line(raw.seo_title, PL.seoTitle) || null, seo_desc: line(raw.seo_desc, PL.seoDesc) || null, seo_image: img(raw.seo_image, true), created_at: int(raw.created_at), updated_at: int(raw.updated_at) };
 }
 
-/** `replace`: the projects of the backup replace those on the site (cleared first by clear('projects')). `add`: only slugs that do not exist yet are added. */
+/**
+ * `replace`: the projects of the backup replace those on the site (cleared first by
+ * clear('projects')). `add`: only slugs that do not exist yet are added.
+ */
 export async function importProjects(body: Row, mode: 'replace' | 'add', dry: boolean): Promise<Report> {
   const rep = report(); const assets = await assetIds();
   const items = (Array.isArray(body.items) ? body.items : []).slice(0, PAGE.projects);
@@ -176,7 +194,7 @@ export async function importNowCategory(body: Row, first: boolean, dry: boolean)
   for (const i of (Array.isArray(c.items) ? c.items : []).slice(0, MAX_ITEMS)) {
     const title = isObj(i) ? parseTitle(i.title) : '';
     if (!title) { rep.skipped++; rep.problems.push(`An item without a title in "${name}" was skipped.`); continue; }
-    const rawLink = line(i.link, 500), link = rawLink ? (cleanUrl(rawLink) ? rawLink : 'bad') : null;   // an acceptable address is kept as written
+    const rawLink = line(i.link, 500), link = rawLink ? (cleanUrl(rawLink) ? rawLink : 'bad') : null;  // An acceptable address is kept as written
     if (link === 'bad') rep.problems.push(`"${title}": the link was not an http(s) address and was left out.`);
     const status = i.status === 'done' ? 'done' : 'current'; const progress = Number.isInteger(i.progress) && i.progress >= 0 && i.progress <= 100 && status === 'current' ? i.progress : null;
     items.push({ title, note: parseNote(i.note), link: link === 'bad' ? null : link, status, started_at: int(i.started_at), finished_at: int(i.finished_at), progress, updated_at: int(i.updated_at) });
@@ -193,7 +211,10 @@ export async function importNowCategory(body: Row, first: boolean, dry: boolean)
   rep.added = 1 + items.length; return rep;
 }
 
-/** Messages are added (never replaced) and a message already here (same time, sender and text) is not added twice. */
+/**
+ * Messages are added (never replaced) and a message already here (same time, sender and text) is not
+ * added twice.
+ */
 export async function importMessages(body: Row, dry: boolean): Promise<Report> {
   const rep = report();
   for (const m of (Array.isArray(body.items) ? body.items : []).slice(0, PAGE.messages)) {
@@ -207,7 +228,10 @@ export async function importMessages(body: Row, dry: boolean): Promise<Report> {
   return rep;
 }
 
-/** Deletes the projects a "replace" is about to replace. (Resume and Now clear themselves on their first piece; accounts, sessions and files are never touched.) */
+/**
+ * Deletes the projects a "replace" is about to replace. (Resume and Now clear themselves on their
+ * first piece; accounts, sessions and files are never touched.).
+ */
 export async function clearProjects(dry: boolean): Promise<Report> {
   const rep = report();
   if (!dry) await env.DB.prepare('DELETE FROM projects').run();

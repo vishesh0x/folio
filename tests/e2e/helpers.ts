@@ -1,3 +1,7 @@
+/**
+ * Shared constants and helper functions for the end-to-end tests.
+ */
+
 import type { APIRequestContext } from '@playwright/test';
 
 export const ADMIN_EMAIL = 'admin@example.com';
@@ -5,7 +9,10 @@ export const ADMIN_PASSWORD = 'correct horse battery staple 42';
 export const AUTH_FILE = 'tests/.auth/admin.json';
 
 const r = () => Math.floor(Math.random() * 250) + 1;
-/** A random IPv4 address, sent as cf-connecting-ip so every test gets its own rate-limit bucket (Cloudflare sets this in production). */
+/**
+ * A random IPv4 address, sent as cf-connecting-ip so every test gets its own rate-limit bucket
+ * (Cloudflare sets this in production).
+ */
 export const freshIp = () => `10.${r()}.${r()}.${r()}`;
 
 /** Headers a browser sends for a request made by one of the site's own pages. */
@@ -26,8 +33,9 @@ export const cspDirective = (csp: string, name: string): string[] | null => {
 export const WIDTHS = [320, 375, 414, 768] as const;
 
 /**
- * Runs in the browser. Returns what sticks out past the screen edge (ignoring anything clipped by a scrolling/hidden
- * ancestor, such as a wide table inside its own scroll box, and the intentionally off-screen honeypot/skip-link).
+ * Runs in the browser. Returns what sticks out past the screen edge (ignoring anything clipped by a
+ * scrolling/hidden ancestor, such as a wide table inside its own scroll box, and the intentionally
+ * off-screen honeypot/skip-link).
  */
 export const layoutProblems = (page: import('@playwright/test').Page) => page.evaluate(() => {
   const vw = document.documentElement.clientWidth, out: string[] = [];
@@ -44,7 +52,10 @@ export const layoutProblems = (page: import('@playwright/test').Page) => page.ev
   return { scrollWidth: document.documentElement.scrollWidth, clientWidth: vw, offenders: Array.from(new Set(out)).slice(0, 5) };
 });
 
-/** page.goto that survives wrangler dev's local-proxy flake (see fixtures.ts): retries a 500 that is not the site's own error page. */
+/**
+ * page.goto that survives wrangler dev's local-proxy flake (see fixtures.ts): retries a 500 that is
+ * not the site's own error page.
+ */
 export async function openPage(page: import('@playwright/test').Page, url: string) {
   let res = await page.goto(url, { waitUntil: 'load' });
   for (let i = 0; i < 3 && res && res.status() === 500 && !(await res.text()).includes('Something broke'); i++) res = await page.goto(url, { waitUntil: 'load' });
